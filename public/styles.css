@@ -25,6 +25,9 @@
   font-family: "Inter", system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 * { box-sizing: border-box; }
+/* Sørg for at HTML-attributtet hidden alltid skjuler elementet,
+   også når et klasse-selektor setter display (f.eks. .modal/.btn-ghost). */
+[hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--text); font-size: 15px; -webkit-font-smoothing: antialiased; }
 
 /* ---- Innlogging (ansatt + admin) ---- */
