@@ -153,6 +153,50 @@ tbody tr:hover td { background: var(--mint); }
   color: #fff; padding: 12px 18px; border-radius: 10px; font-size: 13px; box-shadow: 0 10px 30px rgba(3,2,19,.18);
   max-width: 90%; z-index: 100; }
 
+/* ---- Organisasjonskart ---- */
+.org-actions { display: flex; gap: 8px; align-items: center; }
+.org-scroll { overflow: auto; padding: 16px 4px 8px; }
+.tree { display: inline-block; min-width: 100%; text-align: center; }
+.tree ul { position: relative; padding-top: 22px; display: flex; justify-content: center; margin: 0; list-style: none; }
+.tree li { list-style: none; position: relative; padding: 22px 10px 0; text-align: center; }
+/* Forbindelseslinjer */
+.tree li::before, .tree li::after { content: ""; position: absolute; top: 0; right: 50%;
+  border-top: 2px solid var(--mint-2); width: 50%; height: 22px; }
+.tree li::after { right: auto; left: 50%; border-left: 2px solid var(--mint-2); }
+.tree li:only-child::after, .tree li:only-child::before { display: none; }
+.tree li:only-child { padding-top: 0; }
+.tree li:first-child::before, .tree li:last-child::after { border: 0 none; }
+.tree li:last-child::before { border-right: 2px solid var(--mint-2); border-radius: 0 6px 0 0; }
+.tree li:first-child::after { border-radius: 6px 0 0 0; }
+.tree ul ul::before { content: ""; position: absolute; top: 0; left: 50%; border-left: 2px solid var(--mint-2); width: 0; height: 22px; }
+
+.org-node { position: relative; display: inline-flex; flex-direction: column; align-items: flex-start;
+  min-width: 190px; max-width: 230px; background: #fff; border: 1px solid var(--border); border-top: 3px solid var(--accent);
+  border-radius: 11px; padding: 11px 13px; box-shadow: var(--shadow); text-align: left; }
+.org-node.lead { border-top-color: var(--ink); background: var(--mint); }
+.org-node .on-name { font-weight: 700; font-size: 14px; }
+.org-node .on-title { font-size: 12px; color: var(--accent-dark); font-weight: 600; margin-top: 1px; }
+.org-node .on-contact { font-size: 11px; color: var(--muted); margin-top: 5px; word-break: break-all; }
+.org-node .on-tools { position: absolute; top: 6px; right: 6px; display: none; gap: 2px; }
+.tree.editing .org-node { cursor: grab; }
+.tree.editing .org-node:hover .on-tools { display: flex; }
+.org-node .on-tools button { border: 1px solid var(--border); background: #fff; border-radius: 6px;
+  width: 24px; height: 24px; font-size: 13px; line-height: 1; cursor: pointer; padding: 0; }
+.org-node .on-tools button:hover { background: var(--mint); }
+.org-node.drag-over { outline: 2px dashed var(--accent); outline-offset: 2px; }
+.org-node.dragging { opacity: .45; }
+
+/* Modal */
+.modal { position: fixed; inset: 0; background: rgba(3,2,19,.45); display: flex; align-items: center;
+  justify-content: center; z-index: 200; }
+.modal-card { background: #fff; border-radius: 16px; padding: 26px; width: 380px; max-width: 92vw; box-shadow: 0 24px 60px rgba(0,0,0,.3); }
+.modal-card h3 { margin: 0 0 18px; }
+.modal-card label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+.modal-card input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px;
+  font-size: 14px; font-family: inherit; margin-top: 5px; color: var(--text); }
+.modal-card input:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+
 /* ---- Admin ---- */
 .admin-wrap { max-width: 760px; margin: 0 auto; padding: 30px 26px 60px; }
 .admin-wrap h1 { font-size: 24px; margin: 0 0 4px; }

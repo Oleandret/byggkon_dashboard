@@ -19,6 +19,7 @@
     <nav class="tabs">
       <button class="tab active" data-tab="oversikt">Oversikt</button>
       <button class="tab" data-tab="prosjekter">Prosjekter</button>
+      <button class="tab" data-tab="organisasjon">Organisasjon</button>
     </nav>
     <div class="topbar-right">
       <span id="updated" class="updated">Laster …</span>
@@ -102,9 +103,44 @@
     </main>
   </section>
 
+  <!-- ============ FANE: ORGANISASJON ============ -->
+  <section class="tab-panel" id="panel-organisasjon">
+    <main class="container">
+      <div class="card">
+        <div class="proj-head">
+          <h2>Organisasjonskart</h2>
+          <div class="org-actions">
+            <button id="orgEditToggle" class="btn-ghost">✎ Rediger</button>
+            <button id="orgAddRoot" class="btn-ghost" hidden>+ Person</button>
+            <button id="orgReset" class="btn-ghost" hidden>Forkast</button>
+            <button id="orgSave" class="btn-primary" hidden>Lagre</button>
+          </div>
+        </div>
+        <p class="subnote" id="orgHint">Skrivebeskyttet. Klikk «Rediger» for å flytte personer, legge til eller endre.</p>
+        <div class="org-scroll"><div class="orgchart tree" id="orgChart"></div></div>
+      </div>
+    </main>
+  </section>
+
+  <!-- Modal for å redigere/legge til person -->
+  <div id="orgModal" class="modal" hidden>
+    <div class="modal-card">
+      <h3 id="orgModalTitle">Rediger person</h3>
+      <label>Navn<input id="m_name" /></label>
+      <label>Tittel / rolle<input id="m_title" /></label>
+      <label>E-post<input id="m_email" /></label>
+      <label>Telefon<input id="m_phone" /></label>
+      <div class="modal-actions">
+        <button id="m_cancel" class="btn-ghost">Avbryt</button>
+        <button id="m_save" class="btn-primary">Lagre</button>
+      </div>
+    </div>
+  </div>
+
   <div id="errorBanner" class="error-banner" hidden></div>
 
   <script src="/app.js"></script>
+  <script src="/org.js"></script>
 
   <!-- Nova AI-widget -->
   <script src="https://nova-ai-agent-bygg-kon-production.up.railway.app/widget.js"

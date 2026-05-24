@@ -25,7 +25,29 @@ function defaults() {
     weeklyCapacityHours: Number(process.env.WEEKLY_CAPACITY_HOURS || 37.5),
     cacheTtlMs: Number(process.env.CACHE_TTL_MS || 5 * 60 * 1000),
     refreshSeconds: Number(process.env.REFRESH_SECONDS || 60),
+    orgChart: defaultOrgChart(),
   };
+}
+
+// Startstruktur for organisasjonskartet (fra opplastet PDF, mai 2026).
+function defaultOrgChart() {
+  return [
+    { id: "ole", name: "Ole-André Torjussen", title: "Daglig leder", email: "oat@byggkon.no", phone: "929 80 460", parentId: null },
+    { id: "benedicte", name: "Benedicte Molnes", title: "Lederstøtte og prosjektingeniør", email: "bm@byggkon.no", phone: "467 89 790", parentId: "ole" },
+    { id: "tormod", name: "Tormod Skavland", title: "Avdelingsleder BYGG og prosjektadm", email: "ts@byggkon.no", phone: "976 56 526", parentId: "ole" },
+    { id: "mariam", name: "Mariam Sediqi Ansari", title: "Prosjektingeniør", email: "msa@byggkon.no", phone: "977 71 112", parentId: "tormod" },
+    { id: "william", name: "William Larsen", title: "Avdelingsleder RIB", email: "wl@byggkon.no", phone: "412 27 676", parentId: "ole" },
+    { id: "mortenl", name: "Morten Larsen", title: "Faglig leder RIB", email: "morten@byggkon.no", phone: "970 85 371", parentId: "william" },
+    { id: "lana", name: "Svjetlana Milic Baros", title: "RIB", email: "lana@byggkon.no", phone: "950 97 996", parentId: "william" },
+    { id: "bendik", name: "Bendik Selmer-Andersen", title: "RIB", email: "ba@byggkon.no", phone: "917 14 515", parentId: "william" },
+    { id: "ola", name: "Ola K Undheim", title: "RIB", email: "au@byggkon.no", phone: "913 44 486", parentId: "william" },
+    { id: "torgunnar", name: "Tor Gunnar Vilke", title: "RIB", email: "tgv@byggkon.no", phone: "452 59 205", parentId: "william" },
+    { id: "ove", name: "Ove Henning Tjølsen", title: "Faglig leder ARK", email: "ovehenning@byggkon.no", phone: "951 98 426", parentId: "ole" },
+    { id: "svein", name: "Svein Arne Bjørkheim", title: "Avdelingsleder RIBr", email: "sab@byggkon.no", phone: "954 24 989", parentId: "ole" },
+    { id: "morteng", name: "Morten Grimen", title: "RIBr", email: "mg@byggkon.no", phone: "", parentId: "svein" },
+    { id: "anders", name: "Anders Midbrød", title: "Andre rådgivende fag", email: "am@byggkon.no", phone: "404 97 160", parentId: "ole" },
+    { id: "frode", name: "Frode Fiksdal", title: "AI-prosjekter, RIBtre", email: "ff@byggkon.no", phone: "977 54 977", parentId: "ole" },
+  ];
 }
 
 let cached = null;

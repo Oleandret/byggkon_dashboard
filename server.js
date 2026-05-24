@@ -1,3 +1,4 @@
+import "dotenv/config"; // leser en lokal .env-fil hvis den finnes (ignoreres på Railway)
 import express from "express";
 import cookieSession from "cookie-session";
 import path from "path";
@@ -111,6 +112,29 @@ app.get("/api/overview", requireAuth, async (req, res) => {
 app.post("/api/refresh", requireAuth, (req, res) => {
   clearCache();
   res.json({ ok: true });
+});
+
+// ---- Organisasjonskart (innloggede ansatte kan se og redigere) ----
+app.get("/api/org", requireAuth, (req, res) => {
+  res.json({ nodes: getConfig().orgChart || [] });
+});
+app.post("/api/org", requireAuth, (req, res) => {
+  try {
+    const nodes = Array.isArray(req.body?.nodes) ? req.body.nodes : null;
+    if (!nodes) return res.status(400).json({ error: "Mangler nodes-liste" });
+    const clean = nodes.map((n) => ({
+      id: String(n.id),
+      name: String(n.name || ""),
+      title: String(n.title || ""),
+      email: String(n.email || ""),
+      phone: String(n.phone || ""),
+      parentId: n.parentId == null ? null : String(n.parentId),
+    }));
+    saveConfig({ orgChart: clean });
+    res.json({ ok: true, count: clean.length });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.get("/healthz", (req, res) => res.json({ ok: true }));
