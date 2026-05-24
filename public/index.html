@@ -3,74 +3,117 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bygg-Kon — Driftsdashboard</title>
+  <title>Bygg-Kon — Sanntidsoversikt</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <span class="brand-mark">BYGG-KON</span>
-      <span class="brand-sub">Driftsdashboard</span>
+      <span class="brand-mark" id="brandName">BYGG-KON</span>
+      <span class="brand-sub">Sanntidsoversikt</span>
     </div>
+    <nav class="tabs">
+      <button class="tab active" data-tab="oversikt">Oversikt</button>
+      <button class="tab" data-tab="prosjekter">Prosjekter</button>
+    </nav>
     <div class="topbar-right">
       <span id="updated" class="updated">Laster …</span>
-      <button id="refreshBtn" class="btn-ghost" title="Hent ferske tall">↻ Oppdater</button>
+      <button id="refreshBtn" class="btn-ghost" title="Hent ferske tall">↻</button>
+      <a href="/admin" class="btn-ghost" title="Innstillinger">⚙ Admin</a>
       <form method="POST" action="/logout" class="logout-form">
         <button type="submit" class="btn-ghost">Logg ut</button>
       </form>
     </div>
   </header>
 
-  <main class="container">
-    <!-- KPI-kort -->
-    <section class="kpi-grid" id="kpis"></section>
+  <!-- ============ FANE: OVERSIKT ============ -->
+  <section class="tab-panel active" id="panel-oversikt">
+    <!-- Heltebanner med bygg-bilde -->
+    <div class="hero" id="hero">
+      <div class="hero-overlay"></div>
+      <div class="hero-content">
+        <div class="hero-top">
+          <div>
+            <div class="hero-kicker">Driftssentral</div>
+            <h1 class="hero-title" id="heroTitle">BYGG-KON</h1>
+            <div class="hero-tagline">Prosjektledelse · Fagprosjektering · Byggherrerådgivning</div>
+          </div>
+          <div class="hero-clock">
+            <div id="clock" class="clock">--:--</div>
+            <div id="date" class="date">—</div>
+          </div>
+        </div>
+        <div class="hero-kpis" id="heroKpis"></div>
+      </div>
+    </div>
 
-    <!-- Grafer -->
-    <section class="grid-2">
-      <div class="card">
-        <h2>Omsetning per måned (hittil i år)</h2>
-        <canvas id="revenueChart" height="120"></canvas>
-      </div>
-      <div class="card">
-        <h2>Timer per ansatt (denne måneden)</h2>
-        <canvas id="hoursChart" height="120"></canvas>
-      </div>
-    </section>
+    <main class="container">
+      <div class="wall-grid">
+        <!-- Venstre: rullende prosjekter -->
+        <div class="card scroll-card">
+          <h2>Aktive prosjekter <span class="count-chip" id="projCount"></span></h2>
+          <div class="marquee" id="projMarquee">
+            <div class="marquee-track" id="projTrack"></div>
+          </div>
+        </div>
 
-    <!-- Tabeller -->
-    <section class="grid-2">
-      <div class="card">
-        <h2>Utestående fakturaer</h2>
-        <div class="table-wrap"><table id="outstandingTable"></table></div>
-      </div>
-      <div class="card">
-        <h2>Mest aktive prosjekter (timer denne mnd.)</h2>
-        <div class="table-wrap"><table id="projectHoursTable"></table></div>
-      </div>
-    </section>
+        <!-- Midt: faktureringsgrad siste 4 uker -->
+        <div class="card">
+          <h2>Faktureringsgrad — siste 4 uker
+            <span class="subnote">lav grad = ledig kapasitet</span>
+          </h2>
+          <div class="billing-list" id="billingList"></div>
+        </div>
 
-    <section class="grid-2">
-      <div class="card">
-        <h2>Aktive prosjekter</h2>
-        <div class="table-wrap"><table id="projectsTable"></table></div>
+        <!-- Høyre: omsetning -->
+        <div class="card">
+          <h2>Omsetning per måned (i år)</h2>
+          <canvas id="revenueChart" height="220"></canvas>
+        </div>
       </div>
-      <div class="card">
-        <h2>Åpne ordre</h2>
-        <div class="table-wrap"><table id="ordersTable"></table></div>
-      </div>
-    </section>
 
-    <section class="card">
-      <h2>Ansatte</h2>
-      <div class="table-wrap"><table id="employeesTable"></table></div>
-    </section>
-  </main>
+      <div class="grid-2">
+        <div class="card">
+          <h2>Utestående fakturaer</h2>
+          <div class="table-wrap"><table id="outstandingTable"></table></div>
+        </div>
+        <div class="card">
+          <h2>Åpne ordre</h2>
+          <div class="table-wrap"><table id="ordersTable"></table></div>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============ FANE: PROSJEKTER ============ -->
+  <section class="tab-panel" id="panel-prosjekter">
+    <main class="container">
+      <div class="card">
+        <div class="proj-head">
+          <h2>Alle aktive prosjekter</h2>
+          <input id="projSearch" class="search" type="search" placeholder="Søk prosjekt, kunde eller leder …" />
+        </div>
+        <div class="table-wrap tall"><table id="projectsTable"></table></div>
+      </div>
+    </main>
+  </section>
 
   <div id="errorBanner" class="error-banner" hidden></div>
+
   <script src="/app.js"></script>
+
+  <!-- Nova AI-widget -->
+  <script src="https://nova-ai-agent-bygg-kon-production.up.railway.app/widget.js"
+          data-brand="Nova"
+          data-label="Spør oss"
+          data-color="#030213"
+          data-accent="#1e8b6f"
+          data-welcome="Hei, jeg er Nova AI og kan hjelpe deg med fagspørsmål om bygging, regelverk og prosjektarbeid. Hva lurer du på?"
+          data-position="right"
+          async></script>
 </body>
 </html>

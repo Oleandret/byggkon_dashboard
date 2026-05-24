@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bygg-Kon — Innstillinger</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">BYGG-KON</span>
+      <span class="brand-sub">Innstillinger</span>
+    </div>
+    <div class="topbar-right">
+      <a href="/" class="btn-ghost">← Til dashbordet</a>
+      <form method="POST" action="/logout" class="logout-form"><button class="btn-ghost">Logg ut</button></form>
+    </div>
+  </header>
+
+  <div class="admin-wrap">
+    <div class="admin-bar">
+      <div>
+        <h1>Innstillinger</h1>
+        <p class="lead">Alt som styrer dashbordet. Lagres trygt på serveren.</p>
+      </div>
+      <span id="savedMsg" class="saved-msg" hidden>✓ Lagret</span>
+    </div>
+
+    <form id="settingsForm">
+      <div class="section-title">Visning</div>
+      <div class="field">
+        <label for="companyName">Firmanavn</label>
+        <input id="companyName" name="companyName" />
+      </div>
+      <div class="field">
+        <label for="heroImageUrl">Forsidebilde (URL)</label>
+        <input id="heroImageUrl" name="heroImageUrl" placeholder="https://…" />
+        <div class="hint">Bildet som vises som banner. Standard er bygg-bildet fra byggkon.no.</div>
+      </div>
+
+      <div class="section-title">Tripletex API</div>
+      <div class="field">
+        <label for="tripletexBaseUrl">Base-URL</label>
+        <input id="tripletexBaseUrl" name="tripletexBaseUrl" placeholder="https://tripletex.no/v2" />
+        <div class="hint">Produksjon: https://tripletex.no/v2 · Test: https://api-test.tripletex.tech/v2</div>
+      </div>
+      <div class="field">
+        <label for="tripletexConsumerToken">Consumer token <span id="consumerSet" class="set" hidden>· satt</span></label>
+        <input id="tripletexConsumerToken" name="tripletexConsumerToken" type="password" autocomplete="off" placeholder="Lim inn ny token (la stå tom for å beholde)" />
+      </div>
+      <div class="field">
+        <label for="tripletexEmployeeToken">Employee token <span id="employeeSet" class="set" hidden>· satt</span></label>
+        <input id="tripletexEmployeeToken" name="tripletexEmployeeToken" type="password" autocomplete="off" placeholder="Lim inn ny token (la stå tom for å beholde)" />
+      </div>
+
+      <div class="section-title">Tilgang og kapasitet</div>
+      <div class="field">
+        <label for="dashboardPassword">Ansatt-passord <span id="passwordSet" class="set" hidden>· satt</span></label>
+        <input id="dashboardPassword" name="dashboardPassword" type="password" autocomplete="off" placeholder="Felles passord ansatte logger inn med (tom = behold)" />
+      </div>
+      <div class="field">
+        <label for="weeklyCapacityHours">Kapasitet per uke (timer)</label>
+        <input id="weeklyCapacityHours" name="weeklyCapacityHours" type="number" step="0.5" />
+        <div class="hint">Brukes til å vurdere ledig kapasitet. Standard 37,5.</div>
+      </div>
+      <div class="field">
+        <label for="refreshSeconds">Oppdateringsintervall (sekunder)</label>
+        <input id="refreshSeconds" name="refreshSeconds" type="number" />
+      </div>
+      <div class="field">
+        <label for="cacheTtlMs">Cache-tid (millisekunder)</label>
+        <input id="cacheTtlMs" name="cacheTtlMs" type="number" />
+        <div class="hint">Hvor lenge data mellomlagres mellom API-kall. Standard 300000 (5 min).</div>
+      </div>
+
+      <button type="submit" class="btn-primary">Lagre innstillinger</button>
+    </form>
+    <p class="hint" id="settingsPath" style="margin-top:18px"></p>
+  </div>
+
+  <div id="errorBanner" class="error-banner" hidden></div>
+  <script src="/admin.js"></script>
+</body>
+</html>

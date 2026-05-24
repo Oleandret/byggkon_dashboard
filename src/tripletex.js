@@ -1,46 +1,46 @@
 // Tripletex API-klient med session-token-håndtering og enkel caching.
+// Konfigurasjon (tokens, base-URL, cache-tid) hentes dynamisk fra settings.js,
+// slik at admin-siden kan endre dem uten omstart.
 // Dokumentasjon: https://tripletex.no/v2-docs/
-
-const BASE_URL = process.env.TRIPLETEX_BASE_URL || "https://tripletex.no/v2";
-const CONSUMER_TOKEN = process.env.TRIPLETEX_CONSUMER_TOKEN;
-const EMPLOYEE_TOKEN = process.env.TRIPLETEX_EMPLOYEE_TOKEN;
-
-// Hvor lenge data caches i minnet (ms). Reduserer antall API-kall når mange
-// ansatte ser på dashbordet samtidig, og holder oss godt innenfor rate limits.
-const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS || 5 * 60 * 1000);
+import { getConfig } from "./settings.js";
 
 let sessionToken = null;
 let sessionExpires = 0; // epoch ms da token utløper
 const cache = new Map(); // key -> { value, expires }
 
-function assertConfig() {
-  if (!CONSUMER_TOKEN || !EMPLOYEE_TOKEN) {
-    throw new Error(
-      "Mangler TRIPLETEX_CONSUMER_TOKEN og/eller TRIPLETEX_EMPLOYEE_TOKEN. " +
-        "Sett disse miljøvariablene (se README)."
-    );
-  }
-}
-
 function ymd(date) {
   return date.toISOString().slice(0, 10);
 }
 
+// Tilbakestiller session + cache (kalles når innstillinger endres).
+export function resetClient() {
+  sessionToken = null;
+  sessionExpires = 0;
+  cache.clear();
+}
+
+export function clearCache() {
+  cache.clear();
+}
+
 // Oppretter (eller gjenbruker) en session-token mot Tripletex.
 async function getSessionToken() {
+  const { tripletexBaseUrl, tripletexConsumerToken, tripletexEmployeeToken } = getConfig();
   const now = Date.now();
-  // Gjenbruk token hvis den er gyldig i minst 10 minutter til.
   if (sessionToken && sessionExpires - now > 10 * 60 * 1000) {
     return sessionToken;
   }
-  assertConfig();
+  if (!tripletexConsumerToken || !tripletexEmployeeToken) {
+    throw new Error(
+      "Tripletex er ikke konfigurert ennå. Legg inn consumer- og employee-token på admin-siden (/admin)."
+    );
+  }
 
-  // Token settes til å utløpe i morgen – Tripletex tillater inntil ~7 dager.
   const expiration = new Date(now + 24 * 60 * 60 * 1000);
   const url =
-    `${BASE_URL}/token/session/:create` +
-    `?consumerToken=${encodeURIComponent(CONSUMER_TOKEN)}` +
-    `&employeeToken=${encodeURIComponent(EMPLOYEE_TOKEN)}` +
+    `${tripletexBaseUrl}/token/session/:create` +
+    `?consumerToken=${encodeURIComponent(tripletexConsumerToken)}` +
+    `&employeeToken=${encodeURIComponent(tripletexEmployeeToken)}` +
     `&expirationDate=${ymd(expiration)}`;
 
   const res = await fetch(url, { method: "PUT" });
@@ -50,15 +50,14 @@ async function getSessionToken() {
   }
   const json = await res.json();
   sessionToken = json?.value?.token;
-  if (!sessionToken) {
-    throw new Error("Tripletex returnerte ingen session-token.");
-  }
+  if (!sessionToken) throw new Error("Tripletex returnerte ingen session-token.");
   sessionExpires = expiration.getTime();
   return sessionToken;
 }
 
 // Lavnivå GET mot Tripletex med Basic-auth (brukernavn "0", passord = session-token).
 async function apiGet(path, params = {}) {
+  const { tripletexBaseUrl } = getConfig();
   const token = await getSessionToken();
   const auth = Buffer.from(`0:${token}`).toString("base64");
 
@@ -66,7 +65,7 @@ async function apiGet(path, params = {}) {
   for (const [k, v] of Object.entries(params)) {
     if (v !== undefined && v !== null && v !== "") qs.append(k, String(v));
   }
-  const url = `${BASE_URL}${path}${qs.toString() ? `?${qs}` : ""}`;
+  const url = `${tripletexBaseUrl}${path}${qs.toString() ? `?${qs}` : ""}`;
 
   const res = await fetch(url, {
     headers: { Authorization: `Basic ${auth}`, Accept: "application/json" },
@@ -78,19 +77,14 @@ async function apiGet(path, params = {}) {
   return res.json();
 }
 
-// Cachet GET – samme spørring innen TTL gir cachet svar.
 async function cachedGet(path, params = {}) {
   const key = path + JSON.stringify(params);
   const hit = cache.get(key);
   const now = Date.now();
   if (hit && hit.expires > now) return hit.value;
   const value = await apiGet(path, params);
-  cache.set(key, { value, expires: now + CACHE_TTL_MS });
+  cache.set(key, { value, expires: now + getConfig().cacheTtlMs });
   return value;
-}
-
-export function clearCache() {
-  cache.clear();
 }
 
 // ---- Domeneoppslag ----
@@ -139,11 +133,11 @@ export async function getTimeEntries(fromDate, toDate) {
   const data = await cachedGet("/timesheet/entry", {
     dateFrom: fromDate,
     dateTo: toDate,
-    count: 10000,
+    count: 20000,
     fields:
       "id,date,hours,chargeableHours,chargeable,hourlyRate,project(id,name),employee(id,firstName,lastName)",
   });
   return data.values || [];
 }
 
-export { ymd, BASE_URL };
+export { ymd };

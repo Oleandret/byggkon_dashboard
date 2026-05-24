@@ -7,6 +7,7 @@ import {
   getTimeEntries,
   ymd,
 } from "./tripletex.js";
+import { getConfig } from "./settings.js";
 
 function startOfYear(d = new Date()) {
   return new Date(d.getFullYear(), 0, 1);
@@ -14,21 +15,32 @@ function startOfYear(d = new Date()) {
 function startOfMonth(d = new Date()) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
+function daysAgo(n, d = new Date()) {
+  const x = new Date(d);
+  x.setDate(x.getDate() - n);
+  return x;
+}
+function fullName(p) {
+  return p ? `${p.firstName || ""} ${p.lastName || ""}`.trim() : "";
+}
 
-// Samlet oversikt brukt av dashbordet i ett kall.
 export async function buildOverview() {
+  const cfg = getConfig();
   const today = new Date();
-  const yearStart = ymd(startOfYear(today));
-  const monthStart = ymd(startOfMonth(today));
   const todayStr = ymd(today);
+  const yearStart = startOfYear(today);
+  const monthStart = ymd(startOfMonth(today));
+  const fourWeeksAgoStr = ymd(daysAgo(28, today));
 
-  // Hent alt parallelt.
-  const [projects, invoices, orders, employees, monthEntries] = await Promise.all([
+  // Tidligste dato vi trenger timer fra (året, eller 4 uker tilbake om det er tidligere).
+  const timeFrom = ymd(daysAgo(28, today) < yearStart ? daysAgo(28, today) : yearStart);
+
+  const [projects, invoices, orders, employees, timeEntries] = await Promise.all([
     getProjects({ isClosed: false }),
-    getInvoices(yearStart, todayStr),
-    getOpenOrders(yearStart, todayStr),
+    getInvoices(ymd(yearStart), todayStr),
+    getOpenOrders(ymd(yearStart), todayStr),
     getEmployees(),
-    getTimeEntries(monthStart, todayStr),
+    getTimeEntries(timeFrom, todayStr),
   ]);
 
   // ---- Økonomi ----
@@ -41,18 +53,14 @@ export async function buildOverview() {
       invoiceNumber: i.invoiceNumber,
       customer: i.customer?.name || "",
       dueDate: i.invoiceDueDate,
-      amount: i.amount,
       outstanding: i.amountOutstanding,
       overdue: i.invoiceDueDate ? i.invoiceDueDate < todayStr : false,
     }))
     .sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""));
 
   const outstandingTotal = outstanding.reduce((s, i) => s + i.outstanding, 0);
-  const overdueTotal = outstanding
-    .filter((i) => i.overdue)
-    .reduce((s, i) => s + i.outstanding, 0);
+  const overdueTotal = outstanding.filter((i) => i.overdue).reduce((s, i) => s + i.outstanding, 0);
 
-  // Omsetning per måned (kolonnediagram)
   const monthlyRevenue = Array(12).fill(0);
   for (const i of realInvoices) {
     if (!i.invoiceDate) continue;
@@ -60,67 +68,90 @@ export async function buildOverview() {
     if (m >= 0 && m < 12) monthlyRevenue[m] += i.amount || 0;
   }
 
-  // ---- Timer denne måneden ----
-  const totalHours = monthEntries.reduce((s, e) => s + (e.hours || 0), 0);
-  const chargeableHours = monthEntries.reduce(
-    (s, e) => s + (e.chargeableHours || 0),
-    0
-  );
-  const billableRatio = totalHours > 0 ? chargeableHours / totalHours : 0;
+  // ---- Timer denne kalendermåneden (KPI) ----
+  const monthEntries = timeEntries.filter((e) => e.date >= monthStart);
+  const hoursThisMonth = monthEntries.reduce((s, e) => s + (e.hours || 0), 0);
+  const chargeableThisMonth = monthEntries.reduce((s, e) => s + (e.chargeableHours || 0), 0);
 
-  // Timer per ansatt
-  const hoursByEmployee = new Map();
-  for (const e of monthEntries) {
-    const name = e.employee
-      ? `${e.employee.firstName || ""} ${e.employee.lastName || ""}`.trim()
-      : "Ukjent";
-    const cur = hoursByEmployee.get(name) || { name, hours: 0, chargeable: 0 };
+  // ---- Faktureringsgrad siste 4 uker, per ansatt (kun de som har ført timer) ----
+  const capacity4w = (cfg.weeklyCapacityHours || 37.5) * 4;
+  const last4w = timeEntries.filter((e) => e.date >= fourWeeksAgoStr);
+  const byEmp = new Map();
+  for (const e of last4w) {
+    const name = fullName(e.employee) || "Ukjent";
+    const cur = byEmp.get(name) || { name, hours: 0, billable: 0 };
     cur.hours += e.hours || 0;
-    cur.chargeable += e.chargeableHours || 0;
-    hoursByEmployee.set(name, cur);
+    cur.billable += e.chargeableHours || 0;
+    byEmp.set(name, cur);
   }
-  const employeeHours = [...hoursByEmployee.values()].sort((a, b) => b.hours - a.hours);
+  const billing = [...byEmp.values()]
+    .filter((e) => e.hours > 0)
+    .map((e) => {
+      const billingRate = e.hours > 0 ? e.billable / e.hours : 0; // faktureringsgrad
+      const utilization = capacity4w > 0 ? e.billable / capacity4w : 0; // mot kapasitet
+      let status = "Høy utnyttelse";
+      if (billingRate < 0.6) status = "Ledig kapasitet";
+      else if (billingRate < 0.85) status = "Moderat";
+      return {
+        name: e.name,
+        hours: e.hours,
+        billable: e.billable,
+        billingRate,
+        utilization,
+        status,
+      };
+    })
+    .sort((a, b) => a.billingRate - b.billingRate); // lavest faktureringsgrad (ledig) først
 
-  // Timer per prosjekt (topp aktive denne måneden)
-  const hoursByProject = new Map();
-  for (const e of monthEntries) {
+  const avgBillingRate =
+    billing.length > 0 ? billing.reduce((s, e) => s + e.billingRate, 0) / billing.length : 0;
+  const freeCapacityCount = billing.filter((e) => e.billingRate < 0.6).length;
+
+  // ---- Prosjekter (aggregert timer) ----
+  const projHours = new Map(); // id -> { ytd, ytdBillable, last4w, lastActivity }
+  for (const e of timeEntries) {
     if (!e.project) continue;
-    const cur = hoursByProject.get(e.project.id) || {
-      name: e.project.name,
-      hours: 0,
-    };
-    cur.hours += e.hours || 0;
-    hoursByProject.set(e.project.id, cur);
+    const cur = projHours.get(e.project.id) || { ytd: 0, ytdBillable: 0, last4w: 0, lastActivity: "" };
+    cur.ytd += e.hours || 0;
+    cur.ytdBillable += e.chargeableHours || 0;
+    if (e.date >= fourWeeksAgoStr) cur.last4w += e.hours || 0;
+    if (e.date > cur.lastActivity) cur.lastActivity = e.date;
+    projHours.set(e.project.id, cur);
   }
-  const projectHours = [...hoursByProject.values()]
-    .sort((a, b) => b.hours - a.hours)
-    .slice(0, 10);
 
-  // ---- Prosjekter ----
-  const projectList = projects
-    .map((p) => ({
-      number: p.number,
-      name: p.name,
-      customer: p.customer?.name || "",
-      projectManager: p.projectManager
-        ? `${p.projectManager.firstName || ""} ${p.projectManager.lastName || ""}`.trim()
-        : "",
-      startDate: p.startDate,
-    }))
-    .sort((a, b) => (b.startDate || "").localeCompare(a.startDate || ""));
+  const projectsDetailed = projects
+    .map((p) => {
+      const h = projHours.get(p.id) || { ytd: 0, ytdBillable: 0, last4w: 0, lastActivity: "" };
+      return {
+        number: p.number,
+        name: p.name,
+        customer: p.customer?.name || "",
+        projectManager: fullName(p.projectManager),
+        hours4w: h.last4w,
+        hoursYTD: h.ytd,
+        billableYTD: h.ytdBillable,
+        lastActivity: h.lastActivity || null,
+      };
+    })
+    .sort((a, b) => b.hours4w - a.hours4w);
 
-  // ---- Ordre ----
-  const orderList = orders
-    .map((o) => ({
-      number: o.number,
-      customer: o.customer?.name || o.customerName || "",
-      orderDate: o.orderDate,
-      deliveryDate: o.deliveryDate,
-    }))
-    .sort((a, b) => (b.orderDate || "").localeCompare(a.orderDate || ""));
+  // Enkel liste til rullekolonnen
+  const projects4Scroll = projectsDetailed.map((p) => ({
+    number: p.number,
+    name: p.name,
+    customer: p.customer,
+    projectManager: p.projectManager,
+    hours4w: p.hours4w,
+  }));
 
   return {
     updatedAt: new Date().toISOString(),
+    display: {
+      companyName: cfg.companyName,
+      heroImageUrl: cfg.heroImageUrl,
+      refreshSeconds: cfg.refreshSeconds,
+      weeklyCapacityHours: cfg.weeklyCapacityHours,
+    },
     kpis: {
       revenueYTD,
       outstandingTotal,
@@ -128,22 +159,23 @@ export async function buildOverview() {
       activeProjects: projects.length,
       openOrders: orders.length,
       employees: employees.length,
-      hoursThisMonth: totalHours,
-      chargeableHoursThisMonth: chargeableHours,
-      billableRatio,
+      hoursThisMonth,
+      chargeableHoursThisMonth: chargeableThisMonth,
+      avgBillingRate,
+      freeCapacityCount,
     },
     monthlyRevenue,
-    outstanding: outstanding.slice(0, 25),
-    employeeHours,
-    projectHours,
-    projects: projectList,
-    orders: orderList,
-    employees: employees
-      .map((e) => ({
-        name: `${e.firstName || ""} ${e.lastName || ""}`.trim(),
-        email: e.email || "",
-        number: e.employeeNumber,
+    outstanding: outstanding.slice(0, 30),
+    billing,
+    projects: projects4Scroll,
+    projectsDetailed,
+    orders: orders
+      .map((o) => ({
+        number: o.number,
+        customer: o.customer?.name || o.customerName || "",
+        orderDate: o.orderDate,
+        deliveryDate: o.deliveryDate,
       }))
-      .sort((a, b) => a.name.localeCompare(b.name)),
+      .sort((a, b) => (b.orderDate || "").localeCompare(a.orderDate || "")),
   };
 }
