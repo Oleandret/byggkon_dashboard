@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bygg-Kon — Driftsdashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">BYGG-KON</span>
+      <span class="brand-sub">Driftsdashboard</span>
+    </div>
+    <div class="topbar-right">
+      <span id="updated" class="updated">Laster …</span>
+      <button id="refreshBtn" class="btn-ghost" title="Hent ferske tall">↻ Oppdater</button>
+      <form method="POST" action="/logout" class="logout-form">
+        <button type="submit" class="btn-ghost">Logg ut</button>
+      </form>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- KPI-kort -->
+    <section class="kpi-grid" id="kpis"></section>
+
+    <!-- Grafer -->
+    <section class="grid-2">
+      <div class="card">
+        <h2>Omsetning per måned (hittil i år)</h2>
+        <canvas id="revenueChart" height="120"></canvas>
+      </div>
+      <div class="card">
+        <h2>Timer per ansatt (denne måneden)</h2>
+        <canvas id="hoursChart" height="120"></canvas>
+      </div>
+    </section>
+
+    <!-- Tabeller -->
+    <section class="grid-2">
+      <div class="card">
+        <h2>Utestående fakturaer</h2>
+        <div class="table-wrap"><table id="outstandingTable"></table></div>
+      </div>
+      <div class="card">
+        <h2>Mest aktive prosjekter (timer denne mnd.)</h2>
+        <div class="table-wrap"><table id="projectHoursTable"></table></div>
+      </div>
+    </section>
+
+    <section class="grid-2">
+      <div class="card">
+        <h2>Aktive prosjekter</h2>
+        <div class="table-wrap"><table id="projectsTable"></table></div>
+      </div>
+      <div class="card">
+        <h2>Åpne ordre</h2>
+        <div class="table-wrap"><table id="ordersTable"></table></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Ansatte</h2>
+      <div class="table-wrap"><table id="employeesTable"></table></div>
+    </section>
+  </main>
+
+  <div id="errorBanner" class="error-banner" hidden></div>
+  <script src="/app.js"></script>
+</body>
+</html>

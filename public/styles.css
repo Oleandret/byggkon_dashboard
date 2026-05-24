@@ -1,0 +1,164 @@
+/* Bygg-Kon dashboard – profil tilpasset www.byggkon.no
+   Lyst tema, Inter-font, nesten-svart tekst (#030213) og mint-aksent (#e6f4f0). */
+:root {
+  --bg: #f3f8f7;          /* svakt mint-tonet sidebakgrunn */
+  --bg-elev: #ffffff;     /* topbar / hevet flate */
+  --card: #ffffff;        /* kort */
+  --border: #e6ece9;      /* hårfine streker */
+  --grid: #eef3f1;        /* graf-rutenett */
+  --text: #030213;        /* hovedtekst (byggkon.no) */
+  --ink: #030213;
+  --muted: #5f6f74;       /* dempet tekst */
+  --mint: #e6f4f0;        /* signatur mint-bakgrunn (byggkon.no) */
+  --mint-2: #c8e6dd;      /* dypere mint for grafer */
+  --accent: #0f8a7e;      /* teal aksent – knapper, lenker, grafer */
+  --accent-soft: #bfe3da; /* lys teal for sekundære grafserier */
+  --accent-2: #0f8a7e;
+  --good: #1f8a5b;
+  --bad: #b42318;
+  --bad-bg: #fef2f2;
+  --warn: #b45309;
+  --warn-bg: #fef3e2;
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(3,2,19,.05), 0 8px 24px rgba(3,2,19,.04);
+  font-family: "Inter", system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Innlogging ---- */
+.login-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(180deg, var(--mint) 0%, var(--bg) 60%);
+}
+.login-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 44px 38px;
+  width: 350px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.login-logo {
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  font-size: 26px;
+  color: var(--ink);
+}
+.login-logo::after {
+  content: "";
+  display: block;
+  width: 38px;
+  height: 4px;
+  background: var(--accent);
+  border-radius: 4px;
+  margin: 10px auto 0;
+}
+.login-sub { color: var(--muted); margin: 14px 0 28px; font-size: 14px; }
+.login-card label {
+  display: block; text-align: left; font-size: 13px; color: var(--muted);
+  margin-bottom: 6px; font-weight: 500;
+}
+.login-card input {
+  width: 100%; padding: 12px 14px; border-radius: 10px;
+  border: 1px solid var(--border); background: #fff;
+  color: var(--text); font-size: 15px; margin-bottom: 18px; font-family: inherit;
+}
+.login-card input:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+.login-card button {
+  width: 100%; padding: 12px; border: none; border-radius: 10px;
+  background: var(--accent); color: #fff; font-weight: 600;
+  font-size: 15px; cursor: pointer; font-family: inherit;
+}
+.login-card button:hover { filter: brightness(1.05); }
+.login-error { color: var(--bad); margin-top: 14px; font-size: 13px; }
+
+/* ---- Topbar ---- */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 28px; background: var(--bg-elev);
+  border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10;
+}
+.brand { display: flex; align-items: baseline; gap: 12px; }
+.brand-mark { font-weight: 800; letter-spacing: 1.5px; color: var(--ink); font-size: 20px; }
+.brand-sub {
+  color: var(--accent); font-size: 13px; font-weight: 600;
+  border-left: 1px solid var(--border); padding-left: 12px;
+}
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.updated { color: var(--muted); font-size: 13px; }
+.logout-form { margin: 0; }
+.btn-ghost {
+  background: #fff; border: 1px solid var(--border); color: var(--text);
+  padding: 8px 14px; border-radius: 9px; cursor: pointer; font-size: 13px;
+  font-family: inherit;
+}
+.btn-ghost:hover { background: var(--mint); border-color: var(--mint-2); }
+
+/* ---- Layout ---- */
+.container { max-width: 1300px; margin: 0 auto; padding: 28px; }
+.kpi-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 16px; margin-bottom: 26px;
+}
+.grid-2 {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px;
+}
+@media (max-width: 960px) { .grid-2 { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px; margin-bottom: 18px;
+  box-shadow: var(--shadow);
+}
+.card h2 { margin: 0 0 16px; font-size: 14px; font-weight: 600; color: var(--text); letter-spacing: .2px; }
+
+/* ---- KPI-kort ---- */
+.kpi {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow);
+  position: relative; overflow: hidden;
+}
+.kpi .label { color: var(--muted); font-size: 13px; margin-bottom: 8px; font-weight: 500; }
+.kpi .value { font-size: 26px; font-weight: 700; color: var(--ink); letter-spacing: -.5px; }
+.kpi .value.small { font-size: 22px; }
+.kpi .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.kpi.accent { background: var(--mint); border-color: var(--mint-2); }
+.kpi.accent .value { color: var(--ink); }
+.kpi .value.bad { color: var(--bad); }
+.kpi .value.good { color: var(--good); }
+
+/* ---- Tabeller ---- */
+.table-wrap { overflow-x: auto; max-height: 360px; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+th {
+  color: var(--muted); font-weight: 600; position: sticky; top: 0;
+  background: var(--card); font-size: 11.5px; text-transform: uppercase; letter-spacing: .5px;
+}
+td { color: var(--text); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr:hover td { background: var(--mint); }
+.pill { padding: 2px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+.pill.overdue { background: var(--bad-bg); color: var(--bad); }
+.pill.ok { background: var(--mint); color: var(--good); }
+.empty { color: var(--muted); padding: 18px 4px; }
+
+/* ---- Feilbanner ---- */
+.error-banner {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+  background: var(--bad); color: #fff; padding: 12px 18px; border-radius: 10px;
+  font-size: 13px; box-shadow: 0 10px 30px rgba(3,2,19,.18); max-width: 90%;
+}

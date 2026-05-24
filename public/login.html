@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bygg-Kon — Innlogging</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body class="login-body">
+  <div class="login-card">
+    <div class="login-logo">BYGG-KON</div>
+    <p class="login-sub">Internt driftsdashboard</p>
+    <form method="POST" action="/login">
+      <label for="password">Passord</label>
+      <input type="password" id="password" name="password" autofocus required
+             placeholder="Skriv inn felles passord" />
+      <button type="submit">Logg inn</button>
+    </form>
+    <p id="error" class="login-error" hidden>Feil passord, prøv igjen.</p>
+  </div>
+  <script>
+    if (new URLSearchParams(location.search).has("error")) {
+      document.getElementById("error").hidden = false;
+    }
+  </script>
+</body>
+</html>
