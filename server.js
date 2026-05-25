@@ -129,6 +129,10 @@ app.post("/api/admin/settings", requireAdmin, (req, res) => {
         partial[k] = v;
       }
     }
+    // Valider MCP-URL: må være en faktisk http(s)-adresse (ikke f.eks. et passord)
+    if (partial.regnskapsagentMcpUrl !== undefined && !/^https?:\/\//i.test(partial.regnskapsagentMcpUrl)) {
+      return res.status(400).json({ error: "Regnskapsagent MCP-URL må starte med https:// — lim inn hele URL-en fra Regnskapsagent, ikke et passord." });
+    }
     // Verdier (array) lagres direkte hvis sendt
     if (Array.isArray(req.body?.values)) {
       partial.values = req.body.values

@@ -51,6 +51,10 @@ body { margin: 0; background: var(--bg); color: var(--text); font-size: 15px; -w
 /* ---- Topbar + faner ---- */
 .topbar { display: flex; align-items: center; gap: 24px; padding: 14px 26px; background: var(--bg-elev);
   border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
+.brand-area { display: flex; flex-direction: column; gap: 6px; }
+.brand-link { background: transparent; border: none; color: var(--accent); font-weight: 600; font-size: 12px;
+  cursor: pointer; font-family: inherit; padding: 0 0 0 12px; border-left: 1px solid var(--border); }
+.brand-link:hover { text-decoration: underline; }
 .brand { display: flex; align-items: baseline; gap: 12px; }
 .brand-mark { font-weight: 800; letter-spacing: 1.5px; color: var(--ink); font-size: 20px; }
 .brand-sub { color: var(--accent); font-size: 13px; font-weight: 600; border-left: 1px solid var(--border); padding-left: 12px; }
@@ -331,6 +335,10 @@ tbody tr:hover td { background: var(--mint); }
 .pl-row .val.pos { color: var(--good); }
 .pl-row .val.neg { color: var(--bad); }
 .pl-row.sub .lbl { padding-left: 14px; font-size: 13px; }
+.kunder-layout { display: grid; grid-template-columns: 1fr 400px; gap: 18px; align-items: start; }
+@media (max-width: 1000px) { .kunder-layout { grid-template-columns: 1fr; } }
+.kunder-chart-card { position: sticky; top: 84px; }
+
 .salg-list { margin: 6px 0 0; padding-left: 20px; columns: 2; column-gap: 32px; }
 .salg-list li { font-size: 13.5px; line-height: 1.5; margin-bottom: 6px; break-inside: avoid; }
 @media (max-width: 760px) { .salg-list { columns: 1; } }
@@ -357,26 +365,26 @@ tbody tr:hover td { background: var(--mint); }
 .org-actions { display: flex; gap: 8px; align-items: center; }
 .org-scroll { overflow: auto; padding: 16px 4px 8px; }
 .tree { display: inline-block; min-width: 100%; text-align: center; }
-.tree ul { position: relative; padding-top: 16px; display: flex; justify-content: center; margin: 0; list-style: none; }
-.tree li { list-style: none; position: relative; padding: 16px 5px 0; text-align: center; }
+.tree ul { position: relative; padding-top: 13px; display: flex; justify-content: center; margin: 0; list-style: none; }
+.tree li { list-style: none; position: relative; padding: 13px 4px 0; text-align: center; }
 /* Forbindelseslinjer */
 .tree li::before, .tree li::after { content: ""; position: absolute; top: 0; right: 50%;
-  border-top: 2px solid var(--mint-2); width: 50%; height: 16px; }
+  border-top: 2px solid var(--mint-2); width: 50%; height: 13px; }
 .tree li::after { right: auto; left: 50%; border-left: 2px solid var(--mint-2); }
 .tree li:only-child::after, .tree li:only-child::before { display: none; }
 .tree li:only-child { padding-top: 0; }
 .tree li:first-child::before, .tree li:last-child::after { border: 0 none; }
 .tree li:last-child::before { border-right: 2px solid var(--mint-2); border-radius: 0 6px 0 0; }
 .tree li:first-child::after { border-radius: 6px 0 0 0; }
-.tree ul ul::before { content: ""; position: absolute; top: 0; left: 50%; border-left: 2px solid var(--mint-2); width: 0; height: 16px; }
+.tree ul ul::before { content: ""; position: absolute; top: 0; left: 50%; border-left: 2px solid var(--mint-2); width: 0; height: 13px; }
 
 .org-node { position: relative; display: inline-flex; flex-direction: column; align-items: flex-start;
-  min-width: 150px; max-width: 184px; background: #fff; border: 1px solid var(--border); border-top: 3px solid var(--accent);
-  border-radius: 9px; padding: 7px 10px; box-shadow: var(--shadow); text-align: left; }
+  min-width: 120px; max-width: 150px; background: #fff; border: 1px solid var(--border); border-top: 3px solid var(--accent);
+  border-radius: 8px; padding: 5px 8px; box-shadow: var(--shadow); text-align: left; }
 .org-node.lead { border-top-color: var(--ink); background: var(--mint); }
-.org-node .on-name { font-weight: 700; font-size: 12.5px; line-height: 1.2; }
-.org-node .on-title { font-size: 10.5px; color: var(--accent-dark); font-weight: 600; margin-top: 1px; }
-.org-node .on-contact { font-size: 10px; color: var(--muted); margin-top: 3px; word-break: break-all; }
+.org-node .on-name { font-weight: 700; font-size: 11.5px; line-height: 1.15; }
+.org-node .on-title { font-size: 9.5px; color: var(--accent-dark); font-weight: 600; margin-top: 1px; line-height: 1.15; }
+.org-node .on-contact { display: none; }
 .org-node .on-tools { position: absolute; top: 6px; right: 6px; display: none; gap: 2px; }
 .tree.editing .org-node { cursor: grab; }
 .tree.editing .org-node:hover .on-tools { display: flex; }

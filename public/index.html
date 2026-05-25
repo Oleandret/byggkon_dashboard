@@ -13,11 +13,14 @@
 <body>
   <header class="topbar">
     <button id="menuToggle" class="btn-ghost menu-btn" title="Meny">☰</button>
-    <div class="brand">
-      <span class="brand-mark" id="brandName">BYGG-KON</span>
-      <span class="brand-sub">Sanntidsoversikt</span>
+    <div class="brand-area">
+      <div class="brand">
+        <span class="brand-mark" id="brandName">BYGG-KON</span>
+        <span class="brand-sub">Sanntidsoversikt</span>
+        <button id="driftLink" class="brand-link" title="Til driftssentralen">Driftssentral sanntid ↗</button>
+      </div>
+      <div class="values-strip topbar-values" id="valuesStrip"></div>
     </div>
-    <div class="values-strip topbar-values" id="valuesStrip"></div>
     <div class="topbar-right">
       <span id="updated" class="updated">Laster …</span>
       <button id="refreshBtn" class="btn-ghost" title="Hent ferske tall">↻</button>
@@ -400,11 +403,17 @@
           <li>Kartlegg hva slags kunder de beste er — vi vil ha mer av dem.</li>
         </ul>
       </div>
-      <div class="card">
-        <h2>Beste kunder — siste 12 måneder</h2>
-        <p class="subnote">Sortert på omsetning siste 12 måneder, høyest øverst.</p>
-        <div id="kunderStatus" class="eco-status">Laster kunder …</div>
-        <div class="table-wrap tall"><table id="kunderTable"></table></div>
+      <div class="kunder-layout">
+        <div class="card">
+          <h2>Beste kunder — siste 12 måneder</h2>
+          <p class="subnote">Sortert på omsetning siste 12 måneder, høyest øverst.</p>
+          <div id="kunderStatus" class="eco-status">Laster kunder …</div>
+          <div class="table-wrap tall"><table id="kunderTable"></table></div>
+        </div>
+        <div class="card kunder-chart-card">
+          <h2>Topp 10 kunder</h2>
+          <div class="chart-box" style="height:440px"><canvas id="kunderChart"></canvas></div>
+        </div>
       </div>
     </main>
   </section>

@@ -44,6 +44,12 @@ function renderReminders() {
     : `<div class="empty">Ingen påminnelser akkurat nå.</div>`;
 }
 
+/* ---- Driftssentral-lenke -> åpne Oversikt ---- */
+(function () {
+  const dl = document.getElementById("driftLink");
+  if (dl) dl.addEventListener("click", () => { const t = document.querySelector('.tab[data-tab="oversikt"]'); if (t) t.click(); });
+})();
+
 /* ---- Sidemeny ---- */
 (function setupSidebar() {
   const sb = document.getElementById("sidebar");
@@ -87,7 +93,7 @@ document.querySelectorAll(".tab").forEach((t) => {
 });
 
 /* ---- Kunder-fane (lazy) ---- */
-let customersLoaded = false;
+let customersLoaded = false, kunderChart;
 async function loadCustomers(force = false) {
   if (customersLoaded && !force) return;
   const status = document.getElementById("kunderStatus");
@@ -107,6 +113,23 @@ async function loadCustomers(force = false) {
         nok(c.revenue), num(c.invoices),
       ]),
       "Ingen kunder funnet.");
+
+    // Graf: topp 10 kunder
+    const top = d.customers.slice(0, 10);
+    const ctx = document.getElementById("kunderChart");
+    if (ctx && top.length) {
+      const data = { labels: top.map((c) => c.name), datasets: [{ data: top.map((c) => c.revenue), backgroundColor: css("--accent"), borderRadius: 5 }] };
+      const opts = {
+        indexAxis: "y", responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => nok(c.raw) } } },
+        scales: {
+          x: { ticks: { color: css("--muted"), callback: (v) => nokShort(v) }, grid: { color: css("--grid") } },
+          y: { ticks: { color: css("--muted"), font: { size: 11 } }, grid: { display: false } },
+        },
+      };
+      if (kunderChart) { kunderChart.data = data; kunderChart.update(); }
+      else kunderChart = new Chart(ctx, { type: "bar", data, options: opts });
+    }
   } catch (err) {
     status.hidden = false; status.textContent = "Kunne ikke hente kunder: " + err.message;
   }
