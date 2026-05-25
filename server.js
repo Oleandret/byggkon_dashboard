@@ -588,6 +588,43 @@ app.post("/api/hrrequests/update", requireAuth, (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
+// ---- Intensjonsavtaler (selskaper vi samarbeider med) ----
+app.get("/api/intentions", requireAuth, (req, res) => res.json({ intentions: getConfig().intentions || [] }));
+app.post("/api/intentions", requireAuth, (req, res) => {
+  try {
+    const list = Array.isArray(req.body?.intentions) ? req.body.intentions : null;
+    if (!list) return res.status(400).json({ error: "Mangler intentions-liste" });
+    const clean = list.map((x) => ({
+      company: String(x.company || "").slice(0, 120),
+      contact: String(x.contact || "").slice(0, 120),
+      type: String(x.type || "").slice(0, 120),
+      status: String(x.status || "").slice(0, 60),
+      date: String(x.date || "").slice(0, 10),
+      note: String(x.note || "").slice(0, 1000),
+    }));
+    saveConfig({ intentions: clean });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Pårørende per ansatt (HR) ----
+app.get("/api/nextofkin", requireAuth, (req, res) => res.json({ nextOfKin: getConfig().nextOfKin || [] }));
+app.post("/api/nextofkin", requireAuth, (req, res) => {
+  try {
+    const list = Array.isArray(req.body?.nextOfKin) ? req.body.nextOfKin : null;
+    if (!list) return res.status(400).json({ error: "Mangler nextOfKin-liste" });
+    const clean = list.map((x) => ({
+      employee: String(x.employee || "").slice(0, 80),
+      kinName: String(x.kinName || "").slice(0, 80),
+      relation: String(x.relation || "").slice(0, 60),
+      phone: String(x.phone || "").slice(0, 40),
+      note: String(x.note || "").slice(0, 400),
+    }));
+    saveConfig({ nextOfKin: clean });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
 // ---- HR-dokumenter (forsikring, sentralgodkjenning, relevante) ----
 app.get("/api/hrdocfiles", requireAuth, (req, res) => res.json({ docs: getConfig().hrDocs || [] }));
 app.post("/api/hrdocfiles", requireAuth, (req, res) => {

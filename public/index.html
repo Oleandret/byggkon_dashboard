@@ -45,6 +45,7 @@
       <button class="tab" data-tab="okonomi">Økonomi</button>
       <button class="tab" data-tab="kostnader">Kostnader</button>
       <button class="tab" data-tab="kunder">Kunder</button>
+      <button class="tab" data-tab="intensjonsavtaler">Intensjonsavtaler</button>
       <button class="tab" data-tab="markedsforing">Markedsføring</button>
       <button class="tab" data-tab="avdelinger">Avdelinger</button>
       <button class="tab" data-tab="hr">HR</button>
@@ -397,6 +398,7 @@
         <button class="subtab active" data-sub="plassering">Kontorplassering</button>
         <button class="subtab" data-sub="ansatte">Ansatte / kompetanse</button>
         <button class="subtab" data-sub="roller">Rollebeskrivelser</button>
+        <button class="subtab" data-sub="parorende">Pårørende</button>
         <button class="subtab" data-sub="organisasjon">Organisasjon</button>
         <button class="subtab" data-sub="hms">HMS / verneombud</button>
         <button class="subtab" data-sub="rekruttering">Rekruttering</button>
@@ -556,6 +558,21 @@
           </div>
           <p class="subnote">Lenker til ansattes CV-er (f.eks. i OneDrive/SharePoint). Selve filene lagres i deres filsystem.</p>
           <div class="scaffold-grid" id="cvGrid"></div>
+        </div>
+      </div>
+
+      <div class="hr-sub" id="hrsub-parorende">
+        <div class="card">
+          <div class="proj-head">
+            <h2>Pårørende — nødkontakt per ansatt</h2>
+            <div class="org-actions">
+              <button id="kinEdit" class="btn-ghost">🔓 Lås opp</button>
+              <button id="kinAdd" class="btn-ghost" hidden>+ Ansatt</button>
+              <button id="kinSave" class="btn-primary" hidden>Lagre</button>
+            </div>
+          </div>
+          <p class="subnote">Hvem skal kontaktes hvis noe skjer med en ansatt. Behandle som sensitiv informasjon. Lagres på server.</p>
+          <div class="table-wrap tall"><table id="kinTable"></table></div>
         </div>
       </div>
 
@@ -751,6 +768,25 @@
         </div>
         <p class="subnote">Alle kan legge inn potensielle kunder vi bør kontakte – så følger vi dem opp og får nye, gode kunder.</p>
         <div class="table-wrap"><table id="leadTable"></table></div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============ FANE: INTENSJONSAVTALER ============ -->
+  <section class="tab-panel" id="panel-intensjonsavtaler">
+    <main class="container">
+      <div class="page-intro"><span class="pi-ico">🤝</span><span class="pi-txt"><b>Hva siden gjør:</b> Systematisk oversikt over selskaper vi samarbeider med og intensjonsavtaler. <b>Hensikt:</b> Holde oversikt over partnerskap og avtaler – oppdaterbar og låsbar.</span></div>
+      <div class="card">
+        <div class="proj-head">
+          <h2>Intensjonsavtaler og samarbeidspartnere</h2>
+          <div class="org-actions">
+            <button id="intEdit" class="btn-ghost">🔓 Lås opp</button>
+            <button id="intAdd" class="btn-ghost" hidden>+ Avtale</button>
+            <button id="intSave" class="btn-primary" hidden>Lagre</button>
+          </div>
+        </div>
+        <p class="subnote">Selskaper vi samarbeider med. Lås opp for å oppdatere, lås igjen for å fryse lista.</p>
+        <div class="table-wrap tall"><table id="intTable"></table></div>
       </div>
     </main>
   </section>
@@ -1011,6 +1047,8 @@
   <script src="/leads.js"></script>
   <script src="/kiagents.js"></script>
   <script src="/hrextra.js"></script>
+  <script src="/intentions.js"></script>
+  <script src="/nextofkin.js"></script>
   <script src="/fagmoter.js"></script>
   <script src="/contacts.js"></script>
   <script src="/licenses.js"></script>
