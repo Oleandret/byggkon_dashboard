@@ -249,6 +249,11 @@
             <button id="tbEdit" class="btn-ghost">🔓 Rediger</button>
             <button id="tbSave" class="btn-primary" hidden>Lagre</button>
           </div>
+          <div class="faktura-box">
+            <div class="fb-head">📨 Faktura mottak — send leverandørfakturaer og kvitteringer hit:</div>
+            <div class="fb-email"><a href="mailto:byggkon@ebilag.com">byggkon@ebilag.com</a></div>
+            <div class="fb-addr">Bygg-Kon AS · Travbaneveien 3, 4031 Stavanger · Org.nr. 943 885 397 MVA</div>
+          </div>
         </div>
         <div class="eco-layout">
         <div class="eco-main">
@@ -382,6 +387,11 @@
         <button class="subtab" data-sub="rekruttering">Rekruttering</button>
         <button class="subtab" data-sub="onboarding">Onboarding</button>
         <button class="subtab" data-sub="cv">CV-er</button>
+        <button class="subtab" data-sub="visjon">Visjon</button>
+        <button class="subtab" data-sub="dokumenter">Dokumenter</button>
+        <button class="subtab" data-sub="parkering">Parkering</button>
+        <button class="subtab" data-sub="oilers">Oilers-losj</button>
+        <button class="subtab" data-sub="foresporsler">Forespørsler</button>
       </div>
 
       <div class="hr-sub" id="hrsub-ansatte">
@@ -533,6 +543,88 @@
           <div class="scaffold-grid" id="cvGrid"></div>
         </div>
       </div>
+
+      <div class="hr-sub" id="hrsub-visjon">
+        <div class="card">
+          <div class="proj-head"><h2>Visjon — felles målsetning</h2>
+            <div class="org-actions"><button id="visEdit" class="btn-ghost">🔓 Lås opp</button><button id="visSave" class="btn-primary" hidden>Lagre</button></div>
+          </div>
+          <p class="subnote">Bygg-Kons felles retning og forventninger.</p>
+          <div id="visView" class="vision-text"></div>
+          <textarea id="visText" class="doc-text" rows="22" hidden></textarea>
+        </div>
+      </div>
+
+      <div class="hr-sub" id="hrsub-dokumenter">
+        <div class="card">
+          <div class="proj-head"><h2>Relevante dokumenter</h2>
+            <button id="docEdit" class="btn-ghost">🔓 Lås opp</button>
+          </div>
+          <p class="subnote">Forsikringer, sentralgodkjenning og andre viktige dokumenter. Last opp siste revisjon (PDF/bilde). Revisjonsdato vises alltid.</p>
+          <div id="docUpload" class="doc-upload" hidden>
+            <input id="docTitle" class="kon-f" type="text" placeholder="Tittel (f.eks. «Ansvarsforsikring 2026»)" />
+            <select id="docCat" class="kon-f">
+              <option value="Forsikring">Forsikring</option>
+              <option value="Sentralgodkjenning">Sentralgodkjenning</option>
+              <option value="Annet" selected>Annet / relevant</option>
+            </select>
+            <input id="docRevision" class="kon-f" type="date" />
+            <input id="docFile" class="kon-f" type="file" accept="application/pdf,image/*" />
+            <button id="docSave" class="btn-primary">Last opp</button>
+          </div>
+          <div id="docList" class="doc-list"></div>
+        </div>
+      </div>
+
+      <div class="hr-sub" id="hrsub-parkering">
+        <div class="card">
+          <div class="proj-head"><h2>Parkering</h2>
+            <div class="org-actions">
+              <button id="parkEdit" class="btn-ghost">🔓 Lås opp</button>
+              <button id="parkSave" class="btn-primary" hidden>Lagre</button>
+            </div>
+          </div>
+          <p class="subnote" id="parkHint">Kart/bilde over parkeringsmuligheter. Lås opp for å laste opp bilde og pinne plasser.</p>
+          <div class="org-actions" id="parkUploadRow" hidden style="margin-bottom:10px;flex-wrap:wrap">
+            <input id="parkFile" type="file" accept="image/*" />
+            <button id="parkUpload" class="btn-ghost">Last opp bilde</button>
+            <input id="parkPinName" class="search" type="text" placeholder="Merke (f.eks. «Gjest», «Lader») …" />
+            <button id="parkPinAdd" class="btn-primary">+ Plasser</button>
+            <span id="parkMsg" class="subnote"></span>
+          </div>
+          <div class="floorplan-wrap" id="parkWrap">
+            <img id="parkImg" alt="Parkering" />
+            <div id="parkPins"></div>
+          </div>
+          <p class="subnote" id="parkMissing" hidden>Ingen bilde lastet opp ennå.</p>
+        </div>
+      </div>
+
+      <div class="hr-sub" id="hrsub-oilers">
+        <div class="card">
+          <h2>Bestilling av losj til Oilers-kamper</h2>
+          <p>Bygg-Kon disponerer losj på Stavanger Oilers sine hjemmekamper. Slik bestiller du:</p>
+          <ol class="oilers-steps">
+            <li>Åpne kampoversikten og finn kampen du vil på.</li>
+            <li>Bestill billetter og antall til restauranten.</li>
+            <li>Gi beskjed internt om hvem som blir med.</li>
+          </ol>
+          <a class="btn-primary" href="https://stavangeroilers.tmtickets.no/Events" target="_blank" rel="noopener">Se kamper og bestill ↗</a>
+        </div>
+      </div>
+
+      <div class="hr-sub" id="hrsub-foresporsler">
+        <div class="card">
+          <h2>Forespørsler — praktiske behov</h2>
+          <p class="subnote">Trenger du noe? Utstyr, tilganger, praktiske ting på kontoret? Legg det inn her, så følger vi opp.</p>
+          <div class="fm-suggest">
+            <input id="reqInput" class="search" type="text" placeholder="Hva trenger du? …" />
+            <input id="reqBy" class="search" type="text" placeholder="Ditt navn (valgfritt)" />
+            <button id="reqBtn" class="btn-primary">Send</button>
+          </div>
+          <div id="reqList" class="req-list"></div>
+        </div>
+      </div>
     </main>
   </section>
 
@@ -633,6 +725,18 @@
           <div class="chart-box" style="height:440px"><canvas id="kunderChart"></canvas></div>
         </div>
       </div>
+      <div class="card">
+        <div class="proj-head">
+          <h2>Potensielle kunder — å følge opp</h2>
+          <div class="org-actions">
+            <button id="leadEdit" class="btn-ghost">🔓 Lås opp</button>
+            <button id="leadAdd" class="btn-ghost" hidden>+ Kunde</button>
+            <button id="leadSave" class="btn-primary" hidden>Lagre</button>
+          </div>
+        </div>
+        <p class="subnote">Alle kan legge inn potensielle kunder vi bør kontakte – så følger vi dem opp og får nye, gode kunder.</p>
+        <div class="table-wrap"><table id="leadTable"></table></div>
+      </div>
     </main>
   </section>
 
@@ -640,6 +744,11 @@
   <section class="tab-panel" id="panel-markedsforing">
     <main class="container">
       <div class="page-intro"><span class="pi-ico">📣</span><span class="pi-txt"><b>Hva siden gjør:</b> Samler markedsarbeidet — synlighet i sosiale medier, e-postmarkedsføring, kundepleie og potensielle kundelister. <b>Hensikt:</b> Holde markedsføringen målrettet og koordinert så vi blir mer synlige og vinner nye oppdrag.</span></div>
+      <div class="card intro-card">
+        <h2>💼 Knytt kontakter på LinkedIn</h2>
+        <p>Alle oppfordres til å være aktive på <b>LinkedIn</b> – koble dere til kunder, samarbeidspartnere og bransjefolk, og del og lik Bygg-Kon sitt innhold. Jo flere av oss som er synlige, jo større rekkevidde får vi i markedet. Det er en av de enkleste måtene hver enkelt kan bidra til mer synlighet og nye oppdrag.</p>
+        <a class="sc-link" href="https://www.linkedin.com/company/bygg-kon/" target="_blank" rel="noopener">Følg Bygg-Kon på LinkedIn ↗</a>
+      </div>
       <div class="card">
         <div class="proj-head">
           <h2>Markedsføring</h2>
@@ -671,9 +780,26 @@
     <main class="container">
       <div class="page-intro"><span class="pi-ico">🤖</span><span class="pi-txt"><b>Hva siden gjør:</b> Oversikt over KI-agentene våre fra byggkon.ai-plattformen og hva de brukes til. <b>Hensikt:</b> Gjøre det enkelt for alle å ta i bruk KI-verktøyene i det daglige arbeidet.</span></div>
       <div class="card">
-        <h2>KI-agenter</h2>
-        <p class="subnote">Oversikt over Bygg-Kons AI-agenter. Frontend/innlogging til hver agent kobles på her etter hvert. (Passord vises ikke her av sikkerhetshensyn.)</p>
-        <div class="scaffold-grid" id="kiGrid"></div>
+        <div class="proj-head">
+          <h2>KI-agenter — status</h2>
+          <div class="org-actions">
+            <button id="kiEdit" class="btn-ghost">🔓 Lås opp</button>
+            <button id="kiAdd" class="btn-ghost" hidden>+ Agent</button>
+            <button id="kiSave" class="btn-primary" hidden>Lagre</button>
+          </div>
+        </div>
+        <p class="subnote">Systematisk oversikt: pågående, ferdige og ideer. (Passord vises ikke her av sikkerhetshensyn.)</p>
+        <div id="kiBoard" class="ki-board"></div>
+      </div>
+      <div class="card">
+        <h2>Foreslå en KI-agent</h2>
+        <p class="subnote">Hva trenger du hjelp til? Foreslå en agent – så vurderer vi å bygge den.</p>
+        <div class="fm-suggest">
+          <input id="kiSuggestInput" class="search" type="text" placeholder="Hva bør agenten gjøre? …" />
+          <input id="kiSuggestBy" class="search" type="text" placeholder="Ditt navn (valgfritt)" />
+          <button id="kiSuggestBtn" class="btn-primary">Foreslå</button>
+        </div>
+        <div id="kiSuggestions"></div>
       </div>
     </main>
   </section>
@@ -805,6 +931,9 @@
   <script src="/scaffold.js"></script>
   <script src="/hr.js"></script>
   <script src="/roles.js"></script>
+  <script src="/leads.js"></script>
+  <script src="/kiagents.js"></script>
+  <script src="/hrextra.js"></script>
   <script src="/fagmoter.js"></script>
   <script src="/contacts.js"></script>
   <script src="/licenses.js"></script>

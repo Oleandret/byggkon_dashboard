@@ -502,9 +502,168 @@ app.post("/api/roledescriptions", requireAuth, (req, res) => {
   try {
     const list = Array.isArray(req.body?.roles) ? req.body.roles : null;
     if (!list) return res.status(400).json({ error: "Mangler roles-liste" });
-    const clean = list.map((r) => ({ name: String(r.name || "").slice(0, 80), role: String(r.role || "").slice(0, 120), description: String(r.description || "").slice(0, 4000) }));
+    const clean = list.map((r) => ({ name: String(r.name || "").slice(0, 80), role: String(r.role || "").slice(0, 120), description: String(r.description || "").slice(0, 4000), photo: String(r.photo || "").slice(0, 500) }));
     saveConfig({ roleDescriptions: clean });
     res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// Last opp bilde av ansatt (brukes ved rollebeskrivelsen). Returnerer url.
+app.post("/api/roles/upload", requireAuth, (req, res) => {
+  try {
+    const idRaw = String(req.body?.id || "ansatt");
+    const m = /^data:image\/(png|jpeg|jpg|webp|gif);base64,(.+)$/i.exec(req.body?.dataUrl || "");
+    if (!m) return res.status(400).json({ error: "Ugyldig bilde. Last opp PNG, JPG, WEBP eller GIF." });
+    const ext = m[1].toLowerCase().replace("jpeg", "jpg");
+    const buf = Buffer.from(m[2], "base64");
+    if (buf.length > 8 * 1024 * 1024) return res.status(400).json({ error: "Bildet er for stort (maks 8 MB)." });
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    const safe = idRaw.replace(/[^a-z0-9_-]/gi, "").slice(0, 40) || "ansatt";
+    for (const e of ["png", "jpg", "webp", "gif"]) { try { fs.unlinkSync(path.join(UPLOAD_DIR, `emp-${safe}.${e}`)); } catch {} }
+    const fname = `emp-${safe}.${ext}`;
+    fs.writeFileSync(path.join(UPLOAD_DIR, fname), buf);
+    res.json({ ok: true, url: "/uploads/" + fname + "?v=" + Date.now() });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Potensielle kunder (leads) ----
+app.get("/api/leads", requireAuth, (req, res) => res.json({ leads: getConfig().leads || [] }));
+app.post("/api/leads", requireAuth, (req, res) => {
+  try {
+    const list = Array.isArray(req.body?.leads) ? req.body.leads : null;
+    if (!list) return res.status(400).json({ error: "Mangler leads-liste" });
+    const clean = list.map((l) => ({ name: String(l.name || "").slice(0, 120), contact: String(l.contact || "").slice(0, 160), note: String(l.note || "").slice(0, 600), by: String(l.by || "").slice(0, 60) }));
+    saveConfig({ leads: clean });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- HR-forespørsler (praktiske behov) ----
+app.get("/api/hrrequests", requireAuth, (req, res) => res.json({ requests: (getConfig().hrRequests || []).slice(-200) }));
+app.post("/api/hrrequests", requireAuth, (req, res) => {
+  try {
+    const text = String(req.body?.text || "").trim().slice(0, 600);
+    if (!text) return res.status(400).json({ error: "Tom forespørsel" });
+    const by = String(req.body?.by || "").trim().slice(0, 60);
+    const list = (getConfig().hrRequests || []).slice(-199);
+    list.push({ id: "r" + Date.now().toString(36), text, by, ts: Date.now(), done: false });
+    saveConfig({ hrRequests: list });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post("/api/hrrequests/update", requireAuth, (req, res) => {
+  try {
+    const id = String(req.body?.id || "");
+    const action = String(req.body?.action || "");
+    let list = getConfig().hrRequests || [];
+    if (action === "delete") list = list.filter((r) => r.id !== id);
+    else if (action === "toggle") list = list.map((r) => (r.id === id ? { ...r, done: !r.done } : r));
+    saveConfig({ hrRequests: list });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- HR-dokumenter (forsikring, sentralgodkjenning, relevante) ----
+app.get("/api/hrdocfiles", requireAuth, (req, res) => res.json({ docs: getConfig().hrDocs || [] }));
+app.post("/api/hrdocfiles", requireAuth, (req, res) => {
+  try {
+    const title = String(req.body?.title || "Dokument").slice(0, 160);
+    const category = String(req.body?.category || "Annet").slice(0, 60);
+    const revision = String(req.body?.revision || "").slice(0, 10);
+    const m = /^data:(application\/pdf|image\/(png|jpeg|jpg|webp));base64,(.+)$/i.exec(req.body?.dataUrl || "");
+    if (!m) return res.status(400).json({ error: "Ugyldig fil. Last opp PDF eller PNG/JPG." });
+    const ext = m[1].toLowerCase().includes("pdf") ? "pdf" : m[2].toLowerCase().replace("jpeg", "jpg");
+    const buf = Buffer.from(m[3], "base64");
+    if (buf.length > 14 * 1024 * 1024) return res.status(400).json({ error: "Filen er for stor (maks 14 MB)." });
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    const id = "doc" + Date.now().toString(36) + Math.floor(Math.random() * 1000);
+    const fname = `${id}.${ext}`;
+    fs.writeFileSync(path.join(UPLOAD_DIR, fname), buf);
+    const list = (getConfig().hrDocs || []).slice(-199);
+    list.push({ id, title, category, revision, url: "/uploads/" + fname, uploadedAt: new Date().toISOString().slice(0, 10) });
+    saveConfig({ hrDocs: list });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post("/api/hrdocfiles/delete", requireAuth, (req, res) => {
+  try {
+    const id = String(req.body?.id || "");
+    saveConfig({ hrDocs: (getConfig().hrDocs || []).filter((d) => d.id !== id) });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Visjon / felles målsetning ----
+app.get("/api/vision", requireAuth, (req, res) => res.json({ vision: getConfig().vision || "" }));
+app.post("/api/vision", requireAuth, (req, res) => {
+  try { saveConfig({ vision: String(req.body?.vision || "").slice(0, 8000) }); res.json({ ok: true }); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- KI: forslag fra ansatte ----
+app.get("/api/kisuggestions", requireAuth, (req, res) => res.json({ suggestions: (getConfig().kiSuggestions || []).slice(-100) }));
+app.post("/api/kisuggestions", requireAuth, (req, res) => {
+  try {
+    const text = String(req.body?.text || "").trim().slice(0, 600);
+    if (!text) return res.status(400).json({ error: "Tomt forslag" });
+    const by = String(req.body?.by || "").trim().slice(0, 60);
+    const list = (getConfig().kiSuggestions || []).slice(-99);
+    list.push({ id: "k" + Date.now().toString(36), text, by, ts: Date.now() });
+    saveConfig({ kiSuggestions: list });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post("/api/kisuggestions/delete", requireAuth, (req, res) => {
+  try {
+    const id = String(req.body?.id || "");
+    saveConfig({ kiSuggestions: (getConfig().kiSuggestions || []).filter((s) => s.id !== id) });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- KI-agenter: statusoversikt (pågående/ferdig/idé) ----
+app.get("/api/kiagents", requireAuth, (req, res) => res.json({ agents: getConfig().kiAgents || [] }));
+app.post("/api/kiagents", requireAuth, (req, res) => {
+  try {
+    const list = Array.isArray(req.body?.agents) ? req.body.agents : null;
+    if (!list) return res.status(400).json({ error: "Mangler agents-liste" });
+    const allowed = ["pågående", "ferdig", "idé"];
+    const clean = list.map((a) => ({
+      name: String(a.name || "").slice(0, 80), email: String(a.email || "").slice(0, 120),
+      desc: String(a.desc || "").slice(0, 400), status: allowed.includes(a.status) ? a.status : "idé",
+    }));
+    saveConfig({ kiAgents: clean });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Parkering: bilde + pins ----
+app.get("/api/parking", requireAuth, (req, res) => res.json({ parking: getConfig().parking || { url: "", pins: [] } }));
+app.post("/api/parking", requireAuth, (req, res) => {
+  try {
+    const p = req.body?.parking || {};
+    const clean = {
+      url: String(p.url || "").slice(0, 500),
+      pins: Array.isArray(p.pins) ? p.pins.map((pn) => ({ name: String(pn.name || "").slice(0, 80), x: Math.max(0, Math.min(100, Number(pn.x) || 0)), y: Math.max(0, Math.min(100, Number(pn.y) || 0)) })) : [],
+    };
+    saveConfig({ parking: clean });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post("/api/parking/upload", requireAuth, (req, res) => {
+  try {
+    const m = /^data:image\/(png|jpeg|jpg|webp|gif);base64,(.+)$/i.exec(req.body?.dataUrl || "");
+    if (!m) return res.status(400).json({ error: "Ugyldig bilde." });
+    const ext = m[1].toLowerCase().replace("jpeg", "jpg");
+    const buf = Buffer.from(m[2], "base64");
+    if (buf.length > 12 * 1024 * 1024) return res.status(400).json({ error: "Bildet er for stort (maks 12 MB)." });
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    for (const e of ["png", "jpg", "webp", "gif"]) { try { fs.unlinkSync(path.join(UPLOAD_DIR, `parking.${e}`)); } catch {} }
+    fs.writeFileSync(path.join(UPLOAD_DIR, `parking.${ext}`), buf);
+    const url = "/uploads/parking." + ext + "?v=" + Date.now();
+    const cur = getConfig().parking || { url: "", pins: [] };
+    saveConfig({ parking: { ...cur, url } });
+    res.json({ ok: true, url });
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 

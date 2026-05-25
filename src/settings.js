@@ -61,6 +61,21 @@ function defaults() {
     projectNotes: {},
     supplierMeta: {},
     roleDescriptions: [],
+    leads: [],
+    hrRequests: [],
+    hrDocs: [],
+    parking: { url: "", pins: [] },
+    kiSuggestions: [],
+    kiAgents: [
+      { name: "Hilde", email: "hilde@byggkon.ai", desc: "AI-agent for å finne eiendom", status: "pågående" },
+      { name: "Stein", email: "stein@byggkon.ai", desc: "AI-agent for kalkyle og kostnader på bygg", status: "pågående" },
+      { name: "Nova", email: "nova@byggkon.ai", desc: "AI-agent for kompetanse på bygging og regelverk", status: "ferdig" },
+      { name: "Embla", email: "embla@byggkon.ai", desc: "AI-agent for tilbud", status: "pågående" },
+      { name: "Eira", email: "eira@byggkon.ai", desc: "AI-agent for kundeoppfølging", status: "pågående" },
+      { name: "Openclaw", email: "nova@byggkon.ai", desc: "Openclaw", status: "idé" },
+      { name: "Saga", email: "saga@byggkon.ai", desc: "Testkonto for AI-agenter", status: "pågående" },
+    ],
+    vision: defaultVision(),
     newsFeeds: [
       { name: "Aftenbladet", url: "https://www.aftenbladet.no/rss" },
       { name: "VG", url: "https://www.vg.no/rss/feed/" },
@@ -143,6 +158,26 @@ function defaultLedermoter() {
 }
 
 // Startinnhold for markedsføring-fanen (redigerbar strategi).
+function defaultVision() {
+  return `Felles målsetning for Byggkon
+
+Byggkon skal være en trygg, lojal og profesjonell samarbeidspartner som leverer kvalitet i alle ledd. Vi skal være kjent for å dekke flere fagfelt, levere på tvers av disipliner og håndtere både små, store og komplekse prosjekter – inkludert større og mer varierte oppdrag og samarbeid med totalentreprenører.
+
+Vi skal alltid ha kunden i sentrum og jobbe målrettet for å sikre fornøyde kunder gjennom høy faglig kvalitet, erfaring og pålitelig gjennomføring. Byggkon skal tydelig vise hvem vi er, både i markedet og på nettsiden, med en enkel, profesjonell og effektiv kommunikasjon som gjenspeiler kvaliteten vi leverer.
+
+Menneskene i Byggkon er vår viktigste ressurs. Vi skal ta vare på kompetansen i selskapet, se hver enkelt medarbeider og legge til rette for utvikling, samarbeid og trivsel. En åpen kultur med lav terskel for dialog skal prege hele organisasjonen.
+
+Ledelsen i Byggkon skal være synlig, tilgjengelig og tydelig. Det forventes at ledelsen:
+• sikrer tilførsel av riktige og tilstrekkelige oppdrag
+• har åpen, direkte og ærlig dialog med ansatte
+• har lav terskel for innspill, spørsmål og tilbakemeldinger
+• prioriterer struktur, systemer og kontinuitet i driften
+• har tydelig fokus på økonomi, inntjening og bærekraftig vekst
+• ser menneskene bak rollene og bygger tillit i organisasjonen
+
+Gjennom tydelig ledelse, gode systemer og felles retning skal Byggkon skape forutsigbarhet, stabilitet og langsiktig verdiskaping – for kunder, ansatte og samarbeidspartnere.`;
+}
+
 function defaultMarketing() {
   return [
     "MARKEDSFØRING – BYGG-KON",
