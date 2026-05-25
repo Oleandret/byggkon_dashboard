@@ -73,7 +73,7 @@
       .filter((b) => (b.billingRate || 0) < 0.6)
       .sort((a, b) => (a.billingRate || 0) - (b.billingRate || 0));
     if (!free.length) { el.innerHTML = `<span class="subnote">Alle godt booket 👍</span>`; return; }
-    el.innerHTML = free.map((b) => `<span class="ds-cap-chip">${esc(b.name)} <b>${Math.round((b.billingRate || 0) * 100)}%</b></span>`).join("");
+    el.innerHTML = free.map((b) => `<span class="ds-cap-chip">${esc(b.name)}</span>`).join("");
   }
   async function refreshFocus() {
     try {

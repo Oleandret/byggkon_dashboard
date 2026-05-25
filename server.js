@@ -272,11 +272,8 @@ app.get("/api/driftssentral", requireAuth, async (req, res) => {
 const STATUS_AGENTS = [
   { key: "loki", name: "Loki AI", url: "https://byggkon-loki-ai-production.up.railway.app/", check: true },
   { key: "nova", name: "Nova AI", url: "https://nova-ai-agent-bygg-kon-production.up.railway.app/", check: true },
-  { key: "hilde", name: "Hilde", url: "https://byggkon.bluemint.dev", check: false },
-  { key: "embla", name: "KI Tilbud (Embla)", url: "https://bk-tilbud.aiki.as/login", check: false },
-  { key: "stein", name: "Stein (kalkyle)", url: "", check: false },
-  { key: "eira", name: "Eira (kundeoppfølging)", url: "", check: false },
   { key: "regnskap", name: "Regnskapsagent", url: "", check: false },
+  { key: "hilde", name: "Hilde (eiendom)", url: "https://byggkon.bluemint.dev", check: false },
 ];
 let agentStatusCache = { ts: 0, agents: [] };
 app.get("/api/agent-status", requireAuth, async (req, res) => {

@@ -537,24 +537,19 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .hub-node.down .hub-dot { background: var(--bad); }
 
 /* ---- AI-agent live status (blinkende «tilkoblet») ---- */
-.agent-status { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
-.agent-badge { display: inline-flex; align-items: center; gap: 9px; text-decoration: none;
-  border-radius: 999px; padding: 7px 14px; font-size: 13px; font-weight: 700; border: 1px solid;
-  transition: transform .12s; }
-.agent-badge:hover { transform: translateY(-1px); }
-.agent-badge.up { background: rgba(30,139,111,.10); border-color: var(--accent-soft); color: var(--accent-dark); }
-.agent-badge.down { background: var(--bad-bg); border-color: #f3c0bb; color: var(--bad); }
-.agent-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
-.agent-badge.up .agent-dot { background: #18b27e; box-shadow: 0 0 0 0 rgba(24,178,126,.6); animation: agentPulse 1.6s infinite; }
+.agent-status { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 6px 0; }
+.agent-badge { display: inline-flex; align-items: center; gap: 6px; text-decoration: none;
+  font-size: 11px; font-weight: 600; color: var(--muted); border: 0; background: none; padding: 0; }
+.agent-badge.up { color: var(--accent-dark); }
+.agent-badge.down { color: var(--bad); }
+.agent-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.agent-badge.up .agent-dot { background: #18b27e; box-shadow: 0 0 0 0 rgba(24,178,126,.6); animation: agentPulse 1.8s infinite; }
 .agent-badge.down .agent-dot { background: var(--bad); opacity: .8; }
 @keyframes agentPulse {
-  0% { box-shadow: 0 0 0 0 rgba(24,178,126,.55); }
-  70% { box-shadow: 0 0 0 9px rgba(24,178,126,0); }
+  0% { box-shadow: 0 0 0 0 rgba(24,178,126,.5); }
+  70% { box-shadow: 0 0 0 7px rgba(24,178,126,0); }
   100% { box-shadow: 0 0 0 0 rgba(24,178,126,0); }
 }
-/* Stor variant på driftssentralen (banner-skjerm) */
-.agent-status[data-style="big"] .agent-badge { font-size: 15px; padding: 9px 18px; }
-.agent-status[data-style="big"] .agent-dot { width: 12px; height: 12px; }
 
 /* ---- Firmalogo i toppen ---- */
 .brand-logo { height: 34px; width: auto; max-width: 220px; object-fit: contain; display: block; }
