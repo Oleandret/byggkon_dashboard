@@ -43,11 +43,14 @@ function defaults() {
     companyWebsite: process.env.COMPANY_WEBSITE || "www.byggkon.no",
     values: defaultValues(),
     departments: ["Intern administrasjon", "Prosjektadministrasjon / BYGG", "RIB", "ARK", "RIBr", "Andre rådgivende fag"],
-    floorPlanUrl: process.env.FLOORPLAN_URL || "/floorplan.png",
-    floorPins: [],
+    floorplans: [
+      { id: "stavanger", name: "Travbaneveien (Stavanger)", url: process.env.FLOORPLAN_URL || "/floorplan.png", pins: [] },
+      { id: "haugesund", name: "Haugesund (RIBr)", url: "", pins: [] },
+    ],
     hrRecruiting: "",
     hrOnboarding: defaultOnboarding(),
     cvs: [],
+    marketing: defaultMarketing(),
     news: [{ date: "2026-05-25", text: "Velkommen til Bygg-Kon sitt nye interne dashboard!" }],
     newsFeeds: [
       { name: "Aftenbladet", url: "https://www.aftenbladet.no/rss" },
@@ -127,6 +130,36 @@ function defaultLedermoter() {
     "- Status Glenn: iverksatt, ikke landet ennå. Flere jobber sammen med ham.",
   ].join("\n");
   return [{ id: "2026-05-20", date: "2026-05-20", title: "Ledermøte", notes }];
+}
+
+// Startinnhold for markedsføring-fanen (redigerbar strategi).
+function defaultMarketing() {
+  return [
+    "MARKEDSFØRING – BYGG-KON",
+    "",
+    "Mål: Øke synligheten og få tilgang på de beste prosjektene og kundene.",
+    "",
+    "Synlighet i sosiale medier",
+    "- Jevnlige innlegg på LinkedIn: prosjekter, fagkompetanse, nyansatte, milepæler.",
+    "- Send prosjektbilder/info til Daniel (fredager) for publisering.",
+    "",
+    "E-postmarkedsføring",
+    "- Nyhetsbrev til kunder og kontakter med faglig innhold og referanseprosjekter.",
+    "- Følg opp tilbud og henvendelser raskt.",
+    "",
+    "Relasjonsbygging",
+    "- Lunsj og møter med nøkkelkunder jevnlig (mandager: prioriter de gode kundene).",
+    "- Fredager: oppfølging — ring den som skal ha leveransen.",
+    "",
+    "Potensielle kundelister",
+    "- Utarbeide og vedlikeholde liste over potensielle kunder (segmentert).",
+    "- Bruk Mercell og Prosjektagenten for å finne aktuelle prosjekter.",
+    "- Kartlegg hva slags kunder de beste er — finn flere lignende.",
+    "",
+    "Innhold og fag",
+    "- Synliggjør kompetansen: RIB, RIBr, ARK, prosjektledelse og AI-verktøy.",
+    "- Vis frem byggkon.ai-plattformen som et konkurransefortrinn.",
+  ].join("\n");
 }
 
 // Startinnhold for onboarding-siden (fra intern rutine, uten passord).
@@ -251,7 +284,6 @@ export function getConfigForAdmin() {
     companyWebsite: c.companyWebsite,
     values: c.values || [],
     departments: c.departments || [],
-    floorPlanUrl: c.floorPlanUrl,
     hasMcpUrl: Boolean(c.regnskapsagentMcpUrl),
     hasDashboardPassword: Boolean(c.dashboardPassword),
     weeklyCapacityHours: c.weeklyCapacityHours,

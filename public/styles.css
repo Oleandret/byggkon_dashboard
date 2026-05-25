@@ -214,6 +214,9 @@ body.sidebar-locked .topbar, body.sidebar-locked .tab-panel { margin-left: 240px
 .hero-kpi .value.warn { color: #ffd9a8; }
 .hero-kpi .value.bad { color: #ffb4ab; }
 
+.report-output { white-space: pre-wrap; background: #fbfdfc; border: 1px solid var(--border); border-radius: 10px;
+  padding: 16px; margin-top: 14px; font-size: 14px; line-height: 1.55; }
+
 /* ---- Siste nytt (RSS) ---- */
 .rss-feed { max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; }
 .rss-item { display: flex; align-items: baseline; gap: 10px; padding: 9px 4px; border-bottom: 1px solid var(--border);

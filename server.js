@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 import { buildOverview } from "./src/metrics.js";
 import { buildEconomy } from "./src/economy.js";
 import { getNewsFeed } from "./src/newsfeed.js";
-import { clearCache, resetClient, getInvoices, getCustomers, ymd } from "./src/tripletex.js";
+import { clearCache, resetClient, getInvoices, getCustomers, getSupplierInvoices, ymd } from "./src/tripletex.js";
 import { getConfig, saveConfig, getConfigForAdmin, SETTINGS_PATH } from "./src/settings.js";
 
 // Mappe for opplastede filer (ved siden av innstillingsfila – legg på Volume på Railway).
@@ -79,29 +79,6 @@ app.get("/admin", requireAdmin, (req, res) =>
 // ---- Admin-API ----
 app.get("/api/admin/settings", requireAdmin, (req, res) => res.json(getConfigForAdmin()));
 
-// Opplasting av plantegning (base64 data-URL). Lagres i UPLOAD_DIR.
-app.post("/api/admin/upload-floorplan", requireAdmin, (req, res) => {
-  try {
-    const dataUrl = req.body?.dataUrl || "";
-    const m = /^data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);base64,(.+)$/i.exec(dataUrl);
-    if (!m) return res.status(400).json({ error: "Ugyldig bilde. Last opp PNG, JPG, WEBP, GIF eller SVG." });
-    let ext = m[1].toLowerCase().replace("jpeg", "jpg").replace("svg+xml", "svg");
-    const buf = Buffer.from(m[2], "base64");
-    if (buf.length > 12 * 1024 * 1024) return res.status(400).json({ error: "Bildet er for stort (maks 12 MB)." });
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-    // Fjern eventuelle gamle plantegninger
-    for (const e of ["png", "jpg", "webp", "gif", "svg"]) {
-      try { fs.unlinkSync(path.join(UPLOAD_DIR, "floorplan." + e)); } catch {}
-    }
-    const fname = "floorplan." + ext;
-    fs.writeFileSync(path.join(UPLOAD_DIR, fname), buf);
-    const url = "/uploads/" + fname + "?v=" + Date.now();
-    saveConfig({ floorPlanUrl: url });
-    res.json({ ok: true, floorPlanUrl: url });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
 app.post("/api/admin/settings", requireAdmin, (req, res) => {
   try {
     const allowed = [
@@ -117,7 +94,6 @@ app.post("/api/admin/settings", requireAdmin, (req, res) => {
       "companyEmail",
       "companyPhone",
       "companyWebsite",
-      "floorPlanUrl",
     ];
     const partial = {};
     for (const k of allowed) {
@@ -160,9 +136,71 @@ app.get("/api/overview", requireAuth, async (req, res) => {
     res.status(502).json({ error: err.message });
   }
 });
+// ---- Kostnader per leverandør (siste 12 mnd, fra Tripletex) ----
+app.get("/api/costs", requireAuth, async (req, res) => {
+  try {
+    const today = new Date();
+    const to = ymd(today);
+    const from = ymd(new Date(today.getFullYear() - 1, today.getMonth(), today.getDate()));
+    const sis = await getSupplierInvoices(from, to);
+    const bySup = new Map();
+    let total = 0;
+    for (const s of sis) {
+      const name = s.supplier?.name || "Ukjent";
+      const cost = Math.abs(s.amount || 0);
+      const cur = bySup.get(name) || { name, cost: 0, count: 0 };
+      cur.cost += cost; cur.count += 1; total += cost;
+      bySup.set(name, cur);
+    }
+    const suppliers = [...bySup.values()].sort((a, b) => b.cost - a.cost);
+    res.json({ suppliers, total });
+  } catch (err) {
+    console.error("Feil i /api/costs:", err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
 app.get("/api/news-feed", requireAuth, async (req, res) => {
   try {
     res.json({ items: await getNewsFeed() });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// ---- AI-rapport (LLM) ----
+app.post("/api/report", requireAuth, async (req, res) => {
+  try {
+    const prompt = String(req.body?.prompt || "").slice(0, 4000);
+    if (!prompt) return res.status(400).json({ error: "Beskriv hva slags rapport du vil ha." });
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const model = process.env.ANTHROPIC_MODEL || "claude-opus-4-7";
+    if (!apiKey) return res.status(400).json({ error: "AI-rapporter er ikke aktivert ennå. Legg inn ANTHROPIC_API_KEY (og evt. ANTHROPIC_MODEL) i Railway → Variables." });
+    // Hent litt systemkontekst så rapporten blir konkret
+    let ctx = {};
+    try {
+      const [ov, ec] = await Promise.all([buildOverview(), buildEconomy()]);
+      ctx = {
+        kpis: ov.kpis,
+        resultatIÅr: ec.resultYTD, resultatLTM: ec.resultLTM, balanse: ec.balance,
+        likviditet: ec.liquidity, faktureringsgrad3mnd: ec.billing3m && ec.billing3m.total,
+        toppProsjekter: (ov.projectsDetailed || []).slice(0, 8).map((p) => ({ navn: p.name, timer4uker: p.hours4w })),
+      };
+    } catch {}
+    const body = {
+      model, max_tokens: 1800,
+      system: "Du er en rapportassistent for byggefirmaet Bygg-Kon AS. Lag en ryddig, kortfattet rapport på norsk basert på brukerens ønske og de medfølgende systemtallene. Bruk tydelige overskrifter og punktlister. Hvis data mangler for noe brukeren ber om, si det kort.",
+      messages: [{ role: "user", content: `Ønsket rapport: ${prompt}\n\nTilgjengelige systemtall (JSON):\n${JSON.stringify(ctx)}` }],
+    };
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify(body),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return res.status(502).json({ error: j.error?.message || `AI-kall feilet (${r.status})` });
+    const text = (j.content || []).map((c) => c.text || "").join("\n");
+    res.json({ report: text });
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
@@ -209,22 +247,49 @@ app.post("/api/refresh", requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-// ---- HR / plantegning med ansatt-pins ----
+// ---- HR / plantegninger (flere kontorer) med ansatt-pins ----
 app.get("/api/hr", requireAuth, (req, res) => {
-  const c = getConfig();
-  res.json({ floorPlanUrl: c.floorPlanUrl || "/floorplan.png", pins: c.floorPins || [] });
+  res.json({ floorplans: getConfig().floorplans || [] });
 });
 app.post("/api/hr", requireAuth, (req, res) => {
   try {
-    const pins = Array.isArray(req.body?.pins) ? req.body.pins : null;
-    if (!pins) return res.status(400).json({ error: "Mangler pins-liste" });
-    const clean = pins.map((p) => ({
+    const fps = Array.isArray(req.body?.floorplans) ? req.body.floorplans : null;
+    if (!fps) return res.status(400).json({ error: "Mangler floorplans-liste" });
+    const clean = fps.map((p) => ({
+      id: String(p.id || "").slice(0, 40),
       name: String(p.name || "").slice(0, 80),
-      x: Math.max(0, Math.min(100, Number(p.x) || 0)),
-      y: Math.max(0, Math.min(100, Number(p.y) || 0)),
+      url: String(p.url || "").slice(0, 500),
+      pins: Array.isArray(p.pins) ? p.pins.map((pn) => ({
+        name: String(pn.name || "").slice(0, 80),
+        x: Math.max(0, Math.min(100, Number(pn.x) || 0)),
+        y: Math.max(0, Math.min(100, Number(pn.y) || 0)),
+      })) : [],
     }));
-    saveConfig({ floorPins: clean });
-    res.json({ ok: true, count: clean.length });
+    saveConfig({ floorplans: clean });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Opplasting av plantegning for et kontor (base64). Innlogget ansatt kan laste opp.
+app.post("/api/hr/upload", requireAuth, (req, res) => {
+  try {
+    const planId = String(req.body?.planId || "plan");
+    const m = /^data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);base64,(.+)$/i.exec(req.body?.dataUrl || "");
+    if (!m) return res.status(400).json({ error: "Ugyldig bilde. Last opp PNG, JPG, WEBP, GIF eller SVG." });
+    const ext = m[1].toLowerCase().replace("jpeg", "jpg").replace("svg+xml", "svg");
+    const buf = Buffer.from(m[2], "base64");
+    if (buf.length > 12 * 1024 * 1024) return res.status(400).json({ error: "Bildet er for stort (maks 12 MB)." });
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    const safe = planId.replace(/[^a-z0-9_-]/gi, "") || "plan";
+    for (const e of ["png", "jpg", "webp", "gif", "svg"]) { try { fs.unlinkSync(path.join(UPLOAD_DIR, `floorplan-${safe}.${e}`)); } catch {} }
+    const fname = `floorplan-${safe}.${ext}`;
+    fs.writeFileSync(path.join(UPLOAD_DIR, fname), buf);
+    const url = "/uploads/" + fname + "?v=" + Date.now();
+    const fps = (getConfig().floorplans || []).map((p) => (p.id === planId ? { ...p, url } : p));
+    saveConfig({ floorplans: fps });
+    res.json({ ok: true, planId, url });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -253,6 +318,16 @@ app.post("/api/ledelse", requireAdmin, (req, res) => {
       title: String(m.title || "").slice(0, 200), notes: String(m.notes || "").slice(0, 50000),
     })) : (getConfig().ledelse?.meetings || []);
     saveConfig({ ledelse: { meetings } });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Markedsføring (redigerbar strategi) ----
+app.get("/api/marketing", requireAuth, (req, res) => res.json({ marketing: getConfig().marketing || "" }));
+app.post("/api/marketing", requireAuth, (req, res) => {
+  try {
+    if (typeof req.body?.marketing !== "string") return res.status(400).json({ error: "Mangler tekst" });
+    saveConfig({ marketing: req.body.marketing.slice(0, 50000) });
     res.json({ ok: true });
   } catch (err) { res.status(400).json({ error: err.message }); }
 });

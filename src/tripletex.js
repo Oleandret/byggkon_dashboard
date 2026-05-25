@@ -94,6 +94,15 @@ export async function getTimeEntries(fromDate, toDate) {
   });
 }
 
+// Leverandørfakturaer (kostnader) i en periode.
+export async function getSupplierInvoices(fromDate, toDate) {
+  return fetchAll("search_supplier_invoices", {
+    invoiceDateFrom: fromDate,
+    invoiceDateTo: toDate,
+    fields: "id,invoiceDate,amount,supplier(id,name)",
+  });
+}
+
 // Kunder (id -> navn, e-post, telefon) – til kunde-oversikten.
 export async function getCustomers() {
   return fetchAll("search_customers", { fields: "id,name,email,phoneNumber,invoiceEmail" });

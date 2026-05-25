@@ -44,6 +44,27 @@ function renderReminders() {
     : `<div class="empty">Ingen påminnelser akkurat nå.</div>`;
 }
 
+/* ---- AI-rapport ---- */
+(function () {
+  const btn = document.getElementById("repGenerate");
+  if (!btn) return;
+  btn.addEventListener("click", async () => {
+    const prompt = document.getElementById("repPrompt").value.trim();
+    const status = document.getElementById("repStatus");
+    const out = document.getElementById("repOutput");
+    if (!prompt) { status.textContent = "Skriv hva du vil ha rapport om."; return; }
+    btn.disabled = true; status.textContent = "Genererer …"; out.hidden = true;
+    try {
+      const res = await fetch("/api/report", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Feil");
+      out.textContent = d.report || "(tomt svar)";
+      out.hidden = false; status.textContent = "";
+    } catch (e) { status.textContent = "Feil: " + e.message; }
+    finally { btn.disabled = false; }
+  });
+})();
+
 /* ---- Driftssentral-lenke -> åpne Oversikt ---- */
 (function () {
   const dl = document.getElementById("driftLink");
@@ -89,8 +110,30 @@ document.querySelectorAll(".tab").forEach((t) => {
     document.getElementById("panel-" + t.dataset.tab).classList.add("active");
     if (t.dataset.tab === "okonomi") loadEconomy();
     if (t.dataset.tab === "kunder") loadCustomers();
+    if (t.dataset.tab === "kostnader") loadCosts();
   });
 });
+
+/* ---- Kostnader-fane (lazy) ---- */
+let costsLoaded = false;
+async function loadCosts(force = false) {
+  if (costsLoaded && !force) return;
+  const status = document.getElementById("kostStatus");
+  try {
+    const res = await fetch("/api/costs");
+    if (res.status === 401) { location.href = "/login"; return; }
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Feil ${res.status}`); }
+    const d = await res.json();
+    status.hidden = true; costsLoaded = true;
+    const rows = (d.suppliers || []).map((c, i) => [String(i + 1), esc(c.name), num(c.count), nok(c.cost)]);
+    rows.push(["", "<b>Total</b>", "", `<b>${nok(d.total || 0)}</b>`]);
+    fillTable("kostTable",
+      [{ label: "#" }, { label: "Leverandør" }, { label: "Antall", num: true }, { label: "Kostnad 12 mnd", num: true }],
+      rows, "Ingen kostnader funnet.");
+  } catch (err) {
+    status.hidden = false; status.textContent = "Kunne ikke hente kostnader: " + err.message;
+  }
+}
 
 /* ---- Kunder-fane (lazy) ---- */
 let customersLoaded = false, kunderChart;

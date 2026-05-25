@@ -40,17 +40,21 @@
       <button class="tab active" data-tab="oversikt">Oversikt</button>
       <button class="tab" data-tab="prosjekter">Prosjekter</button>
       <button class="tab" data-tab="okonomi">Økonomi</button>
+      <button class="tab" data-tab="kostnader">Kostnader</button>
       <button class="tab" data-tab="kunder">Kunder</button>
+      <button class="tab" data-tab="markedsforing">Markedsføring</button>
       <button class="tab" data-tab="avdelinger">Avdelinger</button>
-      <button class="tab" data-tab="organisasjon">Organisasjon</button>
       <button class="tab" data-tab="hr">HR</button>
       <button class="tab" data-tab="fagmoter">Fagmøter</button>
       <button class="tab" data-tab="prosjektmoter">Prosjektmøter</button>
       <button class="tab" data-tab="kontakter">Kontakter</button>
       <button class="tab" data-tab="kiagenter">KI-agenter</button>
+      <!-- Organisasjon ligger nå under HR -->
+      <!-- (fjernet topp-fane) -->
       <button class="tab" data-tab="kvalitet">Kvalitetssikring</button>
       <button class="tab" data-tab="rapporter">Rapporter</button>
       <button class="tab" data-tab="itsystem">IT-system</button>
+      <button class="tab" data-tab="office365">Office 365</button>
       <button class="tab" data-tab="ledelse">Ledelse 🔒</button>
       <a class="tab" href="/admin">⚙ Innstillinger</a>
     </nav>
@@ -201,24 +205,6 @@
   </section>
 
   <!-- ============ FANE: ORGANISASJON ============ -->
-  <section class="tab-panel" id="panel-organisasjon">
-    <main class="container">
-      <div class="card">
-        <div class="proj-head">
-          <h2>Organisasjonskart</h2>
-          <div class="org-actions">
-            <button id="orgEditToggle" class="btn-ghost">✎ Rediger</button>
-            <button id="orgAddRoot" class="btn-ghost" hidden>+ Person</button>
-            <button id="orgReset" class="btn-ghost" hidden>Forkast</button>
-            <button id="orgSave" class="btn-primary" hidden>Lagre</button>
-          </div>
-        </div>
-        <p class="subnote" id="orgHint">Skrivebeskyttet. Klikk «Rediger» for å flytte personer, legge til eller endre.</p>
-        <div class="org-scroll"><div class="orgchart tree" id="orgChart"></div></div>
-      </div>
-    </main>
-  </section>
-
   <!-- ============ FANE: PROSJEKTMØTER ============ -->
   <section class="tab-panel" id="panel-prosjektmoter">
     <main class="container">
@@ -283,6 +269,7 @@
       <div class="subtabs" id="hrSubtabs">
         <button class="subtab active" data-sub="plassering">Kontorplassering</button>
         <button class="subtab" data-sub="ansatte">Ansatte / kompetanse</button>
+        <button class="subtab" data-sub="organisasjon">Organisasjon</button>
         <button class="subtab" data-sub="rekruttering">Rekruttering</button>
         <button class="subtab" data-sub="onboarding">Onboarding</button>
         <button class="subtab" data-sub="cv">CV-er</button>
@@ -312,16 +299,38 @@
           <div class="proj-head">
             <h2>Kontorplassering</h2>
             <div class="org-actions">
+              <select id="hrPlan" class="search"></select>
               <button id="hrEdit" class="btn-ghost">🔓 Lås opp</button>
               <button id="hrSave" class="btn-primary" hidden>Lagre</button>
             </div>
           </div>
-          <p class="subnote" id="hrHint">Plantegning over kontoret. Lås opp for å plassere ansatte: klikk på tegningen for å sette en markør.</p>
+          <p class="subnote" id="hrHint">Plantegning over kontoret. Velg kontor i nedtrekkslista. Lås opp for å laste opp bilde og plassere ansatte.</p>
+          <div class="org-actions" id="hrUploadRow" hidden style="margin-bottom:10px">
+            <input id="hrFile" type="file" accept="image/*" />
+            <button id="hrUpload" class="btn-ghost">Last opp plantegning</button>
+            <span id="hrUploadMsg" class="subnote"></span>
+          </div>
           <div class="floorplan-wrap" id="floorWrap">
             <img id="floorImg" alt="Plantegning" />
             <div id="floorPins"></div>
           </div>
           <p class="subnote" id="floorMissing" hidden>Fant ikke plantegningen. Legg bildet som <code>public/floorplan.png</code> i prosjektet, eller sett en bilde-URL under «⚙ Innstillinger».</p>
+        </div>
+      </div>
+
+      <div class="hr-sub" id="hrsub-organisasjon">
+        <div class="card">
+          <div class="proj-head">
+            <h2>Organisasjonskart</h2>
+            <div class="org-actions">
+              <button id="orgEditToggle" class="btn-ghost">✎ Rediger</button>
+              <button id="orgAddRoot" class="btn-ghost" hidden>+ Person</button>
+              <button id="orgReset" class="btn-ghost" hidden>Forkast</button>
+              <button id="orgSave" class="btn-primary" hidden>Lagre</button>
+            </div>
+          </div>
+          <p class="subnote" id="orgHint">Skrivebeskyttet. Klikk «Rediger» for å flytte personer, legge til eller endre.</p>
+          <div class="org-scroll"><div class="orgchart tree" id="orgChart"></div></div>
         </div>
       </div>
 
@@ -383,6 +392,23 @@
     </main>
   </section>
 
+  <!-- ============ FANE: KOSTNADER ============ -->
+  <section class="tab-panel" id="panel-kostnader">
+    <main class="container">
+      <div class="card">
+        <h2>Kostnader per leverandør — siste 12 måneder</h2>
+        <p class="subnote">Hentet fra leverandørfakturaer i Tripletex. Høyeste kostnader øverst.</p>
+        <div id="kostStatus" class="eco-status">Laster kostnader …</div>
+        <div class="table-wrap tall"><table id="kostTable"></table></div>
+      </div>
+      <div class="card">
+        <h2>Til viderefakturering</h2>
+        <p class="subnote">Potensielle kostnader (utlegg) som skal faktureres videre til kunde.</p>
+        <div id="rebillNote" class="value-note">For å hente disse automatisk trenger jeg å vite hvordan dere markerer slike kostnader i Tripletex (f.eks. knyttet til et bestemt prosjekt, en konto, eller en avdeling). Si fra, så kobler jeg det på.</div>
+      </div>
+    </main>
+  </section>
+
   <!-- ============ FANE: KUNDER ============ -->
   <section class="tab-panel" id="panel-kunder">
     <main class="container">
@@ -414,6 +440,23 @@
           <h2>Topp 10 kunder</h2>
           <div class="chart-box" style="height:440px"><canvas id="kunderChart"></canvas></div>
         </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============ FANE: MARKEDSFØRING ============ -->
+  <section class="tab-panel" id="panel-markedsforing">
+    <main class="container">
+      <div class="card">
+        <div class="proj-head">
+          <h2>Markedsføring</h2>
+          <div class="org-actions">
+            <button id="mktEdit" class="btn-ghost">🔓 Lås opp</button>
+            <button id="mktSave" class="btn-primary" hidden>Lagre</button>
+          </div>
+        </div>
+        <p class="subnote">Strategi for synlighet, salg og relasjoner.</p>
+        <textarea id="mktText" class="doc-text" rows="22" disabled></textarea>
       </div>
     </main>
   </section>
@@ -455,9 +498,36 @@
   <section class="tab-panel" id="panel-rapporter">
     <main class="container">
       <div class="card">
-        <h2>Rapporter</h2>
-        <p class="subnote">Automatiske rapporter som lages på fast intervall (recurring) ved at en KI trekker ut data fra systemene.</p>
+        <h2>Lag ny rapport med KI</h2>
+        <p class="subnote">Beskriv hva slags rapport du vil ha — KI henter relevante tall fra systemet og skriver rapporten.</p>
+        <textarea id="repPrompt" class="doc-text" rows="3" placeholder="F.eks: «Lag en kort økonomirapport for ledelsen med resultat hittil i år, likviditet og faktureringsgrad.»"></textarea>
+        <div style="margin-top:10px"><button id="repGenerate" class="btn-primary">Generer rapport</button> <span id="repStatus" class="subnote"></span></div>
+        <div id="repOutput" class="report-output" hidden></div>
+      </div>
+      <div class="card">
+        <h2>Planlagte/automatiske rapporter</h2>
+        <p class="subnote">Faste rapporter som kan settes opp til å lages automatisk.</p>
         <div class="scaffold-grid" id="rapGrid"></div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============ FANE: OFFICE 365 ============ -->
+  <section class="tab-panel" id="panel-office365">
+    <main class="container">
+      <div class="card">
+        <h2>Office 365</h2>
+        <p class="subnote">Microsoft 365 kan ikke vises inni dashbordet (Microsoft blokkerer innramming), så lenkene åpner tjenestene i ny fane — du er allerede innlogget.</p>
+        <div class="scaffold-grid">
+          <div class="scaffold-card"><div class="sc-title">Office 365 hjem</div><div class="sc-note">Alle Microsoft-appene.</div><a class="sc-link" href="https://www.office.com" target="_blank" rel="noopener">Åpne ↗</a></div>
+          <div class="scaffold-card"><div class="sc-title">Outlook (e-post)</div><div class="sc-note">E-post og kontakter.</div><a class="sc-link" href="https://outlook.office.com/mail" target="_blank" rel="noopener">Åpne ↗</a></div>
+          <div class="scaffold-card"><div class="sc-title">Kalender</div><div class="sc-note">Møter og avtaler.</div><a class="sc-link" href="https://outlook.office.com/calendar" target="_blank" rel="noopener">Åpne ↗</a></div>
+          <div class="scaffold-card"><div class="sc-title">Teams</div><div class="sc-note">Chat, møter og samarbeid.</div><a class="sc-link" href="https://teams.microsoft.com" target="_blank" rel="noopener">Åpne ↗</a></div>
+          <div class="scaffold-card"><div class="sc-title">SharePoint</div><div class="sc-note">Prosjekthotell og delte områder.</div><a class="sc-link" href="https://www.office.com/launch/sharepoint" target="_blank" rel="noopener">Åpne ↗</a></div>
+          <div class="scaffold-card"><div class="sc-title">OneDrive</div><div class="sc-note">Dine filer i skyen.</div><a class="sc-link" href="https://www.office.com/launch/onedrive" target="_blank" rel="noopener">Åpne ↗</a></div>
+          <div class="scaffold-card"><div class="sc-title">OneNote</div><div class="sc-note">Notater og møtereferater.</div><a class="sc-link" href="https://www.onenote.com/notebooks" target="_blank" rel="noopener">Åpne ↗</a></div>
+          <div class="scaffold-card"><div class="sc-title">Word / Excel / PowerPoint</div><div class="sc-note">Office-appene på nett.</div><a class="sc-link" href="https://www.office.com/apps" target="_blank" rel="noopener">Åpne ↗</a></div>
+        </div>
       </div>
     </main>
   </section>
@@ -533,6 +603,7 @@
   <script src="/licenses.js"></script>
   <script src="/ledelse.js"></script>
   <script src="/news.js"></script>
+  <script src="/marketing.js"></script>
 
   <!-- Nova AI-widget -->
   <script src="https://nova-ai-agent-bygg-kon-production.up.railway.app/widget.js"
