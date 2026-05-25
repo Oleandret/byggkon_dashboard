@@ -162,8 +162,10 @@ document.querySelectorAll(".tab").forEach((t) => {
     if (t.dataset.tab === "kunder") loadCustomers();
     if (t.dataset.tab === "kostnader") loadCosts();
     if (t.dataset.tab === "itsystem") loadItCosts();
+    if (t.dataset.tab === "prosjekter" && !projectNotesLoaded) { projectNotesLoaded = true; loadProjectNotes(); }
   });
 });
+let projectNotesLoaded = false;
 
 /* ---- IT-kostnader fra Tripletex (lazy) ---- */
 let itCostsLoaded = false;
@@ -198,15 +200,43 @@ async function loadCosts(force = false) {
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Feil ${res.status}`); }
     const d = await res.json();
     status.hidden = true; costsLoaded = true;
-    const rows = (d.suppliers || []).map((c, i) => [String(i + 1), esc(c.name), `<span class="cost-cat">${esc(costCategory(c.name))}</span>`, num(c.count), nok(c.cost)]);
-    rows.push(["", "<b>Total</b>", "", "", `<b>${nok(d.total || 0)}</b>`]);
+    try { const m = await (await fetch("/api/suppliermeta")).json(); supplierMeta = m.meta || {}; } catch {}
+    const sup = d.suppliers || [];
+    const rows = sup.map((c, i) => {
+      const m = supplierMeta[c.name] || {};
+      return [
+        String(i + 1), esc(c.name), `<span class="cost-cat">${esc(costCategory(c.name))}</span>`, num(c.count), nok(c.cost),
+        `<label class="ramme-toggle"><input type="checkbox" class="sm-ramme" data-name="${esc(c.name)}" ${m.rammeavtale ? "checked" : ""}/> <span></span></label>`,
+        `<input class="sm-input sm-ansvarlig" data-name="${esc(c.name)}" value="${esc(m.ansvarlig || "")}" placeholder="Hvem forhandler?" />`,
+        `<input class="sm-input sm-status" data-name="${esc(c.name)}" value="${esc(m.status || "")}" placeholder="Status / notat" />`,
+      ];
+    });
+    rows.push(["", "<b>Total</b>", "", "", `<b>${nok(d.total || 0)}</b>`, "", "", ""]);
     fillTable("kostTable",
-      [{ label: "#" }, { label: "Leverandør" }, { label: "Hva er kostnaden? (antatt)" }, { label: "Antall", num: true }, { label: "Kostnad 12 mnd", num: true }],
+      [{ label: "#" }, { label: "Leverandør" }, { label: "Hva er kostnaden? (antatt)" }, { label: "Antall", num: true }, { label: "Kostnad 12 mnd", num: true },
+       { label: "Rammeavtale" }, { label: "Forhandlingsansvarlig" }, { label: "Status / aksjon" }],
       rows, "Ingen kostnader funnet.");
+    const withRamme = sup.filter((c) => (supplierMeta[c.name] || {}).rammeavtale).length;
+    const sumEl = document.getElementById("kostRammeSummary");
+    if (sumEl) sumEl.innerHTML = `<b>${withRamme}</b> av <b>${sup.length}</b> leverandører har rammeavtale. <span class="subnote">Huk av når avtale er på plass, og noter hvem som forhandler.</span>`;
   } catch (err) {
     status.hidden = false; status.textContent = "Kunne ikke hente kostnader: " + err.message;
   }
 }
+let supplierMeta = {};
+async function saveSupplierMeta(name) {
+  const row = (sel) => document.querySelector(`${sel}[data-name="${CSS.escape(name)}"]`);
+  const ramme = row("input.sm-ramme"); const ansv = row(".sm-ansvarlig"); const st = row(".sm-status");
+  const payload = { name, rammeavtale: ramme ? ramme.checked : false, ansvarlig: ansv ? ansv.value.trim() : "", status: st ? st.value.trim() : "" };
+  supplierMeta[name] = { rammeavtale: payload.rammeavtale, ansvarlig: payload.ansvarlig, status: payload.status };
+  try { await fetch("/api/suppliermeta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); }
+  catch (e) { showError("Kunne ikke lagre leverandørinfo: " + e.message); }
+}
+(function () {
+  const tbl = document.getElementById("kostTable");
+  if (!tbl) return;
+  tbl.addEventListener("change", (e) => { const t = e.target; if (t.classList.contains("sm-ramme") || t.classList.contains("sm-input")) saveSupplierMeta(t.dataset.name); });
+})();
 
 /* ---- Kunder-fane (lazy) ---- */
 let customersLoaded = false, kunderChart;
@@ -449,15 +479,32 @@ function renderProjectsTable() {
   const hoursLabel = emp ? `Timer 4 uker · ${emp.split(" ")[0]}` : "Timer 4 uker";
   fillTable("projectsTable",
     [{ label: "Nr" }, { label: "Prosjekt" }, { label: "Kunde" }, { label: "Prosjekteier" },
-     { label: hoursLabel, num: true }, { label: "Timer i år", num: true }, { label: "Fakturerbart i år", num: true }, { label: "Siste aktivitet" }],
+     { label: hoursLabel, num: true }, { label: "Timer i år", num: true }, { label: "Fakturerbart i år", num: true }, { label: "Siste aktivitet" }, { label: "Notat (viktig)" }],
     rows.map((p) => [
       esc(p.number), esc(p.name), esc(p.customer), esc(p.projectManager),
       num(emp ? (p.byEmp4w[emp] || 0) : p.hours4w), num(p.hoursYTD), num(p.billableYTD), p.lastActivity || "—",
+      `<input class="proj-note" data-num="${esc(p.number)}" value="${esc(projectNotes[p.number] || "")}" placeholder="Notat …" />`,
     ]),
     emp ? `Ingen prosjekter for ${esc(emp)} siste 4 uker.` : "Ingen prosjekter funnet.");
 }
 document.getElementById("projSearch").addEventListener("input", renderProjectsTable);
 document.getElementById("projEmp").addEventListener("change", renderProjectsTable);
+// Lagre prosjektnotat ved blur/enter
+let projectNotes = {};
+(function () {
+  const tbl = document.getElementById("projectsTable");
+  if (!tbl) return;
+  async function save(num, note) {
+    projectNotes[num] = note;
+    try { await fetch("/api/projectnotes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ number: num, note }) }); }
+    catch (e) { showError("Kunne ikke lagre notat: " + e.message); }
+  }
+  tbl.addEventListener("change", (e) => { const i = e.target.closest(".proj-note"); if (i) save(i.dataset.num, i.value.trim()); });
+  tbl.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.classList.contains("proj-note")) e.target.blur(); });
+})();
+async function loadProjectNotes() {
+  try { const d = await (await fetch("/api/projectnotes")).json(); projectNotes = d.notes || {}; renderProjectsTable(); } catch {}
+}
 
 function renderResource() {
   if (!lastData) return;
@@ -537,13 +584,23 @@ function renderEmpResource() {
   let emps = buildEmpProjects();
   if (filter) emps = emps.filter((e) => e.navn === filter);
   if (!emps.length) { wrap.innerHTML = `<div class="empty">Ingen timer ført siste 4 uker.</div>`; return; }
-  wrap.innerHTML = emps.map((e) => `
-    <div class="emp-res-group">
-      <div class="emp-res-head"><span>${esc(e.navn)}</span><span class="emp-res-tot">${num(e.total)} t</span></div>
-      <table class="emp-res-tbl"><tbody>${e.projects.map((p) => `
-        <tr><td>${esc(p.name)}${p.customer ? `<span class="emp-res-cust">${esc(p.customer)}</span>` : ""}</td>
-        <td class="num">${num(p.hours)} t</td></tr>`).join("")}</tbody></table>
-    </div>`).join("");
+  wrap.innerHTML = emps.map((e) => {
+    const maxH = Math.max(...e.projects.map((p) => p.hours), 1);
+    const initials = e.navn.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+    return `<div class="emp-res-group">
+      <div class="emp-res-head">
+        <span class="emp-res-avatar">${esc(initials)}</span>
+        <span class="emp-res-name">${esc(e.navn)}</span>
+        <span class="emp-res-tot">${num(e.total)} t</span>
+      </div>
+      <div class="emp-res-projs">${e.projects.map((p) => `
+        <div class="emp-res-proj">
+          <div class="erp-info"><span class="erp-name">${esc(p.name)}</span>${p.customer ? `<span class="erp-cust">${esc(p.customer)}</span>` : ""}</div>
+          <div class="erp-bar"><span style="width:${Math.round((p.hours / maxH) * 100)}%"></span></div>
+          <div class="erp-hours">${num(p.hours)} t</div>
+        </div>`).join("")}</div>
+    </div>`;
+  }).join("");
 }
 
 /* ---- Hovedlasting ---- */

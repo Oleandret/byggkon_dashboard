@@ -465,6 +465,49 @@ app.post("/api/calendar/delete", requireAuth, (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
+// ---- Prosjektnotater (viktige notater per prosjekt) ----
+app.get("/api/projectnotes", requireAuth, (req, res) => res.json({ notes: getConfig().projectNotes || {} }));
+app.post("/api/projectnotes", requireAuth, (req, res) => {
+  try {
+    const number = String(req.body?.number || "").slice(0, 40);
+    if (!number) return res.status(400).json({ error: "Mangler prosjektnummer" });
+    const note = String(req.body?.note || "").slice(0, 1000);
+    const notes = { ...(getConfig().projectNotes || {}) };
+    if (note) notes[number] = note; else delete notes[number];
+    saveConfig({ projectNotes: notes });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Leverandør-meta (rammeavtale + forhandlingsansvarlig) ----
+app.get("/api/suppliermeta", requireAuth, (req, res) => res.json({ meta: getConfig().supplierMeta || {} }));
+app.post("/api/suppliermeta", requireAuth, (req, res) => {
+  try {
+    const name = String(req.body?.name || "").slice(0, 120);
+    if (!name) return res.status(400).json({ error: "Mangler leverandørnavn" });
+    const meta = { ...(getConfig().supplierMeta || {}) };
+    meta[name] = {
+      rammeavtale: !!req.body?.rammeavtale,
+      ansvarlig: String(req.body?.ansvarlig || "").slice(0, 80),
+      status: String(req.body?.status || "").slice(0, 120),
+    };
+    saveConfig({ supplierMeta: meta });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Ansattes rollebeskrivelser ----
+app.get("/api/roledescriptions", requireAuth, (req, res) => res.json({ roles: getConfig().roleDescriptions || [] }));
+app.post("/api/roledescriptions", requireAuth, (req, res) => {
+  try {
+    const list = Array.isArray(req.body?.roles) ? req.body.roles : null;
+    if (!list) return res.status(400).json({ error: "Mangler roles-liste" });
+    const clean = list.map((r) => ({ name: String(r.name || "").slice(0, 80), role: String(r.role || "").slice(0, 120), description: String(r.description || "").slice(0, 4000) }));
+    saveConfig({ roleDescriptions: clean });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
 // ---- Personalhåndbok (opplasting + revisjonsdato) ----
 app.get("/api/handbook", requireAuth, (req, res) => res.json({ handbook: getConfig().handbook || { url: "", filename: "", revision: "" } }));
 app.post("/api/handbook", requireAuth, (req, res) => {

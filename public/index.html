@@ -89,8 +89,8 @@
 
     <main class="container">
       <div id="birthdayBanner" class="bday-banner" hidden></div>
-      <div class="front-grid">
-        <div class="card">
+      <div class="front-grid front-grid-3">
+        <div class="card front-box">
           <div class="proj-head">
             <h2>Nyheter internt</h2>
             <div class="org-actions">
@@ -99,14 +99,43 @@
               <button id="newsSave" class="btn-primary" hidden>Lagre</button>
             </div>
           </div>
-          <div id="newsList"></div>
+          <div id="newsList" class="front-box-body"></div>
         </div>
-        <div class="card">
+        <div class="card front-box">
           <h2>Påminnelser</h2>
           <a class="sc-link" href="https://tripletex.no/execute/timeRegistration" target="_blank" rel="noopener" style="margin:0 0 10px">⏱️ Før timer i Tripletex ↗</a>
-          <div id="remindersList"></div>
+          <div id="remindersList" class="front-box-body"></div>
         </div>
-        <div class="card">
+        <div class="card cal-card front-box">
+          <div class="proj-head">
+            <h2>Felles kalender</h2>
+            <button id="calShowAll" class="btn-ghost" title="Vis alt fremover">Vis alt</button>
+          </div>
+          <p class="subnote">Bursdager, oppstart, frister og møter. Det som nærmer seg dukker opp her – ca. én uke i forveien.</p>
+          <div class="front-box-body">
+            <div id="calUpcoming" class="cal-upcoming"></div>
+          </div>
+          <form id="calForm" class="cal-form">
+            <div class="cal-form-row">
+              <input id="calDate" class="kon-f" type="date" required />
+              <select id="calType" class="kon-f">
+                <option value="bursdag">🎂 Bursdag</option>
+                <option value="oppstart">🚀 Oppstart</option>
+                <option value="mote">📅 Møte</option>
+                <option value="frist">⏰ Frist</option>
+                <option value="annet" selected>📌 Annet</option>
+              </select>
+            </div>
+            <input id="calTitle" class="kon-f" type="text" placeholder="Hva skjer? (f.eks. «Karis bursdag»)" required />
+            <div class="cal-form-row">
+              <input id="calBy" class="kon-f" type="text" placeholder="Ditt navn (valgfritt)" />
+              <button type="submit" class="btn-primary">Legg til</button>
+            </div>
+          </form>
+        </div>
+      </div><!-- /front-grid -->
+
+      <div class="card">
         <h2>Intern kommunikasjon</h2>
         <p class="subnote">Felles vegg — alle som er innlogget ser det samme.</p>
         <div id="commFeed" class="comm-feed"></div>
@@ -116,48 +145,6 @@
           <button id="commSend" class="btn-primary">Send</button>
         </div>
       </div>
-      <div class="card cal-card">
-        <div class="proj-head">
-          <h2>Felles kalender</h2>
-          <div class="cal-nav">
-            <button id="calPrev" class="btn-ghost" title="Forrige måned">‹</button>
-            <span id="calMonthLbl" class="cal-month-lbl"></span>
-            <button id="calNext" class="btn-ghost" title="Neste måned">›</button>
-            <button id="calToday" class="btn-ghost">I dag</button>
-          </div>
-        </div>
-        <p class="subnote">Bursdager, oppstart for nye folk, frister og møter — alle innloggede kan legge inn.</p>
-        <div class="cal-layout">
-          <div class="cal-grid-wrap">
-            <div class="cal-weekdays">
-              <span>Man</span><span>Tir</span><span>Ons</span><span>Tor</span><span>Fre</span><span>Lør</span><span>Søn</span>
-            </div>
-            <div id="calGrid" class="cal-grid"></div>
-          </div>
-          <div class="cal-side">
-            <h3 class="cal-side-h">Kommende</h3>
-            <div id="calUpcoming" class="cal-upcoming"></div>
-            <form id="calForm" class="cal-form">
-              <div class="cal-form-row">
-                <input id="calDate" class="kon-f" type="date" required />
-                <select id="calType" class="kon-f">
-                  <option value="bursdag">🎂 Bursdag</option>
-                  <option value="oppstart">🚀 Oppstart</option>
-                  <option value="mote">📅 Møte</option>
-                  <option value="frist">⏰ Frist</option>
-                  <option value="annet" selected>📌 Annet</option>
-                </select>
-              </div>
-              <input id="calTitle" class="kon-f" type="text" placeholder="Hva skjer? (f.eks. «Karis bursdag»)" required />
-              <div class="cal-form-row">
-                <input id="calBy" class="kon-f" type="text" placeholder="Ditt navn (valgfritt)" />
-                <button type="submit" class="btn-primary">Legg til</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-      </div><!-- /front-grid -->
 
       <div class="wall-grid">
         <!-- Venstre: rullende prosjekter -->
@@ -389,6 +376,7 @@
       <div class="subtabs" id="hrSubtabs">
         <button class="subtab active" data-sub="plassering">Kontorplassering</button>
         <button class="subtab" data-sub="ansatte">Ansatte / kompetanse</button>
+        <button class="subtab" data-sub="roller">Rollebeskrivelser</button>
         <button class="subtab" data-sub="organisasjon">Organisasjon</button>
         <button class="subtab" data-sub="hms">HMS / verneombud</button>
         <button class="subtab" data-sub="rekruttering">Rekruttering</button>
@@ -415,6 +403,21 @@
         </div>
       </div>
 
+      <div class="hr-sub" id="hrsub-roller">
+        <div class="card">
+          <div class="proj-head">
+            <h2>Ansattes rollebeskrivelse</h2>
+            <div class="org-actions">
+              <button id="roleEdit" class="btn-ghost">🔓 Lås opp</button>
+              <button id="roleAdd" class="btn-ghost" hidden>+ Ansatt</button>
+              <button id="roleSave" class="btn-primary" hidden>Lagre</button>
+            </div>
+          </div>
+          <p class="subnote">Hva hver enkelt har ansvar for. Lås opp for å redigere – lagres på server.</p>
+          <div id="roleList" class="role-list"></div>
+        </div>
+      </div>
+
       <div class="hr-sub active" id="hrsub-plassering">
         <div class="card">
           <div class="proj-head">
@@ -426,10 +429,15 @@
             </div>
           </div>
           <p class="subnote" id="hrHint">Plantegning over kontoret. Velg kontor i nedtrekkslista. Lås opp for å laste opp bilde og plassere ansatte.</p>
-          <div class="org-actions" id="hrUploadRow" hidden style="margin-bottom:10px">
+          <div class="org-actions" id="hrUploadRow" hidden style="margin-bottom:10px;flex-wrap:wrap">
             <input id="hrFile" type="file" accept="image/*" />
             <button id="hrUpload" class="btn-ghost">Last opp plantegning</button>
             <span id="hrUploadMsg" class="subnote"></span>
+          </div>
+          <div class="org-actions" id="hrPinRow" hidden style="margin-bottom:10px;flex-wrap:wrap">
+            <input id="hrPinName" class="search" type="text" placeholder="Navn på ansatt …" />
+            <button id="hrPinAdd" class="btn-primary">+ Plasser på tegningen</button>
+            <span class="subnote">Skriv navn, klikk «Plasser», og klikk så på tegningen der personen sitter.</span>
           </div>
           <div class="floorplan-wrap" id="floorWrap">
             <img id="floorImg" alt="Plantegning" />
@@ -578,7 +586,8 @@
       <div class="page-intro"><span class="pi-ico">🧾</span><span class="pi-txt"><b>Hva siden gjør:</b> Viser de største kostnadene per leverandør siste 12 mnd, hentet fra regnskapet. <b>Hensikt:</b> Ha kontroll på hvor pengene går, og fange opp kostnader som bør reforhandles eller viderefaktureres.</span></div>
       <div class="card">
         <h2>Kostnader per leverandør — siste 12 måneder</h2>
-        <p class="subnote">Hentet fra leverandørfakturaer i Tripletex. Høyeste kostnader øverst.</p>
+        <p class="subnote">Hentet fra leverandørfakturaer i Tripletex. Høyeste kostnader øverst. Mål: inngå rammeavtaler med faste leverandører og forhandle ned pris — fyll inn hvem som er ansvarlig.</p>
+        <div id="kostRammeSummary" class="ramme-summary"></div>
         <div id="kostStatus" class="eco-status">Laster kostnader …</div>
         <div class="table-wrap tall"><table id="kostTable"></table></div>
       </div>
@@ -795,6 +804,7 @@
   <script src="/ansatte.js"></script>
   <script src="/scaffold.js"></script>
   <script src="/hr.js"></script>
+  <script src="/roles.js"></script>
   <script src="/fagmoter.js"></script>
   <script src="/contacts.js"></script>
   <script src="/licenses.js"></script>

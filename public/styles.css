@@ -98,6 +98,7 @@ a.tab { margin-left: auto; }
 /* ---- HR plantegning ---- */
 .floorplan-wrap { position: relative; display: inline-block; max-width: 100%; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
 .floorplan-wrap.editing { cursor: crosshair; }
+.floorplan-wrap.placing { cursor: crosshair; outline: 2px dashed var(--accent); outline-offset: 2px; }
 .floorplan-wrap img { display: block; max-width: 100%; height: auto; }
 #floorPins { position: absolute; inset: 0; pointer-events: none; }
 .floor-pin { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; pointer-events: none; }
@@ -510,15 +511,21 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .matrix.editing td.cell:hover { outline: 2px solid var(--ink); outline-offset: -2px; }
 .namecol .nm-sub { display: block; font-weight: 400; font-size: 11px; color: var(--muted); }
 
-/* ---- Forside: fire kompakte bokser side ved side ---- */
+/* ---- Forside: tre like store bokser side ved side ---- */
 .front-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; align-items: start; margin-bottom: 16px; }
+.front-grid-3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 980px) { .front-grid-3 { grid-template-columns: 1fr; } }
 .front-grid > .card { margin: 0; }
-.front-grid #newsList, .front-grid #remindersList { max-height: 300px; overflow-y: auto; }
-.front-grid .comm-feed { max-height: 240px; }
-/* Kalenderen får alltid stående layout (rutenett over, kommende/skjema under) i den kompakte boksen */
-.front-grid .cal-card .cal-layout { grid-template-columns: 1fr; gap: 12px; }
-.front-grid .cal-card .cal-upcoming { max-height: 150px; }
+.front-box { display: flex; flex-direction: column; min-height: 430px; }
+.front-box-body { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
+.front-box .cal-form { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
 
+.ramme-summary { background: var(--mint); border: 1px solid var(--mint-2); border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; font-size: 13px; }
+.sm-input { width: 100%; min-width: 120px; border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 12.5px; }
+.sm-input:focus { outline: none; border-color: var(--accent); }
+.ramme-toggle input { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+.proj-note { width: 100%; min-width: 130px; border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 12.5px; background: #fffdf5; }
+.proj-note:focus { outline: none; border-color: var(--accent); background: #fff; }
 .cost-cat { display: inline-block; background: var(--mint); border: 1px solid var(--mint-2); color: var(--accent-dark);
   border-radius: 999px; padding: 2px 10px; font-size: 11.5px; font-weight: 600; }
 
@@ -545,6 +552,16 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .hb-rev { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
 .hb-upload { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
 .hb-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+
+/* ---- Ansattes rollebeskrivelse ---- */
+.role-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.role-item { border: 1px solid var(--border); border-top: 3px solid var(--accent); border-radius: 10px; padding: 12px 14px; background: #fff; }
+.role-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.role-name-lbl { font-weight: 700; font-size: 15px; }
+.role-role-lbl { font-size: 12px; color: var(--accent-dark); font-weight: 600; }
+.role-desc-lbl { font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
+.role-item.edit { display: flex; flex-direction: column; gap: 7px; }
+.role-item.edit .role-del { align-self: flex-end; }
 
 /* ---- Faglig utviklingsmål 2026 ---- */
 .dg-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
@@ -580,16 +597,22 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .intro-card p:last-child { margin-bottom: 0; }
 
 /* ---- Per ansatt – prosjekter (prosjektmøter) ---- */
-.emp-res { display: flex; flex-direction: column; gap: 12px; max-height: 620px; overflow: auto; }
-.emp-res-group { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-.emp-res-head { display: flex; justify-content: space-between; align-items: center; gap: 8px;
-  padding: 7px 11px; background: var(--mint); font-weight: 700; font-size: 13px; border-bottom: 1px solid var(--border); }
-.emp-res-tot { color: var(--accent-dark); white-space: nowrap; }
-.emp-res-tbl { width: 100%; border-collapse: collapse; }
-.emp-res-tbl td { padding: 6px 11px; border-top: 1px solid var(--grid); font-size: 12.5px; vertical-align: top; }
-.emp-res-tbl tr:first-child td { border-top: 0; }
-.emp-res-tbl td.num { text-align: right; white-space: nowrap; font-weight: 600; }
-.emp-res-cust { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; }
+.emp-res { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; max-height: 640px; overflow: auto; }
+.emp-res-group { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #fff; }
+.emp-res-head { display: flex; align-items: center; gap: 9px;
+  padding: 9px 12px; background: var(--mint); border-bottom: 1px solid var(--mint-2); }
+.emp-res-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff;
+  font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex: none; }
+.emp-res-name { font-weight: 700; font-size: 13.5px; flex: 1; }
+.emp-res-tot { color: var(--accent-dark); white-space: nowrap; font-weight: 700; font-size: 12.5px; }
+.emp-res-projs { padding: 8px 12px; display: flex; flex-direction: column; gap: 9px; }
+.emp-res-proj { display: grid; grid-template-columns: 1fr 70px auto; align-items: center; gap: 10px; }
+.erp-info { min-width: 0; }
+.erp-name { display: block; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.erp-cust { display: block; font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.erp-bar { height: 6px; background: var(--grid); border-radius: 999px; overflow: hidden; }
+.erp-bar > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.erp-hours { font-size: 12px; font-weight: 700; color: var(--ink); white-space: nowrap; text-align: right; }
 
 /* ---- Felles kalender ---- */
 .cal-nav { display: flex; align-items: center; gap: 6px; }
@@ -617,12 +640,13 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .cal-dot.t-annet { background: #8a6d3b; }
 .cal-more { font-size: 9px; color: var(--muted); font-weight: 700; }
 .cal-side-h { margin: 0 0 8px; font-size: 13px; }
-.cal-upcoming { display: flex; flex-direction: column; gap: 5px; max-height: 240px; overflow: auto; margin-bottom: 12px; }
-.cal-up-item { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center;
-  padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: #fff; font-size: 12.5px; }
-.cal-up-date { font-weight: 700; color: var(--accent-dark); white-space: nowrap; font-size: 11.5px; }
-.cal-up-main { overflow: hidden; text-overflow: ellipsis; }
-.cal-up-ico { margin-right: 4px; }
+.cal-upcoming { display: flex; flex-direction: column; gap: 6px; }
+.cal-up-item { display: grid; grid-template-columns: auto 1fr auto; gap: 9px; align-items: center;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: #fff; font-size: 13px; }
+.cal-up-item .cal-up-ico { font-size: 17px; }
+.cal-up-main { overflow: hidden; display: flex; flex-direction: column; gap: 1px; }
+.cal-up-when { font-size: 11px; color: var(--muted); }
+.cal-up-when.soon { color: var(--accent-dark); font-weight: 700; }
 .cal-by { color: var(--muted); font-size: 10.5px; margin-left: 4px; }
 .cal-del { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; line-height: 1; padding: 2px 4px; border-radius: 6px; }
 .cal-del:hover { background: var(--bad-bg); color: var(--bad); }

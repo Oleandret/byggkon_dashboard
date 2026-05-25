@@ -58,6 +58,9 @@ function defaults() {
     devGoals: [],
     handbook: { url: "", filename: "", revision: "" },
     geocache: {},
+    projectNotes: {},
+    supplierMeta: {},
+    roleDescriptions: [],
     newsFeeds: [
       { name: "Aftenbladet", url: "https://www.aftenbladet.no/rss" },
       { name: "VG", url: "https://www.vg.no/rss/feed/" },

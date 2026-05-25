@@ -8,7 +8,7 @@
 
   function initMap() {
     if (map || typeof L === "undefined") return;
-    map = L.map("dsMap", { scrollWheelZoom: false }).setView([59.0, 8.5], 5); // Sør-Norge som start
+    map = L.map("dsMap", { scrollWheelZoom: false }).setView([59.8, 6.2], 7); // Vestlandet som start
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 18, attribution: "© OpenStreetMap",
     }).addTo(map);

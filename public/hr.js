@@ -25,13 +25,28 @@
       </div>`).join("");
   }
 
+  let placing = false; // "plasser"-modus: neste klikk på tegningen setter pin
+  const pinNameEl = () => document.getElementById("hrPinName");
+  const pinAddBtn = () => document.getElementById("hrPinAdd");
+  function placePin(clientX, clientY) {
+    const r = img.getBoundingClientRect();
+    const name = (pinNameEl()?.value || "").trim();
+    if (!name) { err("Skriv inn navn først."); return; }
+    pins().push({
+      name,
+      x: Math.max(0, Math.min(100, Math.round(((clientX - r.left) / r.width) * 1000) / 10)),
+      y: Math.max(0, Math.min(100, Math.round(((clientY - r.top) / r.height) * 1000) / 10)),
+    });
+    dirty = true;
+    if (pinNameEl()) pinNameEl().value = "";
+    placing = false;
+    wrap.classList.remove("placing");
+    render();
+  }
+  // Klikk på tegningen: legg pin (enten via «Plasser»-modus eller direkte hvis navn er fylt ut).
   img.addEventListener("click", (e) => {
     if (!editing) return;
-    const r = img.getBoundingClientRect();
-    const name = (prompt("Navn på ansatt for denne plassen:") || "").trim();
-    if (!name) return;
-    pins().push({ name, x: Math.round(((e.clientX - r.left) / r.width) * 1000) / 10, y: Math.round(((e.clientY - r.top) / r.height) * 1000) / 10 });
-    dirty = true; render();
+    if (placing || (pinNameEl() && pinNameEl().value.trim())) placePin(e.clientX, e.clientY);
   });
   pinsEl.addEventListener("mousedown", (e) => {
     if (!editing) return; const el = e.target.closest(".floor-pin"); if (!el) return;
@@ -55,13 +70,23 @@
     editBtn.textContent = on ? "🔒 Lås" : "🔓 Lås opp";
     saveBtn.hidden = !on;
     if (uploadRow) uploadRow.hidden = !on;
+    const pinRow = document.getElementById("hrPinRow");
+    if (pinRow) pinRow.hidden = !on;
+    if (!on) { placing = false; wrap.classList.remove("placing"); }
     document.getElementById("hrHint").textContent = on
-      ? "Last opp plantegning for valgt kontor, og klikk på tegningen for å sette markører. Dra for å flytte, dobbeltklikk for å fjerne. Husk å lagre."
+      ? "Skriv navn i feltet under, klikk «Plasser», og klikk så på tegningen der personen sitter. Dra for å flytte, dobbeltklikk for å fjerne. Husk å lagre."
       : "Plantegning over kontoret. Velg kontor i nedtrekkslista. Lås opp for å laste opp bilde og plassere ansatte.";
     wrap.classList.toggle("editing", on);
     render();
   }
   editBtn.addEventListener("click", () => setEditing(!editing));
+  document.addEventListener("click", (e) => {
+    if (e.target && e.target.id === "hrPinAdd") {
+      if (!(pinNameEl()?.value || "").trim()) { err("Skriv inn navn først."); return; }
+      placing = true; wrap.classList.add("placing");
+      document.getElementById("hrHint").textContent = "Klikk på tegningen der personen sitter.";
+    }
+  });
   if (planSel) planSel.addEventListener("change", () => { curId = planSel.value; render(); });
 
   saveBtn.addEventListener("click", async () => {
