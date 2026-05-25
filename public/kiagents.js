@@ -4,8 +4,9 @@
   const board = document.getElementById("kiBoard");
   if (!board) return;
   const editBtn = document.getElementById("kiEdit"), addBtn = document.getElementById("kiAdd"), saveBtn = document.getElementById("kiSave");
-  const COLS = [["pågående", "Pågående", "wip"], ["ferdig", "Ferdig", "done"], ["idé", "Ideer", "idea"]];
-  let agents = [], editing = false, loaded = false;
+  // Rekkefølge: 1) Ideer 2) Pågående 3) Testing 4) Komplett operativ
+  const COLS = [["idé", "Ideer", "idea"], ["pågående", "Pågående", "wip"], ["testing", "Testing", "test"], ["operativ", "Komplett operativ", "done"]];
+  let agents = [], editing = false, loaded = false, dragIdx = -1;
   function err(m) { const el = document.getElementById("errorBanner"); el.textContent = m; el.hidden = false; setTimeout(() => (el.hidden = true), 8000); }
 
   function render() {
@@ -13,7 +14,7 @@
     board.innerHTML = COLS.map(([key, label, cls]) => {
       const items = agents.map((a, i) => [a, i]).filter(([a]) => a.status === key);
       const cards = items.map(([a, i]) => editing
-        ? `<div class="ki-card edit" data-i="${i}">
+        ? `<div class="ki-card edit" data-i="${i}" draggable="true">
              <input class="kon-f" data-f="name" value="${esc(a.name)}" placeholder="Navn" />
              <input class="kon-f" data-f="email" value="${esc(a.email)}" placeholder="e-post / id" />
              <textarea class="kon-f" data-f="desc" rows="2" placeholder="Hva gjør agenten?">${esc(a.desc)}</textarea>
@@ -25,12 +26,23 @@
              ${a.email ? `<div class="ki-email">${esc(a.email)}</div>` : ""}
              ${a.desc ? `<div class="ki-desc">${esc(a.desc)}</div>` : ""}
            </div>`).join("") || `<div class="empty">Ingen.</div>`;
-      return `<div class="ki-col ki-${cls}"><h3 class="ki-col-h">${label} <span class="ki-count">${items.length}</span></h3>${cards}</div>`;
+      return `<div class="ki-col ki-${cls}" data-status="${key}"><h3 class="ki-col-h">${label} <span class="ki-count">${items.length}</span></h3>${cards}</div>`;
     }).join("");
   }
   board.addEventListener("input", (e) => { const c = e.target.closest(".ki-card"); if (c && e.target.dataset.f) agents[Number(c.dataset.i)][e.target.dataset.f] = e.target.value; });
   board.addEventListener("change", (e) => { const c = e.target.closest(".ki-card"); if (c && e.target.dataset.f === "status") render(); });
   board.addEventListener("click", (e) => { if (!e.target.classList.contains("ki-del")) return; agents.splice(Number(e.target.closest(".ki-card").dataset.i), 1); render(); });
+  // Dra-og-slipp for å flytte agenter mellom kolonner (i redigeringsmodus)
+  board.addEventListener("dragstart", (e) => { const c = e.target.closest(".ki-card"); if (!c || !editing) return; dragIdx = Number(c.dataset.i); e.dataTransfer.effectAllowed = "move"; c.classList.add("dragging"); });
+  board.addEventListener("dragend", (e) => { const c = e.target.closest(".ki-card"); if (c) c.classList.remove("dragging"); dragIdx = -1; board.querySelectorAll(".ki-col.drop").forEach((x) => x.classList.remove("drop")); });
+  board.addEventListener("dragover", (e) => { if (dragIdx < 0) return; const col = e.target.closest(".ki-col"); if (col) { e.preventDefault(); board.querySelectorAll(".ki-col.drop").forEach((x) => x.classList.remove("drop")); col.classList.add("drop"); } });
+  board.addEventListener("drop", (e) => {
+    if (dragIdx < 0) return;
+    const col = e.target.closest(".ki-col"); if (!col) return;
+    e.preventDefault();
+    agents[dragIdx].status = col.dataset.status;
+    dragIdx = -1; render();
+  });
   editBtn.addEventListener("click", () => { editing = !editing; editBtn.textContent = editing ? "🔒 Lås" : "🔓 Lås opp"; addBtn.hidden = !editing; saveBtn.hidden = !editing; render(); });
   addBtn.addEventListener("click", () => { agents.push({ name: "", email: "", desc: "", status: "idé" }); render(); });
   saveBtn.addEventListener("click", async () => {

@@ -715,16 +715,22 @@ app.post("/api/kisuggestions/delete", requireAuth, (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-// ---- KI-agenter: statusoversikt (pågående/ferdig/idé) ----
-app.get("/api/kiagents", requireAuth, (req, res) => res.json({ agents: getConfig().kiAgents || [] }));
+// ---- KI-agenter: statusoversikt (idé → pågående → testing → operativ) ----
+const KI_STATUS = ["idé", "pågående", "testing", "operativ"];
+// Gamle statuser migreres til de nye verdiene.
+const kiStatusMap = { "ferdig": "operativ", "klar": "operativ", "i produksjon": "operativ", "under utvikling": "pågående" };
+const normKiStatus = (s) => { const v = kiStatusMap[String(s || "").toLowerCase()] || s; return KI_STATUS.includes(v) ? v : "idé"; };
+app.get("/api/kiagents", requireAuth, (req, res) => {
+  const agents = (getConfig().kiAgents || []).map((a) => ({ ...a, status: normKiStatus(a.status) }));
+  res.json({ agents });
+});
 app.post("/api/kiagents", requireAuth, (req, res) => {
   try {
     const list = Array.isArray(req.body?.agents) ? req.body.agents : null;
     if (!list) return res.status(400).json({ error: "Mangler agents-liste" });
-    const allowed = ["pågående", "ferdig", "idé"];
     const clean = list.map((a) => ({
       name: String(a.name || "").slice(0, 80), email: String(a.email || "").slice(0, 120),
-      desc: String(a.desc || "").slice(0, 400), status: allowed.includes(a.status) ? a.status : "idé",
+      desc: String(a.desc || "").slice(0, 400), status: normKiStatus(a.status),
     }));
     saveConfig({ kiAgents: clean });
     res.json({ ok: true });

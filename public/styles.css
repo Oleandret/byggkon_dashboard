@@ -625,16 +625,21 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .agent-how { font-size: 11.5px; color: var(--muted); line-height: 1.45; }
 
 /* ---- KI-agenter statusoversikt ---- */
-.ki-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-@media (max-width: 820px) { .ki-board { grid-template-columns: 1fr; } }
-.ki-col { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
-.ki-col-h { margin: 0 0 10px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.ki-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+@media (max-width: 1100px) { .ki-board { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .ki-board { grid-template-columns: 1fr; } }
+.ki-col { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; transition: background .12s, outline .12s; }
+.ki-col.drop { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--mint); }
+.ki-col-h { margin: 0 0 10px; font-size: 12.5px; display: flex; align-items: center; gap: 8px; }
 .ki-count { background: var(--mint-2); color: var(--accent-dark); border-radius: 999px; padding: 1px 9px; font-size: 11px; font-weight: 700; }
-.ki-wip { border-top: 3px solid #e8a33d; }
-.ki-done { border-top: 3px solid var(--accent); }
 .ki-idea { border-top: 3px solid #8a8f98; }
+.ki-wip { border-top: 3px solid #e8a33d; }
+.ki-test { border-top: 3px solid #2f6fed; }
+.ki-done { border-top: 3px solid var(--accent); }
 .ki-card { background: #fff; border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px; margin-bottom: 9px; }
-.ki-card.edit { display: flex; flex-direction: column; gap: 6px; }
+.ki-board.editing .ki-card { cursor: grab; }
+.ki-card.dragging { opacity: .45; }
+.ki-card.edit { display: flex; flex-direction: column; gap: 6px; cursor: default; }
 .ki-name { font-weight: 700; font-size: 13.5px; }
 .ki-email { font-size: 11.5px; color: var(--accent-dark); }
 .ki-desc { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.45; }

@@ -72,7 +72,7 @@ function defaults() {
     kiAgents: [
       { name: "Hilde", email: "hilde@byggkon.ai", desc: "AI-agent for å finne eiendom", status: "pågående" },
       { name: "Stein", email: "stein@byggkon.ai", desc: "AI-agent for kalkyle og kostnader på bygg", status: "pågående" },
-      { name: "Nova", email: "nova@byggkon.ai", desc: "AI-agent for kompetanse på bygging og regelverk", status: "ferdig" },
+      { name: "Nova", email: "nova@byggkon.ai", desc: "AI-agent for kompetanse på bygging og regelverk", status: "operativ" },
       { name: "Embla", email: "embla@byggkon.ai", desc: "AI-agent for tilbud", status: "pågående" },
       { name: "Eira", email: "eira@byggkon.ai", desc: "AI-agent for kundeoppfølging", status: "pågående" },
       { name: "Openclaw", email: "nova@byggkon.ai", desc: "Openclaw", status: "idé" },
