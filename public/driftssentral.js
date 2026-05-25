@@ -65,10 +65,13 @@
       head.classList.add("has-hero");
     }
   }
-  function renderCapacity(billing) {
+  function renderCapacity(billingWeek) {
     const el = document.getElementById("dsCapacity");
     if (!el) return;
-    const free = (billing || []).filter((b) => (b.billingRate || 0) < 0.6).sort((a, b) => (a.billingRate || 0) - (b.billingRate || 0));
+    const free = (billingWeek || [])
+      .filter((b) => !/ole\s*andre/i.test(b.name || "")) // daglig leder vises ikke som ledig
+      .filter((b) => (b.billingRate || 0) < 0.6)
+      .sort((a, b) => (a.billingRate || 0) - (b.billingRate || 0));
     if (!free.length) { el.innerHTML = `<span class="subnote">Alle godt booket 👍</span>`; return; }
     el.innerHTML = free.map((b) => `<span class="ds-cap-chip">${esc(b.name)} <b>${Math.round((b.billingRate || 0) * 100)}%</b></span>`).join("");
   }
@@ -77,7 +80,7 @@
       const d = await (await fetch("/api/overview")).json();
       renderFocus(d.employeeFocus);
       renderWeather(d.display);
-      renderCapacity(d.billing);
+      renderCapacity(d.billingWeek);
     } catch {}
   }
 

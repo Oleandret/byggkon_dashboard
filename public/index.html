@@ -252,8 +252,9 @@
           <div id="dsWeather" class="ds-weather"></div>
         </div>
       </div>
+      <div class="agent-status js-agent-status" data-style="big"></div>
       <div class="ds-cap-bar">
-        <span class="ds-cap-label">💡 Ledig kapasitet nå — kan ta mer:</span>
+        <span class="ds-cap-label">💡 Ledig kapasitet (faktureringsgrad siste uke):</span>
         <div id="dsCapacity" class="ds-cap-strip"><span class="subnote">Laster …</span></div>
       </div>
       <div class="ds-grid ds-grid-3">
@@ -895,6 +896,7 @@
       <div class="card">
         <h2>Operative AI-agenter <span class="subnote">— i bruk nå</span></h2>
         <p class="subnote">Klikk for å åpne. «Slik kobler du til» forklarer hvordan du tar agenten i bruk.</p>
+        <div class="agent-status js-agent-status"></div>
         <div class="agent-list">
           <div class="agent-item">
             <div class="agent-head"><span class="agent-name">BYGG-KON.ai (plattform)</span><a class="sc-link" href="https://byggkon-ai-platform-production.up.railway.app" target="_blank" rel="noopener">Åpne ↗</a></div>
@@ -1107,6 +1109,7 @@
   <script src="/onboarding.js"></script>
   <script src="/driftssentral.js"></script>
   <script src="/frontmap.js"></script>
+  <script src="/agentstatus.js"></script>
   <script src="/marketing.js"></script>
   <script src="/mktcontacts.js"></script>
 </body>

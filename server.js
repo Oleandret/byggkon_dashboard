@@ -267,6 +267,31 @@ app.get("/api/driftssentral", requireAuth, async (req, res) => {
   }
 });
 
+// ---- Live status for AI-agentene (sjekker at sidene svarer) ----
+const STATUS_AGENTS = [
+  { key: "loki", name: "Loki AI", url: "https://byggkon-loki-ai-production.up.railway.app/" },
+  { key: "nova", name: "Nova AI", url: "https://nova-ai-agent-bygg-kon-production.up.railway.app/" },
+];
+let agentStatusCache = { ts: 0, agents: [] };
+app.get("/api/agent-status", requireAuth, async (req, res) => {
+  try {
+    const now = Date.now();
+    if (now - agentStatusCache.ts < 20000 && agentStatusCache.agents.length) {
+      return res.json({ agents: agentStatusCache.agents, cached: true });
+    }
+    const agents = await Promise.all(STATUS_AGENTS.map(async (a) => {
+      try {
+        const r = await fetch(a.url, { method: "GET", signal: AbortSignal.timeout(6000) });
+        return { key: a.key, name: a.name, url: a.url, up: r.status < 500 };
+      } catch {
+        return { key: a.key, name: a.name, url: a.url, up: false };
+      }
+    }));
+    agentStatusCache = { ts: now, agents };
+    res.json({ agents });
+  } catch (err) { res.status(502).json({ error: err.message }); }
+});
+
 app.get("/api/news-feed", requireAuth, async (req, res) => {
   try {
     res.json({ items: await getNewsFeed() });

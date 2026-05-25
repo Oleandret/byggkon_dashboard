@@ -124,6 +124,24 @@ export async function buildOverview() {
     billing.length > 0 ? billing.reduce((s, e) => s + e.billingRate, 0) / billing.length : 0;
   const freeCapacityCount = billing.filter((e) => e.billingRate < 0.6).length;
 
+  // ---- Faktureringsgrad siste 7 dager, per ansatt (til kapasitet-stripa) ----
+  const weekAgoStr = ymd(daysAgo(7, today));
+  const weekByEmp = new Map();
+  for (const e of timeEntries) {
+    if (e.date < weekAgoStr) continue;
+    const id = e.employee?.id;
+    const name = employeesById.get(id) || fullName(e.employee) || "Ukjent";
+    const key = id ?? name;
+    const cur = weekByEmp.get(key) || { name, hours: 0, billable: 0 };
+    cur.hours += e.hours || 0;
+    cur.billable += e.chargeableHours || 0;
+    weekByEmp.set(key, cur);
+  }
+  const billingWeek = [...weekByEmp.values()]
+    .filter((e) => e.name && e.name !== "Ukjent" && e.hours > 0)
+    .map((e) => ({ name: e.name, hours: e.hours, billable: e.billable, billingRate: e.billable / e.hours }))
+    .sort((a, b) => a.billingRate - b.billingRate);
+
   // ---- Timeføring denne uka (man–i dag), per nåværende ansatt ----
   // Direkte knyttet til lønnsproblemet: hvem mangler førte timer denne uka?
   const dayShort = ["Søn", "Man", "Tir", "Ons", "Tor", "Fre", "Lør"];
@@ -288,6 +306,7 @@ export async function buildOverview() {
     projects: projects4Scroll,
     employeeFocus,
     timesheetWeek,
+    billingWeek,
     projectsDetailed,
     orders: orders
       .map((o) => ({
