@@ -90,15 +90,6 @@
     <main class="container">
       <div id="birthdayBanner" class="bday-banner" hidden></div>
 
-      <div class="card timesheet-card">
-        <div class="proj-head">
-          <h2>Timeføring denne uka — føres i dag?</h2>
-          <a class="btn-primary" href="https://tripletex.no/execute/timeRegistration" target="_blank" rel="noopener">⏱️ Før timer i Tripletex ↗</a>
-        </div>
-        <p class="subnote">Rød = mangler førte timer den dagen. Husk: skriv kort hva du gjør på hver timelinje, og før timer også på <b>fastprisprosjekter</b> – det skal alltid føres timer på prosjekt, selv om det er fast pris.</p>
-        <div id="timesheetGrid" class="timesheet-grid"></div>
-      </div>
-
       <div class="front-grid front-grid-3">
         <div class="card front-box">
           <div class="proj-head">
@@ -199,6 +190,15 @@
       <div class="card">
         <h2>Siste nytt <span class="subnote">— norske aviser</span></h2>
         <div id="rssFeed" class="rss-feed"><div class="empty">Laster nyheter …</div></div>
+      </div>
+
+      <div class="card timesheet-card">
+        <div class="proj-head">
+          <h2>Timeføring denne uka — føres i dag?</h2>
+          <a class="btn-primary" href="https://tripletex.no/execute/timeRegistration" target="_blank" rel="noopener">⏱️ Før timer i Tripletex ↗</a>
+        </div>
+        <p class="subnote">Rød = mangler førte timer den dagen. Husk: skriv kort hva du gjør på hver timelinje, og før timer også på <b>fastprisprosjekter</b> – det skal alltid føres timer på prosjekt, selv om det er fast pris.</p>
+        <div id="timesheetGrid" class="timesheet-grid"></div>
       </div>
     </main>
   </section>
@@ -848,9 +848,14 @@
   <section class="tab-panel" id="panel-rapporter">
     <main class="container">
       <div class="page-intro"><span class="pi-ico">📈</span><span class="pi-txt"><b>Hva siden gjør:</b> Genererer rapporter automatisk og med KI ut fra tallene i systemet. <b>Hensikt:</b> Få rask innsikt og ferdige sammendrag uten manuelt arbeid.</span></div>
+      <div class="card intro-card">
+        <h2>🔄 Automatiske rapporter fra alle kildene</h2>
+        <p>Systemet kan hente ut <b>recurring rapporter fra alt vi har koblet på</b> — Loki (dokumenter på OneDrive/SharePoint), Nova (fag og regelverk), Tripletex (økonomi, timer, prosjekter) og de andre MCP-ene. På den måten kan informasjon hentes ut <b>automatisk når det er behov</b>, f.eks. ukentlig driftsrapport, månedlig økonomi, eller kapasitet de neste ukene — uten manuelt arbeid.</p>
+        <p class="subnote">Koble til flere kilder under Innstillinger → MCP-servere. Faste rapporter settes opp nederst på siden.</p>
+      </div>
       <div class="card">
         <h2>Lag ny rapport med KI</h2>
-        <p class="subnote">Beskriv hva slags rapport du vil ha — KI henter relevante tall fra systemet og skriver rapporten.</p>
+        <p class="subnote">Beskriv hva slags rapport du vil ha — KI henter relevante tall fra systemet (Loki, Nova, Tripletex m.fl.) og skriver rapporten.</p>
         <textarea id="repPrompt" class="doc-text" rows="3" placeholder="F.eks: «Lag en kort økonomirapport for ledelsen med resultat hittil i år, likviditet og faktureringsgrad.»"></textarea>
         <div style="margin-top:10px"><button id="repGenerate" class="btn-primary">Generer rapport</button> <span id="repStatus" class="subnote"></span></div>
         <div id="repOutput" class="report-output" hidden></div>
@@ -917,14 +922,14 @@
       </div>
       <div class="card">
         <div class="proj-head">
-          <h2>Lisenskostnader</h2>
+          <h2>Budsjett <span class="subnote">— IT, lisenser og abonnement</span></h2>
           <div class="org-actions">
             <button id="licEdit" class="btn-ghost">🔓 Lås opp</button>
-            <button id="licAdd" class="btn-ghost" hidden>+ Lisens</button>
+            <button id="licAdd" class="btn-ghost" hidden>+ Post</button>
             <button id="licSave" class="btn-primary" hidden>Lagre</button>
           </div>
         </div>
-        <p class="subnote">Fyll inn kostnad per system; totalen regnes om til årlig. (Manuell oversikt – for systemer uten faktura i Tripletex.)</p>
+        <p class="subnote">Budsjett som vedlikeholdes og budsjetteres løpende. <b>Ansvarlig: Benedicte.</b> Fyll inn kostnad per post; totalen regnes om til årlig.</p>
         <div class="table-wrap"><table id="licTable"></table></div>
       </div>
       <div class="card">

@@ -119,4 +119,14 @@ if (upBtn) {
   });
 }
 
+// ---- Faner i innstillinger ----
+document.querySelectorAll("#setTabs .set-tab").forEach((b) => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll("#setTabs .set-tab").forEach((x) => x.classList.remove("active"));
+    document.querySelectorAll(".set-panel").forEach((x) => x.classList.remove("active"));
+    b.classList.add("active");
+    document.getElementById("set-" + b.dataset.set)?.classList.add("active");
+  });
+});
+
 loadSettings();

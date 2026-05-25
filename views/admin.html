@@ -30,70 +30,85 @@
       <span id="savedMsg" class="saved-msg" hidden>✓ Lagret</span>
     </div>
 
+    <div class="set-tabs" id="setTabs">
+      <button type="button" class="set-tab active" data-set="generelt">Generelt</button>
+      <button type="button" class="set-tab" data-set="forside">Forside</button>
+      <button type="button" class="set-tab" data-set="mcp">MCP & datakilder</button>
+      <button type="button" class="set-tab" data-set="tilgang">Tilgang & drift</button>
+    </div>
+
     <form id="settingsForm">
-      <div class="section-title">Visning</div>
-      <div class="field">
-        <label for="companyName">Firmanavn</label>
-        <input id="companyName" name="companyName" />
-      </div>
-      <div class="field">
-        <label for="heroImageUrl">Forsidebilde (URL)</label>
-        <input id="heroImageUrl" name="heroImageUrl" placeholder="https://…" />
-        <div class="hint">Bildet som vises som banner. Standard er bygg-bildet fra byggkon.no.</div>
+      <div class="set-panel active" id="set-generelt">
+        <div class="section-title">Visning</div>
+        <div class="field">
+          <label for="companyName">Firmanavn</label>
+          <input id="companyName" name="companyName" />
+        </div>
+        <div class="field">
+          <label for="heroImageUrl">Forsidebilde (URL)</label>
+          <input id="heroImageUrl" name="heroImageUrl" placeholder="https://…" />
+          <div class="hint">Bildet som vises som banner. Standard er bygg-bildet fra byggkon.no.</div>
+        </div>
+
+        <div class="section-title">Firmaopplysninger</div>
+        <div class="field"><label for="companyOrgNr">Organisasjonsnummer</label><input id="companyOrgNr" name="companyOrgNr" /></div>
+        <div class="field"><label for="companyAddress">Adresse</label><input id="companyAddress" name="companyAddress" /></div>
+        <div class="field"><label for="companyEmail">E-post</label><input id="companyEmail" name="companyEmail" /></div>
+        <div class="field"><label for="companyPhone">Telefon</label><input id="companyPhone" name="companyPhone" /></div>
+        <div class="field"><label for="companyWebsite">Nettside</label><input id="companyWebsite" name="companyWebsite" /></div>
       </div>
 
-      <div class="section-title">Firmaopplysninger</div>
-      <div class="field"><label for="companyOrgNr">Organisasjonsnummer</label><input id="companyOrgNr" name="companyOrgNr" /></div>
-      <div class="field"><label for="companyAddress">Adresse</label><input id="companyAddress" name="companyAddress" /></div>
-      <div class="field"><label for="companyEmail">E-post</label><input id="companyEmail" name="companyEmail" /></div>
-      <div class="field"><label for="companyPhone">Telefon</label><input id="companyPhone" name="companyPhone" /></div>
-      <div class="field"><label for="companyWebsite">Nettside</label><input id="companyWebsite" name="companyWebsite" /></div>
+      <div class="set-panel" id="set-forside">
+        <div class="section-title">Verdier (vises på forsiden)</div>
+        <div class="field">
+          <label for="valuesText">Én verdi per linje, format: <code>Bokstav - Tekst</code></label>
+          <textarea id="valuesText" rows="8" placeholder="B - Bærekraftige relasjoner"></textarea>
+          <div class="hint">F.eks. «B - Bærekraftige relasjoner». Tomme linjer hoppes over.</div>
+        </div>
 
-      <div class="section-title">Verdier (vises på forsiden)</div>
-      <div class="field">
-        <label for="valuesText">Én verdi per linje, format: <code>Bokstav - Tekst</code></label>
-        <textarea id="valuesText" rows="8" placeholder="B - Bærekraftige relasjoner"></textarea>
-        <div class="hint">F.eks. «B - Bærekraftige relasjoner». Tomme linjer hoppes over.</div>
-      </div>
-
-      <div class="section-title">Avdelinger</div>
-      <div class="field">
-        <label for="departmentsText">Én avdeling per linje</label>
-        <textarea id="departmentsText" rows="6" placeholder="RIB"></textarea>
+        <div class="section-title">Avdelinger</div>
+        <div class="field">
+          <label for="departmentsText">Én avdeling per linje</label>
+          <textarea id="departmentsText" rows="6" placeholder="RIB"></textarea>
+        </div>
       </div>
 
-      <div class="section-title">Datakilde (Regnskapsagent MCP)</div>
-      <div class="field">
-        <label for="regnskapsagentMcpUrl">Regnskapsagent MCP-URL <span id="mcpSet" class="set" hidden>· satt</span></label>
-        <input id="regnskapsagentMcpUrl" name="regnskapsagentMcpUrl" type="password" autocomplete="off" placeholder="https://regnskapsagent.no/api/mcp/… (la stå tom for å beholde)" />
-        <div class="hint">Hentes i Regnskapsagent-dashbordet («Kopier URL-en»). Denne gir tilgang til Tripletex-dataene – behandle den som et passord. Lagres kun på serveren (helst som miljøvariabel i Railway).</div>
+      <div class="set-panel" id="set-mcp">
+        <div class="section-title">Datakilde (Regnskapsagent MCP)</div>
+        <div class="field">
+          <label for="regnskapsagentMcpUrl">Regnskapsagent MCP-URL <span id="mcpSet" class="set" hidden>· satt</span></label>
+          <input id="regnskapsagentMcpUrl" name="regnskapsagentMcpUrl" type="password" autocomplete="off" placeholder="https://regnskapsagent.no/api/mcp/… (la stå tom for å beholde)" />
+          <div class="hint">Hentes i Regnskapsagent-dashbordet («Kopier URL-en»). Denne gir tilgang til Tripletex-dataene – behandle den som et passord. Lagres kun på serveren (helst som miljøvariabel i Railway).</div>
+        </div>
+
+        <div class="section-title">Andre MCP-servere (Loki, Nova, Eiendom …)</div>
+        <div class="field">
+          <div class="hint">Legg til MCP-serverne bedriften har, så systemet kan snakke med dem og hente informasjon. URL må starte med https://. Behandles som passord – lagres kun på serveren. Disse brukes av KI-rapporter og kontaktlisten.</div>
+          <div id="mcpList"></div>
+          <button type="button" id="mcpAdd" class="btn-ghost" style="margin-top:8px">+ Legg til MCP</button>
+        </div>
       </div>
 
-      <div class="section-title">Andre MCP-servere (Loki, Nova, Eiendom …)</div>
-      <div class="field">
-        <div class="hint">Legg til MCP-serverne bedriften har, så systemet kan snakke med dem og hente informasjon. URL må starte med https://. Behandles som passord – lagres kun på serveren.</div>
-        <div id="mcpList"></div>
-        <button type="button" id="mcpAdd" class="btn-ghost" style="margin-top:8px">+ Legg til MCP</button>
-      </div>
-
-      <div class="section-title">Tilgang og kapasitet</div>
-      <div class="field">
-        <label for="dashboardPassword">Ansatt-passord <span id="passwordSet" class="set" hidden>· satt</span></label>
-        <input id="dashboardPassword" name="dashboardPassword" type="password" autocomplete="off" placeholder="Felles passord ansatte logger inn med (tom = behold)" />
-      </div>
-      <div class="field">
-        <label for="weeklyCapacityHours">Kapasitet per uke (timer)</label>
-        <input id="weeklyCapacityHours" name="weeklyCapacityHours" type="number" step="0.5" />
-        <div class="hint">Brukes til å vurdere ledig kapasitet. Standard 37,5.</div>
-      </div>
-      <div class="field">
-        <label for="refreshSeconds">Oppdateringsintervall (sekunder)</label>
-        <input id="refreshSeconds" name="refreshSeconds" type="number" />
-      </div>
-      <div class="field">
-        <label for="cacheTtlMs">Cache-tid (millisekunder)</label>
-        <input id="cacheTtlMs" name="cacheTtlMs" type="number" />
-        <div class="hint">Hvor lenge data mellomlagres mellom API-kall. Standard 300000 (5 min).</div>
+      <div class="set-panel" id="set-tilgang">
+        <div class="section-title">Tilgang og kapasitet</div>
+        <div class="field">
+          <label for="dashboardPassword">Ansatt-passord <span id="passwordSet" class="set" hidden>· satt</span></label>
+          <input id="dashboardPassword" name="dashboardPassword" type="password" autocomplete="off" placeholder="Felles passord ansatte logger inn med (tom = behold)" />
+        </div>
+        <div class="field">
+          <label for="weeklyCapacityHours">Kapasitet per uke (timer)</label>
+          <input id="weeklyCapacityHours" name="weeklyCapacityHours" type="number" step="0.5" />
+          <div class="hint">Brukes til å vurdere ledig kapasitet. Standard 37,5.</div>
+        </div>
+        <div class="field">
+          <label for="refreshSeconds">Oppdateringsintervall (sekunder)</label>
+          <input id="refreshSeconds" name="refreshSeconds" type="number" />
+        </div>
+        <div class="field">
+          <label for="cacheTtlMs">Cache-tid (millisekunder)</label>
+          <input id="cacheTtlMs" name="cacheTtlMs" type="number" />
+          <div class="hint">Hvor lenge data mellomlagres mellom API-kall. Standard 300000 (5 min).</div>
+        </div>
       </div>
 
       <button type="submit" class="btn-primary">Lagre innstillinger</button>
