@@ -247,39 +247,48 @@ app.get("/api/driftssentral", requireAuth, async (req, res) => {
     });
 
     // ---- Geokoding: adresse (best) -> renset prosjektnavn -> kunde -> gjett (kontoret) ----
-    const cache = { ...(getConfig().geocache || {}) };
-    const OFFICE = { lat: 58.9700, lon: 5.7331 }; // Stavanger – brukes som gjett når usikker
-    const GENERIC = /\b(nybygg|ombygging|rehabilitering|rehab|tilbygg|prosjektering|prosjekt|rammeavtale|byggetrinn|trinn\s*\d+|utvidelse|riving|riv|totalentreprise|forprosjekt|skisseprosjekt|RIB|RIBr|ARK|RIV|RIE|RIBr?|diverse|intern)\b/gi;
+    // Koordinater lagres per prosjekt på server (proj) så de kommer opp umiddelbart.
+    const gc = getConfig().geocache || {};
+    const projCache = { ...(gc.proj || {}) };   // prosjekt-id -> { lat, lon, exact }
+    const qCache = { ...(gc.q || {}) };          // søketekst -> coord | null
+    const OFFICE = { lat: 58.9700, lon: 5.7331 }; // Stavanger – gjett når usikker
+    const GENERIC = /\b(nybygg|ombygging|rehabilitering|rehab|tilbygg|prosjektering|prosjekt|rammeavtale|byggetrinn|trinn\s*\d+|utvidelse|riving|riv|totalentreprise|forprosjekt|skisseprosjekt|RIB|RIBr|ARK|RIV|RIE|diverse|intern)\b/gi;
     const nameQuery = (name) => String(name || "").replace(/^\s*\d+[\s.\-:]*/, "").replace(GENERIC, " ").replace(/\s+/g, " ").trim();
-    // liten deterministisk forskyvning så gjettede pins ikke ligger helt oppå hverandre
-    const jitter = (id) => { let h = 0; const s = String(id); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return ((h % 1000) / 1000 - 0.5) * 0.06; };
-    let added = 0; const BUDGET = 8;
-    async function tryQ(q) {
+    const jitter = (s) => { let h = 0; s = String(s); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return ((h % 1000) / 1000 - 0.5) * 0.06; };
+    let added = 0; const BUDGET = 8; let changed = false;
+    async function geocodeQ(q) {
       if (!q) return null;
-      if (q in cache) return cache[q];           // coord eller null (allerede forsøkt)
-      if (added >= BUDGET) return undefined;     // budsjett brukt opp – prøv neste runde
+      if (q in qCache) return qCache[q];          // allerede forsøkt (coord eller null)
+      if (added >= BUDGET) return undefined;      // budsjett brukt opp – neste runde
       const g = await geocodeOne(q);
       added++; await sleep(1100);
-      cache[q] = g || null;
-      return cache[q];
+      qCache[q] = g || null; changed = true;
+      return qCache[q];
     }
     let pending = false;
     for (const p of list) {
+      const saved = projCache[p.id];
+      if (saved && saved.exact) { p.lat = saved.lat; p.lon = saved.lon; p.approx = false; continue; }
       const cands = [];
       if (addrMap.get(p.id)) cands.push(addrMap.get(p.id) + ", Norge");
       const nm = nameQuery(p.name); if (nm && nm.length > 2) cands.push(nm + ", Norge");
       if (p.customer) cands.push(p.customer + ", Norge");
       let coord = null, allTried = true;
       for (const q of cands) {
-        const r = await tryQ(q);
-        if (r === undefined) { allTried = false; break; } // budsjett oppbrukt
+        const r = await geocodeQ(q);
+        if (r === undefined) { allTried = false; break; }
         if (r) { coord = r; break; }
       }
-      if (coord) { p.lat = coord.lat; p.lon = coord.lon; p.approx = false; }
-      else if (allTried) { p.lat = OFFICE.lat + jitter(p.id); p.lon = OFFICE.lon + jitter(p.name); p.approx = true; }
-      else { pending = true; }
+      if (coord) {
+        p.lat = coord.lat; p.lon = coord.lon; p.approx = false;
+        projCache[p.id] = { lat: coord.lat, lon: coord.lon, exact: true }; changed = true;
+      } else {
+        // Vis alltid en pin – gjett (omtrentlig) ved kontoret
+        p.lat = OFFICE.lat + jitter(p.id); p.lon = OFFICE.lon + jitter(p.name); p.approx = true;
+        if (!allTried) pending = true; // budsjett oppbrukt – forfines i neste runde
+      }
     }
-    if (added > 0) saveConfig({ geocache: cache });
+    if (changed) saveConfig({ geocache: { proj: projCache, q: qCache } });
     res.json({ updatedAt: new Date().toISOString(), projects: list, pending });
   } catch (err) {
     console.error("Feil i /api/driftssentral:", err.message);
