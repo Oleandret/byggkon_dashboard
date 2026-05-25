@@ -8,7 +8,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -38,6 +40,7 @@
     </div>
     <nav class="tabs vertical">
       <button class="tab active" data-tab="oversikt">Oversikt</button>
+      <button class="tab" data-tab="driftssentral">📺 Driftssentral</button>
       <button class="tab" data-tab="prosjekter">Prosjekter</button>
       <button class="tab" data-tab="okonomi">Økonomi</button>
       <button class="tab" data-tab="kostnader">Kostnader</button>
@@ -86,7 +89,7 @@
 
     <main class="container">
       <div id="birthdayBanner" class="bday-banner" hidden></div>
-      <div class="grid-2">
+      <div class="front-grid">
         <div class="card">
           <div class="proj-head">
             <h2>Nyheter internt</h2>
@@ -103,8 +106,7 @@
           <a class="sc-link" href="https://tripletex.no/execute/timeRegistration" target="_blank" rel="noopener" style="margin:0 0 10px">⏱️ Før timer i Tripletex ↗</a>
           <div id="remindersList"></div>
         </div>
-      </div>
-      <div class="card">
+        <div class="card">
         <h2>Intern kommunikasjon</h2>
         <p class="subnote">Felles vegg — alle som er innlogget ser det samme.</p>
         <div id="commFeed" class="comm-feed"></div>
@@ -155,6 +157,7 @@
           </div>
         </div>
       </div>
+      </div><!-- /front-grid -->
 
       <div class="wall-grid">
         <!-- Venstre: rullende prosjekter -->
@@ -187,19 +190,39 @@
         </div>
       </div>
 
-      <div class="grid-2">
-        <div class="card">
-          <h2>Utestående fakturaer</h2>
-          <div class="table-wrap"><table id="outstandingTable"></table></div>
-        </div>
-        <div class="card">
-          <h2>Åpne ordre</h2>
-          <div class="table-wrap"><table id="ordersTable"></table></div>
-        </div>
+      <div class="card">
+        <h2>Utestående fakturaer</h2>
+        <div class="table-wrap"><table id="outstandingTable"></table></div>
       </div>
       <div class="card">
         <h2>Siste nytt <span class="subnote">— norske aviser</span></h2>
         <div id="rssFeed" class="rss-feed"><div class="empty">Laster nyheter …</div></div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============ FANE: DRIFTSSENTRAL (public skjerm) ============ -->
+  <section class="tab-panel" id="panel-driftssentral">
+    <main class="container ds-wide">
+      <div class="ds-header">
+        <div>
+          <h1 class="ds-title">Driftssentral — Bygg-Kon</h1>
+          <p class="ds-sub" id="dsSub">Prosjekter vi jobber på akkurat nå · siste 8 uker</p>
+        </div>
+        <div class="ds-clock" id="dsClock"></div>
+      </div>
+      <div class="ds-grid">
+        <div class="card ds-map-card">
+          <h2>Prosjektkart <span class="subnote">siste 8 uker</span></h2>
+          <div id="dsMap" class="ds-map"></div>
+          <p class="subnote" id="dsMapNote">Pins plasseres ut fra prosjektnavn/sted. Noen prosjekter uten gjenkjennbart sted vises kun i lista.</p>
+        </div>
+        <div class="card scroll-card ds-scroll-card">
+          <h2>Aktive prosjekter <span class="count-chip" id="dsProjCount"></span></h2>
+          <div class="marquee marquee-tall" id="dsMarquee">
+            <div class="marquee-track" id="dsTrack"></div>
+          </div>
+        </div>
       </div>
     </main>
   </section>
@@ -322,6 +345,11 @@
           <p class="subnote">Hver ansatt og prosjektene de har ført timer på, med flest timer øverst.</p>
           <div id="pmEmpResource" class="emp-res"></div>
         </div>
+      </div>
+      <div class="card">
+        <h2>Kapasitet — hvem kan ta mer? <span class="subnote">siste 4 uker, lavest faktureringsgrad = mest ledig</span></h2>
+        <div class="value-note">💚 <b>Vi er ett team.</b> Målet er å fylle ordreboka til hver enkelt — sammen. Har noen ledig kapasitet, er det en mulighet til å hjelpe en kollega, dele kompetanse og ta inn nye oppdrag. Bruk denne oversikten i møtet til å flytte arbeid dit det trengs, og til å løfte hverandre.</div>
+        <div class="table-wrap"><table id="pmCapacity"></table></div>
       </div>
     </main>
   </section>
@@ -466,6 +494,26 @@
           <p class="subnote">Sjekkliste og rutiner for nye ansatte.</p>
           <textarea id="onbText" class="doc-text" rows="16" disabled placeholder="Onboarding-sjekkliste: utstyr, tilganger, fadder, opplæring …"></textarea>
         </div>
+        <div class="grid-2">
+          <div class="card">
+            <h2>Alle systemer — hurtiglenker</h2>
+            <p class="subnote">Interne og eksterne systemer vi bruker. Innlogging finnes i 1Password.</p>
+            <div id="onbLinks" class="onb-links"></div>
+          </div>
+          <div class="card">
+            <div class="proj-head">
+              <h2>Personalhåndbok</h2>
+              <button id="hbEdit" class="btn-ghost">🔓 Lås opp</button>
+            </div>
+            <p class="subnote">Last opp gjeldende personalhåndbok (PDF). Revisjonsdato vises alltid.</p>
+            <div id="hbView"></div>
+            <div id="hbUpload" class="hb-upload" hidden>
+              <label class="hb-row">Revisjonsdato <input id="hbRevision" class="kon-f" type="date" /></label>
+              <input id="hbFile" class="kon-f" type="file" accept="application/pdf,image/*" />
+              <button id="hbSave" class="btn-primary">Last opp / lagre</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="hr-sub" id="hrsub-cv">
@@ -508,6 +556,18 @@
           </div>
           <div id="fmSuggestions"></div>
         </div>
+      </div>
+      <div class="card">
+        <div class="proj-head">
+          <h2>Faglig utviklingsmål 2026 — per ansatt</h2>
+          <div class="org-actions">
+            <button id="dgEdit" class="btn-ghost">🔓 Lås opp</button>
+            <button id="dgAdd" class="btn-ghost" hidden>+ Ansatt</button>
+            <button id="dgSave" class="btn-primary" hidden>Lagre</button>
+          </div>
+        </div>
+        <p class="subnote">Hva hver enkelt ønsker å utvikle seg på i 2026. Punktvis — én linje per mål. Lås opp for å redigere.</p>
+        <div id="dgList" class="dg-list"></div>
       </div>
     </main>
   </section>
@@ -701,8 +761,14 @@
             <button id="licSave" class="btn-primary" hidden>Lagre</button>
           </div>
         </div>
-        <p class="subnote">Fyll inn kostnad per system; totalen regnes om til årlig. (Kan også hentes fra Tripletex-fakturaer senere.)</p>
+        <p class="subnote">Fyll inn kostnad per system; totalen regnes om til årlig. (Manuell oversikt – for systemer uten faktura i Tripletex.)</p>
         <div class="table-wrap"><table id="licTable"></table></div>
+      </div>
+      <div class="card">
+        <h2>IT-kostnader fra Tripletex <span class="subnote">ekte tall, siste 12 mnd</span></h2>
+        <p class="subnote">Automatisk hentet fra leverandørfakturaer som gjelder IT/programvare/abonnement. Sortert med høyeste øverst.</p>
+        <div id="itCostStatus" class="subnote">Laster …</div>
+        <div class="table-wrap"><table id="itCostTable"></table></div>
       </div>
     </main>
   </section>
@@ -735,16 +801,9 @@
   <script src="/ledelse.js"></script>
   <script src="/news.js"></script>
   <script src="/calendar.js"></script>
+  <script src="/devgoals.js"></script>
+  <script src="/onboarding.js"></script>
+  <script src="/driftssentral.js"></script>
   <script src="/marketing.js"></script>
-
-  <!-- Nova AI-widget -->
-  <script src="https://nova-ai-agent-bygg-kon-production.up.railway.app/widget.js"
-          data-brand="Nova"
-          data-label="Spør Nova"
-          data-color="#030213"
-          data-accent="#1e8b6f"
-          data-welcome="Hei, jeg er Nova AI og kan hjelpe deg med fagspørsmål om bygging, regelverk og prosjektarbeid. Hva lurer du på?"
-          data-position="right"
-          async></script>
 </body>
 </html>

@@ -60,6 +60,7 @@
     { title: "Holteportalen (EG Holte)", url: "holteportalen.no", note: "Kalkyle og byggeprosjekt-verktøy. Brukernavn = din byggkon-epost." },
     { title: "Holte KS-system", url: "holteportalen.no", note: "Kvalitetssikringssystem (abonnement)." },
     { title: "OpenAI / ChatGPT", url: "chatgpt.com", note: "Språkmodell (LLM) for tekst, analyse og hjelp. Bedriftskonto: ai@byggkon.no." },
+    { title: "Claude (Anthropic)", url: "claude.ai", note: "Språkmodell (LLM) for tekst, analyse, koding og dokumenter. Driver bl.a. dette dashbordet og Cowork." },
     { title: "n8n", url: "n8n.io", note: "Automatisering og arbeidsflyt for KI-agentene." },
     { title: "Prosjektagenten", url: "prosjektagenten.no", note: "AI for å finne relevante prosjekter/tilbud. Konto: oat@byggkon.no." },
     { title: "Mercell", url: "mercell.com", note: "Anbuds- og tilbudsplattform (offentlige konkurranser). Konto: oat@byggkon.no." },

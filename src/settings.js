@@ -55,6 +55,9 @@ function defaults() {
     news: [{ date: "2026-05-25", text: "Velkommen til Bygg-Kon sitt nye interne dashboard!" }],
     messages: [],
     calendar: [],
+    devGoals: [],
+    handbook: { url: "", filename: "", revision: "" },
+    geocache: {},
     newsFeeds: [
       { name: "Aftenbladet", url: "https://www.aftenbladet.no/rss" },
       { name: "VG", url: "https://www.vg.no/rss/feed/" },
@@ -86,6 +89,7 @@ function defaults() {
       { name: "Ole Christoffer Olsen", role: "Manager – Travbaneveien Admin (utleier)", org: "Aider", phone: "975 37 438 / 51 87 09 00", email: "", note: "Kontaktperson for bygget vi leier." },
       { name: "Mathias Furenes", role: "IT-kontaktperson / IT-support", org: "IT Relasjon AS", phone: "", email: "", note: "Kontakt ved IT-problemer." },
       { name: "Elias Voll", role: "Adgangskontroll – bygg Travbaneveien", org: "", phone: "944 20 426", email: "eliasvoll.tb3@gmail.com", note: "Adgangskort til kontoret." },
+      { name: "Daniel", role: "Markedsfører", org: "Nextify", phone: "", email: "", note: "Vår markedsføringskontakt – synlighet, kampanjer og digital markedsføring." },
     ],
     orgChart: defaultOrgChart(),
     competence: defaultCompetence(),

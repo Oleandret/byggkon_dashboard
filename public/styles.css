@@ -510,6 +510,61 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .matrix.editing td.cell:hover { outline: 2px solid var(--ink); outline-offset: -2px; }
 .namecol .nm-sub { display: block; font-weight: 400; font-size: 11px; color: var(--muted); }
 
+/* ---- Forside: fire kompakte bokser side ved side ---- */
+.front-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; align-items: start; margin-bottom: 16px; }
+.front-grid > .card { margin: 0; }
+.front-grid #newsList, .front-grid #remindersList { max-height: 300px; overflow-y: auto; }
+.front-grid .comm-feed { max-height: 240px; }
+/* Kalenderen får alltid stående layout (rutenett over, kommende/skjema under) i den kompakte boksen */
+.front-grid .cal-card .cal-layout { grid-template-columns: 1fr; gap: 12px; }
+.front-grid .cal-card .cal-upcoming { max-height: 150px; }
+
+.cost-cat { display: inline-block; background: var(--mint); border: 1px solid var(--mint-2); color: var(--accent-dark);
+  border-radius: 999px; padding: 2px 10px; font-size: 11.5px; font-weight: 600; }
+
+/* ---- Driftssentral (public skjerm) ---- */
+.ds-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+.ds-title { margin: 0; font-size: 28px; letter-spacing: -.5px; }
+.ds-sub { margin: 4px 0 0; color: var(--muted); }
+.ds-clock { font-size: 16px; font-weight: 700; color: var(--accent-dark); text-transform: capitalize; }
+.ds-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items: stretch; }
+@media (max-width: 900px) { .ds-grid { grid-template-columns: 1fr; } }
+.ds-map { height: 560px; border-radius: 10px; overflow: hidden; z-index: 0; }
+.ds-map-card { display: flex; flex-direction: column; }
+.ds-scroll-card .marquee.marquee-tall { height: 560px; }
+.leaflet-container { font: inherit; }
+
+/* ---- Onboarding: lenker + personalhåndbok ---- */
+.onb-group { margin-bottom: 12px; }
+.onb-group-h { margin: 0 0 6px; font-size: 12.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.onb-link-row { display: flex; flex-wrap: wrap; gap: 7px; }
+.onb-link-row .sc-link.disabled { opacity: .55; pointer-events: none; }
+.hb-card { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 10px; padding: 12px 14px; background: #fff; }
+.hb-name { font-weight: 700; }
+.hb-rev { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.hb-upload { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+.hb-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+
+/* ---- Faglig utviklingsmål 2026 ---- */
+.dg-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.dg-item { border: 1px solid var(--border); border-top: 3px solid var(--accent); border-radius: 10px; padding: 11px 13px; background: #fff; }
+.dg-name-lbl { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+.dg-bullets { margin: 0; padding-left: 18px; }
+.dg-bullets li { font-size: 13px; line-height: 1.5; margin-bottom: 2px; }
+.dg-item.edit { display: flex; flex-direction: column; gap: 7px; }
+.dg-item.edit .dg-del { align-self: flex-end; }
+
+/* ---- KPI-stripe (økonomi) ---- */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.kpi-card { background: #fff; border: 1px solid var(--border); border-top: 3px solid var(--accent); border-radius: 10px; padding: 11px 13px; }
+.kpi-card.accent { background: var(--mint); }
+.kpi-label { font-size: 11.5px; color: var(--muted); margin-bottom: 3px; }
+.kpi-value { font-size: 20px; font-weight: 800; letter-spacing: -.5px; color: var(--ink); }
+.kpi-value.good { color: var(--accent-dark); }
+.kpi-value.bad { color: var(--bad); }
+.kpi-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
 /* ---- Side-veiledning (kort forklaring øverst på hver fane) ---- */
 .page-intro { display: flex; gap: 11px; align-items: flex-start; background: var(--mint);
   border: 1px solid var(--mint-2); border-left: 4px solid var(--accent); border-radius: 10px;

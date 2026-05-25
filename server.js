@@ -7,7 +7,8 @@ import { fileURLToPath } from "url";
 import { buildOverview } from "./src/metrics.js";
 import { buildEconomy } from "./src/economy.js";
 import { getNewsFeed } from "./src/newsfeed.js";
-import { clearCache, resetClient, getInvoices, getCustomers, getSupplierInvoices, ymd } from "./src/tripletex.js";
+import { clearCache, resetClient, getInvoices, getCustomers, getSupplierInvoices, getProjects, getTimeEntries, ymd } from "./src/tripletex.js";
+import { geocodeOne, sleep } from "./src/geocode.js";
 import { getConfig, saveConfig, getConfigForAdmin, SETTINGS_PATH } from "./src/settings.js";
 
 // Mappe for opplastede filer (ved siden av innstillingsfila – legg på Volume på Railway).
@@ -160,6 +161,79 @@ app.get("/api/costs", requireAuth, async (req, res) => {
   }
 });
 
+// IT-relaterte leverandørkostnader (ekte data fra Tripletex, siste 12 mnd).
+const IT_SUPPLIER_RE = /microsoft|office\s?365|azure|adobe|autodesk|revit|autocad|google|openai|chatgpt|anthropic|claude|atlassian|jira|slack|dropbox|github|gitlab|1password|fokus|statcon|sletten|mercell|prosjektagent|holte|norsk\s?prisbok|byggforsk|standard\s?online|fireflies|fyxer|n8n|webflow|nextify|nova|phonero|telenor|telia|\bice\b|altibox|remarkable|domene|itrelasjon|it relasjon|linkedin/i;
+app.get("/api/it-costs", requireAuth, async (req, res) => {
+  try {
+    const today = new Date();
+    const to = ymd(today);
+    const from = ymd(new Date(today.getFullYear() - 1, today.getMonth(), today.getDate()));
+    const sis = await getSupplierInvoices(from, to);
+    const bySup = new Map();
+    let total = 0;
+    for (const s of sis) {
+      const name = s.supplier?.name || "Ukjent";
+      if (!IT_SUPPLIER_RE.test(name)) continue;
+      const cost = Math.abs(s.amount || 0);
+      const cur = bySup.get(name) || { name, cost: 0, count: 0 };
+      cur.cost += cost; cur.count += 1; total += cost;
+      bySup.set(name, cur);
+    }
+    const suppliers = [...bySup.values()].sort((a, b) => b.cost - a.cost);
+    res.json({ suppliers, total });
+  } catch (err) {
+    console.error("Feil i /api/it-costs:", err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// Driftssentral: aktive prosjekter siste 8 uker + geokodede posisjoner til kart.
+app.get("/api/driftssentral", requireAuth, async (req, res) => {
+  try {
+    const today = new Date();
+    const to = ymd(today);
+    const from = ymd(new Date(today.getTime() - 56 * 24 * 3600 * 1000)); // 8 uker
+    const [projects, time] = await Promise.all([
+      getProjects().catch(() => []),
+      getTimeEntries(from, to).catch(() => []),
+    ]);
+    const pMeta = new Map(projects.map((p) => [p.id, p]));
+    const agg = new Map();
+    for (const e of time) {
+      if (!e.project) continue;
+      const id = e.project.id;
+      const cur = agg.get(id) || { id, name: e.project.name || pMeta.get(id)?.name || `Prosjekt ${id}`, hours: 0, last: "" };
+      cur.hours += e.hours || 0;
+      if (e.date > cur.last) cur.last = e.date;
+      agg.set(id, cur);
+    }
+    let list = [...agg.values()].filter((p) => p.hours > 0).sort((a, b) => b.hours - a.hours).map((p) => {
+      const m = pMeta.get(p.id);
+      return { number: m?.number || "", name: p.name, customer: m?.customer?.name || "", hours: Math.round(p.hours * 10) / 10, last: p.last };
+    });
+
+    // Geokoding mot OSM, cachet i settings. Maks noen få nye per kall for å holde svaret raskt.
+    const cache = { ...(getConfig().geocache || {}) };
+    let added = 0; const BATCH = 6;
+    for (const p of list) {
+      const key = p.name;
+      if (!(key in cache) && added < BATCH) {
+        const g = await geocodeOne(p.name + ", Norge");
+        cache[key] = g || null;
+        added++;
+        await sleep(1100);
+      }
+      const g = cache[key];
+      if (g) { p.lat = g.lat; p.lon = g.lon; }
+    }
+    if (added > 0) saveConfig({ geocache: cache });
+    res.json({ updatedAt: new Date().toISOString(), projects: list, pending: list.some((p) => !("lat" in p)) });
+  } catch (err) {
+    console.error("Feil i /api/driftssentral:", err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
 app.get("/api/news-feed", requireAuth, async (req, res) => {
   try {
     res.json({ items: await getNewsFeed() });
@@ -221,8 +295,35 @@ app.get("/api/customers", requireAuth, async (req, res) => {
     const today = new Date();
     const to = ymd(today);
     const from = ymd(new Date(today.getFullYear() - 1, today.getMonth(), today.getDate()));
-    const [invoices, custList] = await Promise.all([getInvoices(from, to), getCustomers().catch(() => [])]);
+    const [invoices, custList, projects, timeEntries] = await Promise.all([
+      getInvoices(from, to),
+      getCustomers().catch(() => []),
+      getProjects().catch(() => []),
+      getTimeEntries(from, to).catch(() => []),
+    ]);
     const custById = new Map(custList.map((c) => [c.id, c]));
+    // Prosjekt -> { kunde-id, prosjektleder-navn }
+    const projMeta = new Map();
+    for (const p of projects) {
+      const pm = p.projectManager ? `${p.projectManager.firstName || ""} ${p.projectManager.lastName || ""}`.trim() : "";
+      projMeta.set(p.id, { custId: p.customer?.id, pm });
+    }
+    // Timer per kunde per prosjektleder -> finn den som jobber mest mot kunden
+    const custPmHours = new Map(); // custId -> Map(pm -> hours)
+    for (const e of timeEntries) {
+      const meta = projMeta.get(e.project?.id);
+      if (!meta || meta.custId == null || !meta.pm) continue;
+      const m = custPmHours.get(meta.custId) || new Map();
+      m.set(meta.pm, (m.get(meta.pm) || 0) + (e.hours || 0));
+      custPmHours.set(meta.custId, m);
+    }
+    const topPm = (custId) => {
+      const m = custPmHours.get(custId);
+      if (!m) return "";
+      let best = "", bh = 0;
+      for (const [k, v] of m) if (v > bh) { bh = v; best = k; }
+      return best;
+    };
     const byCust = new Map();
     for (const i of invoices) {
       const id = i.customer?.id ?? i.customer?.name ?? "ukjent";
@@ -233,7 +334,7 @@ app.get("/api/customers", requireAuth, async (req, res) => {
     }
     const customers = [...byCust.values()].map((c) => {
       const info = custById.get(c.id) || {};
-      return { name: c.name, revenue: c.revenue, invoices: c.invoices, email: info.email || info.invoiceEmail || "", phone: info.phoneNumber || "" };
+      return { name: c.name, revenue: c.revenue, invoices: c.invoices, email: info.email || info.invoiceEmail || "", phone: info.phoneNumber || "", topProjectManager: topPm(c.id) };
     }).sort((a, b) => b.revenue - a.revenue);
     res.json({ updatedAt: new Date().toISOString(), customers });
   } catch (err) {
@@ -360,6 +461,39 @@ app.post("/api/calendar/delete", requireAuth, (req, res) => {
     if (!id) return res.status(400).json({ error: "Mangler id" });
     const list = (getConfig().calendar || []).filter((e) => e.id !== id);
     saveConfig({ calendar: list });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Personalhåndbok (opplasting + revisjonsdato) ----
+app.get("/api/handbook", requireAuth, (req, res) => res.json({ handbook: getConfig().handbook || { url: "", filename: "", revision: "" } }));
+app.post("/api/handbook", requireAuth, (req, res) => {
+  try {
+    const revision = String(req.body?.revision || "").slice(0, 10);
+    const filename = String(req.body?.filename || "Personalhåndbok").slice(0, 120);
+    const m = /^data:(application\/pdf|image\/(png|jpeg|jpg|webp));base64,(.+)$/i.exec(req.body?.dataUrl || "");
+    if (!m) return res.status(400).json({ error: "Ugyldig fil. Last opp PDF (anbefalt) eller PNG/JPG." });
+    const ext = m[1].toLowerCase().includes("pdf") ? "pdf" : m[2].toLowerCase().replace("jpeg", "jpg");
+    const buf = Buffer.from(m[3], "base64");
+    if (buf.length > 14 * 1024 * 1024) return res.status(400).json({ error: "Filen er for stor (maks 14 MB)." });
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    for (const e of ["pdf", "png", "jpg", "webp"]) { try { fs.unlinkSync(path.join(UPLOAD_DIR, `handbook.${e}`)); } catch {} }
+    fs.writeFileSync(path.join(UPLOAD_DIR, `handbook.${ext}`), buf);
+    const url = "/uploads/handbook." + ext + "?v=" + Date.now();
+    const handbook = { url, filename, revision };
+    saveConfig({ handbook });
+    res.json({ ok: true, handbook });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Faglig utviklingsmål 2026 (per ansatt) ----
+app.get("/api/devgoals", requireAuth, (req, res) => res.json({ devGoals: getConfig().devGoals || [] }));
+app.post("/api/devgoals", requireAuth, (req, res) => {
+  try {
+    const list = Array.isArray(req.body?.devGoals) ? req.body.devGoals : null;
+    if (!list) return res.status(400).json({ error: "Mangler devGoals-liste" });
+    const clean = list.map((g) => ({ name: String(g.name || "").slice(0, 80), goals: String(g.goals || "").slice(0, 4000) }));
+    saveConfig({ devGoals: clean });
     res.json({ ok: true });
   } catch (err) { res.status(400).json({ error: err.message }); }
 });

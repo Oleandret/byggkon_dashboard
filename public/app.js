@@ -17,6 +17,34 @@ const pct = (n) => `${Math.round((n || 0) * 100)} %`;
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
+// Antatt kostnadskategori utledet fra leverandørnavn (gir oversikt over hva kostnaden er).
+const COST_RULES = [
+  ["IT / programvare", /microsoft|adobe|autodesk|google|openai|anthropic|claude|atlassian|slack|dropbox|github|1password|fokus|statcon|revit|autocad|mercell|prosjektagent|holte|norsk prisbok|fdv|fyxer|n8n|nextify|nova|webflow|domene|domeneshop|abonnement.*software/i],
+  ["Telefoni / internett", /phonero|telenor|telia|ice|altibox|gigafib|broadband|internett|mobil/i],
+  ["Husleie / lokaler", /utleie|eiendom|husleie|travbane|aider.*leie|lokale|kontorleie/i],
+  ["Forsikring", /forsikring|tryg|gjensidige|if\b|fremtind|storebrand.*forsik/i],
+  ["Regnskap / revisjon", /regnskap|revisjon|aider|revisor|accounting|byrå/i],
+  ["Bank / finans", /\bbank\b|dnb|sparebank|nordea|finans|factoring|kredinor/i],
+  ["Reise / transport", /flytog|sas|norwegian|vy\b|hotell|hotel|bilutleie|drivstoff|circle k|esso|shell|bom|ferge/i],
+  ["Markedsføring", /markedsf|reklame|annonse|facebook|meta\b|linkedin|google ads|nextify/i],
+  ["Kontor / rekvisita", /staples|kontor|rekvisita|møbler|ikea|elkjøp|power\b|clas ohlson/i],
+  ["Faglitteratur / kurs", /standard\.no|standard online|kurs|sertifisering|nkf|rif|tekna|nito|faglitteratur/i],
+];
+function costCategory(name) {
+  const n = String(name || "");
+  for (const [label, re] of COST_RULES) if (re.test(n)) return label;
+  return "Annet / ukategorisert";
+}
+
+// Nøkkeltall-kort (brukes i KPI-stripa på økonomisiden)
+function kpiCard({ label, value, sub = "", cls = "", accent = false }) {
+  return `<div class="kpi-card${accent ? " accent" : ""}">
+    <div class="kpi-label">${esc(label)}</div>
+    <div class="kpi-value ${cls}">${value}</div>
+    ${sub ? `<div class="kpi-sub">${esc(sub)}</div>` : ""}
+  </div>`;
+}
+
 function showError(msg) {
   const el = document.getElementById("errorBanner");
   el.textContent = msg; el.hidden = false;
@@ -133,8 +161,31 @@ document.querySelectorAll(".tab").forEach((t) => {
     if (t.dataset.tab === "okonomi") loadEconomy();
     if (t.dataset.tab === "kunder") loadCustomers();
     if (t.dataset.tab === "kostnader") loadCosts();
+    if (t.dataset.tab === "itsystem") loadItCosts();
   });
 });
+
+/* ---- IT-kostnader fra Tripletex (lazy) ---- */
+let itCostsLoaded = false;
+async function loadItCosts(force = false) {
+  if (itCostsLoaded && !force) return;
+  const status = document.getElementById("itCostStatus");
+  try {
+    const res = await fetch("/api/it-costs");
+    if (res.status === 401) { location.href = "/login"; return; }
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Feil ${res.status}`); }
+    const d = await res.json();
+    itCostsLoaded = true;
+    if (status) status.hidden = true;
+    const rows = (d.suppliers || []).map((c, i) => [String(i + 1), esc(c.name), num(c.count), nok(c.cost)]);
+    if (rows.length) rows.push(["", "<b>Total IT 12 mnd</b>", "", `<b>${nok(d.total || 0)}</b>`]);
+    fillTable("itCostTable",
+      [{ label: "#" }, { label: "Leverandør" }, { label: "Fakturaer", num: true }, { label: "Kostnad 12 mnd", num: true }],
+      rows, "Ingen IT-kostnader funnet i Tripletex.");
+  } catch (err) {
+    if (status) { status.hidden = false; status.textContent = "Kunne ikke hente IT-kostnader: " + err.message; }
+  }
+}
 
 /* ---- Kostnader-fane (lazy) ---- */
 let costsLoaded = false;
@@ -147,10 +198,10 @@ async function loadCosts(force = false) {
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Feil ${res.status}`); }
     const d = await res.json();
     status.hidden = true; costsLoaded = true;
-    const rows = (d.suppliers || []).map((c, i) => [String(i + 1), esc(c.name), num(c.count), nok(c.cost)]);
-    rows.push(["", "<b>Total</b>", "", `<b>${nok(d.total || 0)}</b>`]);
+    const rows = (d.suppliers || []).map((c, i) => [String(i + 1), esc(c.name), `<span class="cost-cat">${esc(costCategory(c.name))}</span>`, num(c.count), nok(c.cost)]);
+    rows.push(["", "<b>Total</b>", "", "", `<b>${nok(d.total || 0)}</b>`]);
     fillTable("kostTable",
-      [{ label: "#" }, { label: "Leverandør" }, { label: "Antall", num: true }, { label: "Kostnad 12 mnd", num: true }],
+      [{ label: "#" }, { label: "Leverandør" }, { label: "Hva er kostnaden? (antatt)" }, { label: "Antall", num: true }, { label: "Kostnad 12 mnd", num: true }],
       rows, "Ingen kostnader funnet.");
   } catch (err) {
     status.hidden = false; status.textContent = "Kunne ikke hente kostnader: " + err.message;
@@ -170,9 +221,10 @@ async function loadCustomers(force = false) {
     status.hidden = true;
     customersLoaded = true;
     fillTable("kunderTable",
-      [{ label: "#" }, { label: "Kunde" }, { label: "Kontakt / e-post" }, { label: "Telefon" }, { label: "Omsetning 12 mnd", num: true }, { label: "Fakturaer", num: true }],
+      [{ label: "#" }, { label: "Kunde" }, { label: "Mest aktiv prosjektleder" }, { label: "Kontakt / e-post" }, { label: "Telefon" }, { label: "Omsetning 12 mnd", num: true }, { label: "Fakturaer", num: true }],
       d.customers.map((c, i) => [
         String(i + 1), esc(c.name),
+        esc(c.topProjectManager || "—"),
         c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : "—",
         esc(c.phone || "—"),
         nok(c.revenue), num(c.invoices),
@@ -349,6 +401,7 @@ function renderRevenueChart(monthly) {
 /* ---- Tabeller ---- */
 function fillTable(id, headers, rows, emptyMsg) {
   const t = document.getElementById(id);
+  if (!t) return;
   if (!rows.length) { t.innerHTML = `<tbody><tr><td class="empty">${emptyMsg}</td></tr></tbody>`; return; }
   const head = `<thead><tr>${headers.map((h) => `<th class="${h.num ? "num" : ""}">${h.label}</th>`).join("")}</tr></thead>`;
   const body = rows.map((r) => `<tr>${r.map((c, i) => `<td class="${headers[i].num ? "num" : ""}">${c}</td>`).join("")}</tr>`).join("");
@@ -395,7 +448,7 @@ function renderProjectsTable() {
   else rows.sort((a, b) => (b.hours4w || 0) - (a.hours4w || 0) || (b.hoursYTD || 0) - (a.hoursYTD || 0));
   const hoursLabel = emp ? `Timer 4 uker · ${emp.split(" ")[0]}` : "Timer 4 uker";
   fillTable("projectsTable",
-    [{ label: "Nr" }, { label: "Prosjekt" }, { label: "Kunde" }, { label: "Prosjektleder" },
+    [{ label: "Nr" }, { label: "Prosjekt" }, { label: "Kunde" }, { label: "Prosjekteier" },
      { label: hoursLabel, num: true }, { label: "Timer i år", num: true }, { label: "Fakturerbart i år", num: true }, { label: "Siste aktivitet" }],
     rows.map((p) => [
       esc(p.number), esc(p.name), esc(p.customer), esc(p.projectManager),
@@ -421,6 +474,27 @@ function renderResource() {
     "Ingen timer ført siste 4 uker.");
   populatePmEmpFilter();
   renderEmpResource();
+  renderCapacity();
+}
+
+// Kapasitet: ansatte sortert etter faktureringsgrad (lavest = mest ledig).
+function renderCapacity() {
+  const billing = (lastData && lastData.billing) || [];
+  const rows = [...billing].sort((a, b) => (a.billingRate || 0) - (b.billingRate || 0));
+  fillTable("pmCapacity",
+    [{ label: "Ansatt" }, { label: "Faktureringsgrad" }, { label: "Timer (4 uker)", num: true }, { label: "Vurdering" }],
+    rows.map((b) => {
+      const bk = bucket(b.billingRate);
+      const w = Math.min(100, Math.round((b.billingRate || 0) * 100));
+      const tag = b.billingRate < 0.6 ? "Ledig kapasitet" : b.billingRate < 0.85 ? "Litt rom" : "Godt booket";
+      return [
+        esc(b.name),
+        `<div class="ratecell"><b>${pct(b.billingRate)}</b><div class="ratebar"><span style="width:${w}%"></span></div></div>`,
+        num(b.hours),
+        `<span class="tag ${bk.cls}">${tag}</span>`,
+      ];
+    }),
+    "Ingen timer ført siste 4 uker.");
 }
 
 // Bygger per-ansatt-oversikt fra prosjektdata: hver ansatt -> prosjektene de
