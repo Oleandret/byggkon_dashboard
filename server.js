@@ -120,6 +120,12 @@ app.post("/api/admin/settings", requireAdmin, (req, res) => {
     if (Array.isArray(req.body?.departments)) {
       partial.departments = req.body.departments.map((d) => String(d || "").trim()).filter(Boolean);
     }
+    // MCP-servere (navn + url). Url må være http(s).
+    if (Array.isArray(req.body?.mcpServers)) {
+      partial.mcpServers = req.body.mcpServers
+        .map((m) => ({ name: String(m.name || "").slice(0, 60).trim(), url: String(m.url || "").slice(0, 500).trim() }))
+        .filter((m) => m.name && /^https?:\/\//i.test(m.url));
+    }
     saveConfig(partial);
     resetClient(); // ny token + tøm cache slik at nye nøkler tas i bruk
     res.json({ ok: true, settings: getConfigForAdmin() });
@@ -157,6 +163,25 @@ app.get("/api/costs", requireAuth, async (req, res) => {
     res.json({ suppliers, total });
   } catch (err) {
     console.error("Feil i /api/costs:", err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// Markedsføring: full kontaktliste (alle kunder fra Tripletex, all tilgjengelig data).
+app.get("/api/marketing-contacts", requireAuth, async (req, res) => {
+  try {
+    const custList = await getCustomers().catch(() => []);
+    const contacts = custList.map((c) => ({
+      kilde: "Tripletex",
+      navn: c.name || "",
+      epost: c.email || "",
+      fakturaEpost: c.invoiceEmail || "",
+      telefon: c.phoneNumber || "",
+    })).sort((a, b) => a.navn.localeCompare(b.navn, "nb"));
+    const lokiConfigured = (getConfig().mcpServers || []).some((m) => /loki/i.test(m.name));
+    res.json({ updatedAt: new Date().toISOString(), contacts, lokiConfigured });
+  } catch (err) {
+    console.error("Feil i /api/marketing-contacts:", err.message);
     res.status(502).json({ error: err.message });
   }
 });

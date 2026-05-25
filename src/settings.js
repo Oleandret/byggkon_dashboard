@@ -64,6 +64,7 @@ function defaults() {
     leads: [],
     hrRequests: [],
     hrDocs: [],
+    mcpServers: [],
     parking: { url: "", pins: [] },
     kiSuggestions: [],
     kiAgents: [
@@ -334,6 +335,7 @@ export function getConfigForAdmin() {
     weeklyCapacityHours: c.weeklyCapacityHours,
     cacheTtlMs: c.cacheTtlMs,
     refreshSeconds: c.refreshSeconds,
+    mcpServers: (c.mcpServers || []).map((m) => ({ name: m.name, url: m.url })),
     settingsPath: SETTINGS_PATH,
   };
 }

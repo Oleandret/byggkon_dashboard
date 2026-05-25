@@ -124,6 +124,34 @@ export async function buildOverview() {
     billing.length > 0 ? billing.reduce((s, e) => s + e.billingRate, 0) / billing.length : 0;
   const freeCapacityCount = billing.filter((e) => e.billingRate < 0.6).length;
 
+  // ---- Timeføring denne uka (man–i dag), per nåværende ansatt ----
+  // Direkte knyttet til lønnsproblemet: hvem mangler førte timer denne uka?
+  const dayShort = ["Søn", "Man", "Tir", "Ons", "Tor", "Fre", "Lør"];
+  const dow0 = (today.getDay() + 6) % 7; // 0 = mandag
+  const weekStart = new Date(today); weekStart.setDate(today.getDate() - dow0);
+  const weekDates = [];
+  for (let i = 0; i <= dow0 && i < 5; i++) { const d = new Date(weekStart); d.setDate(weekStart.getDate() + i); weekDates.push(ymd(d)); }
+  const weekDateSet = new Set(weekDates);
+  const activeEmpIds = new Set(last4w.map((e) => e.employee?.id).filter((x) => x != null));
+  const loggedByEmp = new Map();
+  for (const e of timeEntries) {
+    if (!weekDateSet.has(e.date) || (e.hours || 0) <= 0) continue;
+    const id = e.employee?.id; if (id == null) continue;
+    if (!loggedByEmp.has(id)) loggedByEmp.set(id, new Set());
+    loggedByEmp.get(id).add(e.date);
+  }
+  const timesheetEmployees = [...activeEmpIds].map((id) => {
+    const logged = loggedByEmp.get(id) || new Set();
+    const missingCount = weekDates.filter((ds) => !logged.has(ds)).length;
+    return { name: employeesById.get(id) || `#${id}`, logged: weekDates.map((ds) => logged.has(ds)), missingCount };
+  }).filter((e) => e.name && e.name !== "Ukjent")
+    .sort((a, b) => b.missingCount - a.missingCount || a.name.localeCompare(b.name));
+  const timesheetWeek = {
+    days: weekDates.map((ds) => ({ date: ds, label: dayShort[new Date(ds).getDay()] })),
+    employees: timesheetEmployees,
+    anyMissing: timesheetEmployees.some((e) => e.missingCount > 0),
+  };
+
   // ---- Prosjekter ----
   // «Aktive prosjekter» = de det faktisk er ført timer på (Tripletex' isClosed-flagg
   // brukes lite hos Bygg-Kon, så vi går på reell aktivitet i stedet).
@@ -258,6 +286,7 @@ export async function buildOverview() {
     billing,
     projects: projects4Scroll,
     employeeFocus,
+    timesheetWeek,
     projectsDetailed,
     orders: orders
       .map((o) => ({

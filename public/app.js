@@ -365,6 +365,21 @@ function renderProjectsMarquee(projects) {
   track.style.animationPlayState = projects.length > 6 ? "running" : "paused";
 }
 
+function renderTimesheet(ts) {
+  const wrap = document.getElementById("timesheetGrid");
+  if (!wrap) return;
+  ts = ts || { days: [], employees: [] };
+  if (!ts.employees.length) { wrap.innerHTML = `<div class="empty">Ingen aktive ansatte å spore timer for denne uka.</div>`; return; }
+  const head = `<div class="ts-row ts-head"><span class="ts-name"></span>${ts.days.map((d) => `<span class="ts-cell">${esc(d.label)}</span>`).join("")}<span class="ts-stat">Status</span></div>`;
+  const rows = ts.employees.map((e) =>
+    `<div class="ts-row${e.missingCount > 0 ? " has-missing" : ""}">
+      <span class="ts-name">${esc(e.name)}</span>
+      ${e.logged.map((l) => `<span class="ts-cell ${l ? "ok" : "miss"}">${l ? "✓" : "✕"}</span>`).join("")}
+      <span class="ts-stat">${e.missingCount > 0 ? `<span class="ts-badge">mangler ${e.missingCount}</span>` : `<span class="ts-ok">OK</span>`}</span>
+    </div>`).join("");
+  wrap.innerHTML = head + rows;
+}
+
 function renderFocusMarquee(focus) {
   const track = document.getElementById("focusTrack");
   if (!track) return;
@@ -617,6 +632,7 @@ async function load() {
     }
     renderHero(d);
     renderProjectsMarquee(d.projects);
+    renderTimesheet(d.timesheetWeek);
     renderFocusMarquee(d.employeeFocus);
     renderBilling(d.billing);
     renderRevenueChart(d.monthlyRevenue);

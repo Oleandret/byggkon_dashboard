@@ -511,6 +511,23 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .matrix.editing td.cell:hover { outline: 2px solid var(--ink); outline-offset: -2px; }
 .namecol .nm-sub { display: block; font-weight: 400; font-size: 11px; color: var(--muted); }
 
+/* ---- Lite prosjektkart ---- */
+.front-map { height: 340px; border-radius: 10px; overflow: hidden; z-index: 0; }
+
+/* ---- Timeføring denne uka ---- */
+.timesheet-card { margin-bottom: 16px; }
+.timesheet-grid { display: flex; flex-direction: column; gap: 4px; max-height: 320px; overflow-y: auto; }
+.ts-row { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 8px; }
+.ts-row.ts-head { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; position: sticky; top: 0; background: var(--card); }
+.ts-row.has-missing { background: var(--bad-bg); }
+.ts-name { flex: 1; min-width: 120px; font-size: 13px; font-weight: 600; }
+.ts-cell { width: 38px; text-align: center; font-size: 12px; font-weight: 700; flex: none; }
+.ts-cell.ok { color: var(--good); }
+.ts-cell.miss { color: var(--bad); }
+.ts-stat { width: 96px; text-align: right; flex: none; }
+.ts-badge { background: var(--bad); color: #fff; border-radius: 999px; padding: 2px 9px; font-size: 11px; font-weight: 700; }
+.ts-ok { color: var(--good); font-weight: 700; font-size: 12px; }
+
 /* ---- Forside: tre like store bokser side ved side ---- */
 .front-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; align-items: start; margin-bottom: 16px; }
 .front-grid-3 { grid-template-columns: repeat(3, 1fr); }

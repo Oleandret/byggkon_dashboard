@@ -89,6 +89,16 @@
 
     <main class="container">
       <div id="birthdayBanner" class="bday-banner" hidden></div>
+
+      <div class="card timesheet-card">
+        <div class="proj-head">
+          <h2>Timeføring denne uka — føres i dag?</h2>
+          <a class="btn-primary" href="https://tripletex.no/execute/timeRegistration" target="_blank" rel="noopener">⏱️ Før timer i Tripletex ↗</a>
+        </div>
+        <p class="subnote">Rød = mangler førte timer den dagen. Husk: skriv kort hva du gjør på hver timelinje, og før timer også på <b>fastprisprosjekter</b> – det skal alltid føres timer på prosjekt, selv om det er fast pris.</p>
+        <div id="timesheetGrid" class="timesheet-grid"></div>
+      </div>
+
       <div class="front-grid front-grid-3">
         <div class="card front-box">
           <div class="proj-head">
@@ -175,6 +185,11 @@
         <div class="marquee marquee-tall" id="focusMarquee">
           <div class="marquee-track" id="focusTrack"></div>
         </div>
+      </div>
+
+      <div class="card">
+        <h2>Prosjektkart <span class="subnote">— hvor vi jobber (siste 8 uker)</span></h2>
+        <div id="frontMap" class="front-map"></div>
       </div>
 
       <div class="card">
@@ -744,10 +759,23 @@
   <section class="tab-panel" id="panel-markedsforing">
     <main class="container">
       <div class="page-intro"><span class="pi-ico">📣</span><span class="pi-txt"><b>Hva siden gjør:</b> Samler markedsarbeidet — synlighet i sosiale medier, e-postmarkedsføring, kundepleie og potensielle kundelister. <b>Hensikt:</b> Holde markedsføringen målrettet og koordinert så vi blir mer synlige og vinner nye oppdrag.</span></div>
+      <div class="card">
+        <h2>Prosjektkart <span class="subnote">— hvor vi jobber (siste 8 uker)</span></h2>
+        <div id="mktMap" class="front-map"></div>
+      </div>
       <div class="card intro-card">
         <h2>💼 Knytt kontakter på LinkedIn</h2>
         <p>Alle oppfordres til å være aktive på <b>LinkedIn</b> – koble dere til kunder, samarbeidspartnere og bransjefolk, og del og lik Bygg-Kon sitt innhold. Jo flere av oss som er synlige, jo større rekkevidde får vi i markedet. Det er en av de enkleste måtene hver enkelt kan bidra til mer synlighet og nye oppdrag.</p>
         <a class="sc-link" href="https://www.linkedin.com/company/bygg-kon/" target="_blank" rel="noopener">Følg Bygg-Kon på LinkedIn ↗</a>
+      </div>
+      <div class="card">
+        <div class="proj-head">
+          <h2>Kontaktliste — til markedsføring</h2>
+          <button id="mcDownload" class="btn-primary">⬇ Last ned CSV</button>
+        </div>
+        <p class="subnote" id="mcNote">Løpende, oppdatert liste over alle kontakter vi klarer å hente inn fra Tripletex. Last ned som CSV og gi til markedsføreren.</p>
+        <div id="mcStatus" class="eco-status">Laster kontakter …</div>
+        <div class="table-wrap tall"><table id="mcTable"></table></div>
       </div>
       <div class="card">
         <div class="proj-head">
@@ -943,6 +971,8 @@
   <script src="/devgoals.js"></script>
   <script src="/onboarding.js"></script>
   <script src="/driftssentral.js"></script>
+  <script src="/frontmap.js"></script>
   <script src="/marketing.js"></script>
+  <script src="/mktcontacts.js"></script>
 </body>
 </html>

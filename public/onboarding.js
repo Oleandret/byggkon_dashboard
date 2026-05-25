@@ -34,6 +34,8 @@
     ]},
     { group: "Marked & styre", items: [
       { t: "LinkedIn", u: "linkedin.com" },
+      { t: "Nettsiden byggkon.no", u: "https://www.byggkon.no/" },
+      { t: "Rediger nettsiden (admin)", u: "http://www.byggkon.no/admin" },
       { t: "Nettside (Webflow)", u: "webflow.com/dashboard/sites/bygg-kon/general" },
       { t: "Orgbrain (styre)", u: "apps.orgbrain.ai/home/organizations/943885397" },
     ]},

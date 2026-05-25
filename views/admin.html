@@ -69,6 +69,13 @@
         <div class="hint">Hentes i Regnskapsagent-dashbordet («Kopier URL-en»). Denne gir tilgang til Tripletex-dataene – behandle den som et passord. Lagres kun på serveren (helst som miljøvariabel i Railway).</div>
       </div>
 
+      <div class="section-title">Andre MCP-servere (Loki, Nova, Eiendom …)</div>
+      <div class="field">
+        <div class="hint">Legg til MCP-serverne bedriften har, så systemet kan snakke med dem og hente informasjon. URL må starte med https://. Behandles som passord – lagres kun på serveren.</div>
+        <div id="mcpList"></div>
+        <button type="button" id="mcpAdd" class="btn-ghost" style="margin-top:8px">+ Legg til MCP</button>
+      </div>
+
       <div class="section-title">Tilgang og kapasitet</div>
       <div class="field">
         <label for="dashboardPassword">Ansatt-passord <span id="passwordSet" class="set" hidden>· satt</span></label>

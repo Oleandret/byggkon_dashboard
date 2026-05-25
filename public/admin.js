@@ -26,8 +26,33 @@ async function loadSettings() {
   if (vt) vt.value = (s.values || []).map((v) => `${v.letter} - ${v.text}`).join("\n");
   const dt = document.getElementById("departmentsText");
   if (dt) dt.value = (s.departments || []).join("\n");
+  renderMcp(s.mcpServers || []);
   document.getElementById("settingsPath").textContent = "Lagringssti: " + (s.settingsPath || "");
 }
+
+// ---- MCP-servere ----
+const esc = (x) => String(x ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function renderMcp(list) {
+  const el = document.getElementById("mcpList");
+  if (!el) return;
+  el.innerHTML = (list.length ? list : []).map((m, i) => `
+    <div class="mcp-row" data-i="${i}" style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <input class="mcp-name" placeholder="Navn (f.eks. Loki)" value="${esc(m.name)}" style="flex:1;min-width:120px" />
+      <input class="mcp-url" placeholder="https://…" value="${esc(m.url)}" style="flex:2;min-width:200px" />
+      <button type="button" class="btn-ghost mcp-del">🗑</button>
+    </div>`).join("");
+}
+function collectMcp() {
+  return [...document.querySelectorAll("#mcpList .mcp-row")].map((r) => ({
+    name: r.querySelector(".mcp-name").value.trim(),
+    url: r.querySelector(".mcp-url").value.trim(),
+  })).filter((m) => m.name || m.url);
+}
+document.getElementById("mcpAdd")?.addEventListener("click", () => {
+  const el = document.getElementById("mcpList");
+  el.insertAdjacentHTML("beforeend", `<div class="mcp-row" style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap"><input class="mcp-name" placeholder="Navn (f.eks. Loki)" style="flex:1;min-width:120px" /><input class="mcp-url" placeholder="https://…" style="flex:2;min-width:200px" /><button type="button" class="btn-ghost mcp-del">🗑</button></div>`);
+});
+document.getElementById("mcpList")?.addEventListener("click", (e) => { if (e.target.classList.contains("mcp-del")) e.target.closest(".mcp-row").remove(); });
 
 document.getElementById("settingsForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -54,6 +79,7 @@ document.getElementById("settingsForm").addEventListener("submit", async (e) => 
   }
   const dt = document.getElementById("departmentsText");
   if (dt) payload.departments = dt.value.split("\n").map((l) => l.trim()).filter(Boolean);
+  payload.mcpServers = collectMcp();
   const res = await fetch("/api/admin/settings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
