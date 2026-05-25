@@ -34,18 +34,46 @@
     if (!track) return;
     focus = focus || [];
     if (!focus.length) { track.innerHTML = `<div class="empty" style="padding:14px">Ingen timer ført siste 2 uker.</div>`; track.style.animation = "none"; return; }
+    // Kompakt: én ansatt = to korte linjer (navn + timer, og toppprosjekt). Lettere å se alle.
     const item = (e) => {
-      const projs = (e.projects || []).map((p, i) => `<div class="focus-proj${i === 0 ? " top" : ""}"><span class="fp-name">${esc(p.name)}${p.customer ? ` · <span class="fp-cust">${esc(p.customer)}</span>` : ""}</span><span class="fp-hours">${num(p.hours)} t</span></div>`).join("");
-      return `<div class="focus-item"><div class="focus-head"><span class="focus-name">${esc(e.name)}</span><span class="focus-tot">${num(e.totalHours)} t</span></div><div class="focus-projs">${projs}</div></div>`;
+      const top = (e.projects || [])[0];
+      const proj = top ? `${esc(top.name)}${top.customer ? ` · ${esc(top.customer)}` : ""} (${num(top.hours)} t)` : "—";
+      const extra = (e.projects || []).length > 1 ? `<span class="dsf-extra">+${e.projects.length - 1}</span>` : "";
+      return `<div class="dsf-row">
+        <div class="dsf-line1"><span class="dsf-name">${esc(e.name)}</span><span class="dsf-tot">${num(e.totalHours)} t</span></div>
+        <div class="dsf-line2">${proj} ${extra}</div>
+      </div>`;
     };
     const html = focus.map(item).join("");
     track.innerHTML = html + html;
     track.style.animation = "";
-    track.style.animationDuration = Math.max(60, focus.length * 5) + "s";
-    track.style.animationPlayState = focus.length > 4 ? "running" : "paused";
+    track.style.animationDuration = Math.max(50, focus.length * 3) + "s";
+    track.style.animationPlayState = focus.length > 8 ? "running" : "paused";
+  }
+  function renderWeather(disp) {
+    const el = document.getElementById("dsWeather");
+    if (el && disp && disp.weather) {
+      const w = disp.weather;
+      el.innerHTML = `<div class="hw-now">${w.current.symbol} ${w.current.temp}°<span class="hw-place"> ${esc(w.place)}</span></div>` +
+        `<div class="hw-days">${(w.days || []).map((day) => `<div class="hw-day"><span class="hw-lbl">${esc(day.label)}</span><span class="hw-sym">${day.symbol}</span><span class="hw-t">${day.max}° / ${day.min}°</span></div>`).join("")}</div>`;
+    }
+    const addr = document.getElementById("dsAddr");
+    if (addr && disp && disp.companyAddress) addr.textContent = "📍 " + disp.companyAddress;
+  }
+  function renderCapacity(billing) {
+    const el = document.getElementById("dsCapacity");
+    if (!el) return;
+    const free = (billing || []).filter((b) => (b.billingRate || 0) < 0.6).sort((a, b) => (a.billingRate || 0) - (b.billingRate || 0));
+    if (!free.length) { el.innerHTML = `<span class="subnote">Alle godt booket 👍</span>`; return; }
+    el.innerHTML = free.map((b) => `<span class="ds-cap-chip">${esc(b.name)} <b>${Math.round((b.billingRate || 0) * 100)}%</b></span>`).join("");
   }
   async function refreshFocus() {
-    try { const d = await (await fetch("/api/overview")).json(); renderFocus(d.employeeFocus); } catch {}
+    try {
+      const d = await (await fetch("/api/overview")).json();
+      renderFocus(d.employeeFocus);
+      renderWeather(d.display);
+      renderCapacity(d.billing);
+    } catch {}
   }
 
   function renderPins(projects) {

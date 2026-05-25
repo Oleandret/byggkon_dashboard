@@ -577,6 +577,20 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .ds-title { margin: 0; font-size: 28px; letter-spacing: -.5px; }
 .ds-sub { margin: 4px 0 0; color: var(--muted); }
 .ds-clock { font-size: 16px; font-weight: 700; color: var(--accent-dark); text-transform: capitalize; }
+.ds-head-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.ds-addr { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+.ds-weather { color: var(--ink); }
+.ds-weather .hw-now { font-size: 15px; font-weight: 700; text-align: right; }
+.ds-weather .hw-place { color: var(--muted); font-weight: 500; }
+.ds-weather .hw-days { display: flex; gap: 10px; margin-top: 3px; }
+.ds-weather .hw-day { display: flex; flex-direction: column; align-items: center; font-size: 10.5px; color: var(--muted); }
+.ds-weather .hw-sym { font-size: 15px; }
+.ds-cap-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--mint); border: 1px solid var(--mint-2);
+  border-radius: 10px; padding: 9px 14px; margin-bottom: 16px; }
+.ds-cap-label { font-weight: 700; font-size: 13px; color: var(--accent-dark); white-space: nowrap; }
+.ds-cap-strip { display: flex; flex-wrap: wrap; gap: 7px; }
+.ds-cap-chip { background: #fff; border: 1px solid var(--mint-2); border-radius: 999px; padding: 3px 11px; font-size: 12.5px; }
+.ds-cap-chip b { color: var(--accent-dark); }
 .ds-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items: stretch; }
 .ds-grid-3 { grid-template-columns: 1fr 2fr 1fr; }
 @media (max-width: 1100px) { .ds-grid-3 { grid-template-columns: 1fr 1fr; } }
@@ -584,6 +598,14 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .ds-map { height: 560px; border-radius: 10px; overflow: hidden; z-index: 0; }
 .ds-map-card { display: flex; flex-direction: column; }
 .ds-scroll-card .marquee.marquee-tall, .ds-side .marquee.marquee-tall { height: 560px; }
+/* Kompakte ansatt-linjer i driftssentralens venstre kolonne */
+.dsf-row { border-bottom: 1px solid var(--grid); padding: 6px 2px; }
+.dsf-line1 { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.dsf-name { font-weight: 700; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dsf-tot { font-size: 11.5px; font-weight: 700; color: var(--accent-dark); white-space: nowrap; }
+.dsf-line2 { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.dsf-extra { background: var(--mint-2); color: var(--accent-dark); border-radius: 999px; padding: 0 5px; font-weight: 700; font-size: 9.5px; }
+.ds-side .marquee-track { gap: 0; }
 .leaflet-container { font: inherit; }
 
 /* ---- Onboarding: lenker + personalhåndbok ---- */
