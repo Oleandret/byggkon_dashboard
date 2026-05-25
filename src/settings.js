@@ -18,9 +18,7 @@ function defaults() {
     heroImageUrl:
       process.env.HERO_IMAGE_URL ||
       "https://cdn.prod.website-files.com/6971dca24ade29a12176f9bf/69bd3f133cccc0a691865253_Travbaneveien3-8.jpg",
-    tripletexBaseUrl: process.env.TRIPLETEX_BASE_URL || "https://tripletex.no/v2",
-    tripletexConsumerToken: process.env.TRIPLETEX_CONSUMER_TOKEN || "",
-    tripletexEmployeeToken: process.env.TRIPLETEX_EMPLOYEE_TOKEN || "",
+    regnskapsagentMcpUrl: process.env.REGNSKAPSAGENT_MCP_URL || "",
     dashboardPassword: process.env.DASHBOARD_PASSWORD || "byggkon",
     weeklyCapacityHours: Number(process.env.WEEKLY_CAPACITY_HOURS || 37.5),
     cacheTtlMs: Number(process.env.CACHE_TTL_MS || 5 * 60 * 1000),
@@ -95,9 +93,7 @@ export function getConfigForAdmin() {
   return {
     companyName: c.companyName,
     heroImageUrl: c.heroImageUrl,
-    tripletexBaseUrl: c.tripletexBaseUrl,
-    hasConsumerToken: Boolean(c.tripletexConsumerToken),
-    hasEmployeeToken: Boolean(c.tripletexEmployeeToken),
+    hasMcpUrl: Boolean(c.regnskapsagentMcpUrl),
     hasDashboardPassword: Boolean(c.dashboardPassword),
     weeklyCapacityHours: c.weeklyCapacityHours,
     cacheTtlMs: c.cacheTtlMs,

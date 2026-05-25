@@ -74,15 +74,19 @@ export async function buildOverview() {
   const chargeableThisMonth = monthEntries.reduce((s, e) => s + (e.chargeableHours || 0), 0);
 
   // ---- Faktureringsgrad siste 4 uker, per ansatt (kun de som har ført timer) ----
+  // Koble timer til ansatt via ID (navne-ekspansjon på timeføringer er ikke pålitelig).
+  const employeesById = new Map(employees.map((e) => [e.id, fullName(e)]));
   const capacity4w = (cfg.weeklyCapacityHours || 37.5) * 4;
   const last4w = timeEntries.filter((e) => e.date >= fourWeeksAgoStr);
   const byEmp = new Map();
   for (const e of last4w) {
-    const name = fullName(e.employee) || "Ukjent";
-    const cur = byEmp.get(name) || { name, hours: 0, billable: 0 };
+    const id = e.employee?.id;
+    const name = employeesById.get(id) || fullName(e.employee) || "Ukjent";
+    const key = id ?? name;
+    const cur = byEmp.get(key) || { name, hours: 0, billable: 0 };
     cur.hours += e.hours || 0;
     cur.billable += e.chargeableHours || 0;
-    byEmp.set(name, cur);
+    byEmp.set(key, cur);
   }
   const billing = [...byEmp.values()]
     .filter((e) => e.hours > 0)
@@ -107,36 +111,50 @@ export async function buildOverview() {
     billing.length > 0 ? billing.reduce((s, e) => s + e.billingRate, 0) / billing.length : 0;
   const freeCapacityCount = billing.filter((e) => e.billingRate < 0.6).length;
 
-  // ---- Prosjekter (aggregert timer) ----
-  const projHours = new Map(); // id -> { ytd, ytdBillable, last4w, lastActivity }
+  // ---- Prosjekter ----
+  // «Aktive prosjekter» = de det faktisk er ført timer på (Tripletex' isClosed-flagg
+  // brukes lite hos Bygg-Kon, så vi går på reell aktivitet i stedet).
+  const activeCutoff = ymd(daysAgo(56, today)); // siste 8 uker = "jobber på nå"
+  const projectsById = new Map(projects.map((p) => [p.id, p]));
+
+  const projAgg = new Map(); // id -> aggregat
   for (const e of timeEntries) {
     if (!e.project) continue;
-    const cur = projHours.get(e.project.id) || { ytd: 0, ytdBillable: 0, last4w: 0, lastActivity: "" };
+    const id = e.project.id;
+    const cur = projAgg.get(id) || { id, name: e.project.name || "", ytd: 0, ytdBillable: 0, last4w: 0, last8w: 0, lastActivity: "" };
+    if (!cur.name && e.project.name) cur.name = e.project.name;
     cur.ytd += e.hours || 0;
     cur.ytdBillable += e.chargeableHours || 0;
     if (e.date >= fourWeeksAgoStr) cur.last4w += e.hours || 0;
+    if (e.date >= activeCutoff) cur.last8w += e.hours || 0;
     if (e.date > cur.lastActivity) cur.lastActivity = e.date;
-    projHours.set(e.project.id, cur);
+    projAgg.set(id, cur);
   }
 
-  const projectsDetailed = projects
-    .map((p) => {
-      const h = projHours.get(p.id) || { ytd: 0, ytdBillable: 0, last4w: 0, lastActivity: "" };
-      return {
-        number: p.number,
-        name: p.name,
-        customer: p.customer?.name || "",
-        projectManager: fullName(p.projectManager),
-        hours4w: h.last4w,
-        hoursYTD: h.ytd,
-        billableYTD: h.ytdBillable,
-        lastActivity: h.lastActivity || null,
-      };
-    })
+  const enrich = (a) => {
+    const p = projectsById.get(a.id);
+    return {
+      number: p?.number || "",
+      name: a.name || p?.name || `Prosjekt ${a.id}`,
+      customer: p?.customer?.name || "",
+      projectManager: fullName(p?.projectManager),
+      hours4w: a.last4w,
+      hoursYTD: a.ytd,
+      billableYTD: a.ytdBillable,
+      lastActivity: a.lastActivity || null,
+    };
+  };
+
+  // Prosjekter-fanen: alt med aktivitet hittil i år
+  const projectsDetailed = [...projAgg.values()].map(enrich).sort((a, b) => b.hoursYTD - a.hoursYTD);
+
+  // Venstre rullekolonne + KPI: prosjekter med aktivitet siste 8 uker
+  const recentlyActive = [...projAgg.values()]
+    .filter((a) => a.last8w > 0)
+    .map(enrich)
     .sort((a, b) => b.hours4w - a.hours4w);
 
-  // Enkel liste til rullekolonnen
-  const projects4Scroll = projectsDetailed.map((p) => ({
+  const projects4Scroll = recentlyActive.map((p) => ({
     number: p.number,
     name: p.name,
     customer: p.customer,
@@ -156,7 +174,7 @@ export async function buildOverview() {
       revenueYTD,
       outstandingTotal,
       overdueTotal,
-      activeProjects: projects.length,
+      activeProjects: recentlyActive.length,
       openOrders: orders.length,
       employees: employees.length,
       hoursThisMonth,

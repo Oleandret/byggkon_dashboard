@@ -42,19 +42,11 @@
         <div class="hint">Bildet som vises som banner. Standard er bygg-bildet fra byggkon.no.</div>
       </div>
 
-      <div class="section-title">Tripletex API</div>
+      <div class="section-title">Datakilde (Regnskapsagent MCP)</div>
       <div class="field">
-        <label for="tripletexBaseUrl">Base-URL</label>
-        <input id="tripletexBaseUrl" name="tripletexBaseUrl" placeholder="https://tripletex.no/v2" />
-        <div class="hint">Produksjon: https://tripletex.no/v2 · Test: https://api-test.tripletex.tech/v2</div>
-      </div>
-      <div class="field">
-        <label for="tripletexConsumerToken">Consumer token <span id="consumerSet" class="set" hidden>· satt</span></label>
-        <input id="tripletexConsumerToken" name="tripletexConsumerToken" type="password" autocomplete="off" placeholder="Lim inn ny token (la stå tom for å beholde)" />
-      </div>
-      <div class="field">
-        <label for="tripletexEmployeeToken">Employee token <span id="employeeSet" class="set" hidden>· satt</span></label>
-        <input id="tripletexEmployeeToken" name="tripletexEmployeeToken" type="password" autocomplete="off" placeholder="Lim inn ny token (la stå tom for å beholde)" />
+        <label for="regnskapsagentMcpUrl">Regnskapsagent MCP-URL <span id="mcpSet" class="set" hidden>· satt</span></label>
+        <input id="regnskapsagentMcpUrl" name="regnskapsagentMcpUrl" type="password" autocomplete="off" placeholder="https://regnskapsagent.no/api/mcp/… (la stå tom for å beholde)" />
+        <div class="hint">Hentes i Regnskapsagent-dashbordet («Kopier URL-en»). Denne gir tilgang til Tripletex-dataene – behandle den som et passord. Lagres kun på serveren (helst som miljøvariabel i Railway).</div>
       </div>
 
       <div class="section-title">Tilgang og kapasitet</div>

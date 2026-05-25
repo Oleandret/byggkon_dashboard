@@ -74,9 +74,7 @@ app.post("/api/admin/settings", requireAdmin, (req, res) => {
     const allowed = [
       "companyName",
       "heroImageUrl",
-      "tripletexBaseUrl",
-      "tripletexConsumerToken",
-      "tripletexEmployeeToken",
+      "regnskapsagentMcpUrl",
       "dashboardPassword",
       "weeklyCapacityHours",
       "cacheTtlMs",
