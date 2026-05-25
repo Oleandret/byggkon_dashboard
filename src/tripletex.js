@@ -61,6 +61,28 @@ export async function getProjects({ isClosed = false } = {}) {
   });
 }
 
+// Henter adresser per prosjekt (best effort). Tripletex' feltnavn varierer, så vi
+// ber om hele objektet (fields=*) og plukker ut det som ligner en adresse.
+// Returnerer Map(prosjekt-id -> adressetekst). Feiler stille til tom Map.
+let _projAddrCache = { ts: 0, map: null };
+export async function getProjectAddresses() {
+  if (_projAddrCache.map && Date.now() - _projAddrCache.ts < 30 * 60 * 1000) return _projAddrCache.map;
+  const map = new Map();
+  try {
+    const data = await callTool("search_projects", { isClosed: false, from: 0, count: 1000, fields: "*" });
+    assertOk("search_projects", data);
+    for (const p of (data?.values || [])) {
+      const a = p.deliveryAddress || p.projectAddress || p.address || p.physicalAddress || p.postalAddress || p.visitAddress || null;
+      let s = "";
+      if (a && typeof a === "object") s = [a.addressLine1, a.addressLine2, a.postalCode, a.city].filter(Boolean).join(" ").trim();
+      else if (typeof a === "string") s = a.trim();
+      if (s) map.set(p.id, s);
+    }
+  } catch { /* fields=* ikke støttet e.l. → tom map, vi faller tilbake på navn */ }
+  _projAddrCache = { ts: Date.now(), map };
+  return map;
+}
+
 export async function getInvoices(fromDate, toDate) {
   return fetchAll("search_invoices", {
     invoiceDateFrom: fromDate,

@@ -90,7 +90,10 @@
     const pts = [];
     for (const p of projects) {
       if (typeof p.lat !== "number" || typeof p.lon !== "number") continue;
-      const m = L.marker([p.lat, p.lon]).bindPopup(`<b>${esc(p.name)}</b><br>${esc(p.customer || "")}<br>${num(p.hours)} t siste 8 uker`);
+      const popup = `<b>${esc(p.name)}</b><br>${esc(p.customer || "")}<br>${num(p.hours)} t siste 8 uker${p.approx ? "<br><i>omtrentlig plassering</i>" : ""}`;
+      const m = p.approx
+        ? L.circleMarker([p.lat, p.lon], { radius: 7, color: "#e8a33d", weight: 2, fillColor: "#f3c969", fillOpacity: .6 }).bindPopup(popup)
+        : L.marker([p.lat, p.lon]).bindPopup(popup);
       markers.addLayer(m);
       pts.push([p.lat, p.lon]);
     }
@@ -110,8 +113,9 @@
       renderPins(projects);
       const note = document.getElementById("dsMapNote");
       if (note) {
-        const pinned = projects.filter((p) => typeof p.lat === "number").length;
-        note.textContent = `${pinned} av ${projects.length} prosjekter plassert på kartet. ${d.pending ? "Flere posisjoner hentes i bakgrunnen – oppdateres automatisk." : ""}`;
+        const exact = projects.filter((p) => typeof p.lat === "number" && !p.approx).length;
+        const approx = projects.filter((p) => p.approx).length;
+        note.textContent = `${exact} prosjekter plassert på adresse${approx ? `, ${approx} omtrentlig (gul)` : ""}. ${d.pending ? "Flere hentes i bakgrunnen – oppdateres automatisk." : ""}`;
       }
       // Geokoding skjer noen få om gangen på serveren – hent på nytt til alt er plassert.
       if (d.pending) { clearTimeout(pollTimer); pollTimer = setTimeout(refresh, 9000); }

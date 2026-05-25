@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 import { buildOverview } from "./src/metrics.js";
 import { buildEconomy } from "./src/economy.js";
 import { getNewsFeed } from "./src/newsfeed.js";
-import { clearCache, resetClient, getInvoices, getCustomers, getSupplierInvoices, getProjects, getTimeEntries, ymd } from "./src/tripletex.js";
+import { clearCache, resetClient, getInvoices, getCustomers, getSupplierInvoices, getProjects, getProjectAddresses, getTimeEntries, ymd } from "./src/tripletex.js";
 import { geocodeOne, sleep } from "./src/geocode.js";
 import { serveWithSnapshot, expireSnapshots } from "./src/snapshot.js";
 const snapTtl = () => getConfig().cacheTtlMs || 300000;
@@ -226,9 +226,10 @@ app.get("/api/driftssentral", requireAuth, async (req, res) => {
     const today = new Date();
     const to = ymd(today);
     const from = ymd(new Date(today.getTime() - 56 * 24 * 3600 * 1000)); // 8 uker
-    const [projects, time] = await Promise.all([
+    const [projects, time, addrMap] = await Promise.all([
       getProjects().catch(() => []),
       getTimeEntries(from, to).catch(() => []),
+      getProjectAddresses().catch(() => new Map()),
     ]);
     const pMeta = new Map(projects.map((p) => [p.id, p]));
     const agg = new Map();
@@ -242,25 +243,44 @@ app.get("/api/driftssentral", requireAuth, async (req, res) => {
     }
     let list = [...agg.values()].filter((p) => p.hours > 0).sort((a, b) => b.hours - a.hours).map((p) => {
       const m = pMeta.get(p.id);
-      return { number: m?.number || "", name: p.name, customer: m?.customer?.name || "", hours: Math.round(p.hours * 10) / 10, last: p.last };
+      return { id: p.id, number: m?.number || "", name: p.name, customer: m?.customer?.name || "", hours: Math.round(p.hours * 10) / 10, last: p.last };
     });
 
-    // Geokoding mot OSM, cachet i settings. Maks noen få nye per kall for å holde svaret raskt.
+    // ---- Geokoding: adresse (best) -> renset prosjektnavn -> kunde -> gjett (kontoret) ----
     const cache = { ...(getConfig().geocache || {}) };
-    let added = 0; const BATCH = 6;
+    const OFFICE = { lat: 58.9700, lon: 5.7331 }; // Stavanger – brukes som gjett når usikker
+    const GENERIC = /\b(nybygg|ombygging|rehabilitering|rehab|tilbygg|prosjektering|prosjekt|rammeavtale|byggetrinn|trinn\s*\d+|utvidelse|riving|riv|totalentreprise|forprosjekt|skisseprosjekt|RIB|RIBr|ARK|RIV|RIE|RIBr?|diverse|intern)\b/gi;
+    const nameQuery = (name) => String(name || "").replace(/^\s*\d+[\s.\-:]*/, "").replace(GENERIC, " ").replace(/\s+/g, " ").trim();
+    // liten deterministisk forskyvning så gjettede pins ikke ligger helt oppå hverandre
+    const jitter = (id) => { let h = 0; const s = String(id); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return ((h % 1000) / 1000 - 0.5) * 0.06; };
+    let added = 0; const BUDGET = 8;
+    async function tryQ(q) {
+      if (!q) return null;
+      if (q in cache) return cache[q];           // coord eller null (allerede forsøkt)
+      if (added >= BUDGET) return undefined;     // budsjett brukt opp – prøv neste runde
+      const g = await geocodeOne(q);
+      added++; await sleep(1100);
+      cache[q] = g || null;
+      return cache[q];
+    }
+    let pending = false;
     for (const p of list) {
-      const key = p.name;
-      if (!(key in cache) && added < BATCH) {
-        const g = await geocodeOne(p.name + ", Norge");
-        cache[key] = g || null;
-        added++;
-        await sleep(1100);
+      const cands = [];
+      if (addrMap.get(p.id)) cands.push(addrMap.get(p.id) + ", Norge");
+      const nm = nameQuery(p.name); if (nm && nm.length > 2) cands.push(nm + ", Norge");
+      if (p.customer) cands.push(p.customer + ", Norge");
+      let coord = null, allTried = true;
+      for (const q of cands) {
+        const r = await tryQ(q);
+        if (r === undefined) { allTried = false; break; } // budsjett oppbrukt
+        if (r) { coord = r; break; }
       }
-      const g = cache[key];
-      if (g) { p.lat = g.lat; p.lon = g.lon; }
+      if (coord) { p.lat = coord.lat; p.lon = coord.lon; p.approx = false; }
+      else if (allTried) { p.lat = OFFICE.lat + jitter(p.id); p.lon = OFFICE.lon + jitter(p.name); p.approx = true; }
+      else { pending = true; }
     }
     if (added > 0) saveConfig({ geocache: cache });
-    res.json({ updatedAt: new Date().toISOString(), projects: list, pending: list.some((p) => !("lat" in p)) });
+    res.json({ updatedAt: new Date().toISOString(), projects: list, pending });
   } catch (err) {
     console.error("Feil i /api/driftssentral:", err.message);
     res.status(502).json({ error: err.message });
