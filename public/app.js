@@ -44,6 +44,28 @@ function renderReminders() {
     : `<div class="empty">Ingen påminnelser akkurat nå.</div>`;
 }
 
+/* ---- Tilbud-status (rediger/lagre) ---- */
+(function () {
+  const eb = document.getElementById("tbEdit"), sb = document.getElementById("tbSave");
+  if (!eb) return;
+  const ids = ["tbSendt", "tbVunnet", "tbTapt"];
+  eb.addEventListener("click", () => {
+    const on = document.getElementById("tbSendt").disabled;
+    ids.forEach((i) => (document.getElementById(i).disabled = !on));
+    eb.textContent = on ? "🔒 Lås" : "🔓 Rediger"; sb.hidden = !on;
+  });
+  sb.addEventListener("click", async () => {
+    sb.disabled = true;
+    try {
+      const body = { sendt: +document.getElementById("tbSendt").value || 0, vunnet: +document.getElementById("tbVunnet").value || 0, tapt: +document.getElementById("tbTapt").value || 0 };
+      const res = await fetch("/api/tilbud", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (!res.ok) throw new Error("Lagring feilet");
+      ids.forEach((i) => (document.getElementById(i).disabled = true));
+      eb.textContent = "🔓 Rediger"; sb.hidden = true; sb.textContent = "Lagret ✓"; setTimeout(() => (sb.textContent = "Lagre"), 2000);
+    } catch (e) { showError("Kunne ikke lagre tilbud: " + e.message); } finally { sb.disabled = false; }
+  });
+})();
+
 /* ---- AI-rapport ---- */
 (function () {
   const btn = document.getElementById("repGenerate");
@@ -261,6 +283,31 @@ function renderProjectsMarquee(projects) {
   track.style.animationPlayState = projects.length > 6 ? "running" : "paused";
 }
 
+function renderFocusMarquee(focus) {
+  const track = document.getElementById("focusTrack");
+  if (!track) return;
+  focus = focus || [];
+  if (!focus.length) {
+    track.innerHTML = `<div class="empty" style="padding:14px">Ingen timer ført siste 2 uker ennå.</div>`;
+    track.style.animation = "none";
+    return;
+  }
+  const item = (e) => {
+    const projs = (e.projects || []).map((p, i) =>
+      `<div class="focus-proj${i === 0 ? " top" : ""}"><span class="fp-name">${esc(p.name)}${p.customer ? ` · <span class="fp-cust">${esc(p.customer)}</span>` : ""}</span><span class="fp-hours">${num(p.hours)} t</span></div>`
+    ).join("");
+    return `<div class="focus-item">
+      <div class="focus-head"><span class="focus-name">${esc(e.name)}</span><span class="focus-tot">${num(e.totalHours)} t</span></div>
+      <div class="focus-projs">${projs}</div>
+    </div>`;
+  };
+  const html = focus.map(item).join("");
+  track.innerHTML = html + html; // dobles for sømløs løkke
+  track.style.animation = "";
+  track.style.animationDuration = Math.max(60, focus.length * 5) + "s";
+  track.style.animationPlayState = focus.length > 4 ? "running" : "paused";
+}
+
 /* ---- Faktureringsgrad ---- */
 function bucket(rate) {
   if (rate < 0.6) return { cls: "free", tag: "Ledig kapasitet" };
@@ -365,13 +412,64 @@ function renderResource() {
     .filter((p) => (p.hours4w || 0) > 0)
     .sort((a, b) => (b.hours4w || 0) - (a.hours4w || 0));
   fillTable("pmResource",
-    [{ label: "Prosjekt" }, { label: "Kunde" }, { label: "Timer 4 uker", num: true }, { label: "Hvem jobber på det (timer)" }],
+    [{ label: "Prosjekt" }, { label: "Kunde" }, { label: "Prosjektleder" }, { label: "Timer 4 uker", num: true }, { label: "Hvem jobber på det (timer)" }],
     rows.map((p) => {
       const who = Object.entries(p.byEmp4w || {}).sort((a, b) => b[1] - a[1])
         .map(([navn, t]) => `${esc(navn)} (${num(t)} t)`).join(", ");
-      return [esc(p.name), esc(p.customer), num(p.hours4w), who || "—"];
+      return [esc(p.name), esc(p.customer), esc(p.projectManager || "—"), num(p.hours4w), who || "—"];
     }),
     "Ingen timer ført siste 4 uker.");
+  populatePmEmpFilter();
+  renderEmpResource();
+}
+
+// Bygger per-ansatt-oversikt fra prosjektdata: hver ansatt -> prosjektene de
+// har ført timer på siste 4 uker, sortert med flest timer øverst.
+function buildEmpProjects() {
+  const map = new Map();
+  for (const p of (lastData.projectsDetailed || [])) {
+    for (const [navn, t] of Object.entries(p.byEmp4w || {})) {
+      if (!t) continue;
+      const cur = map.get(navn) || { navn, total: 0, projects: [] };
+      cur.total += t;
+      cur.projects.push({ name: p.name, customer: p.customer, hours: t });
+      map.set(navn, cur);
+    }
+  }
+  const arr = [...map.values()].sort((a, b) => b.total - a.total);
+  arr.forEach((e) => e.projects.sort((a, b) => b.hours - a.hours));
+  return arr;
+}
+
+function populatePmEmpFilter() {
+  const sel = document.getElementById("pmEmpFilter");
+  if (!sel) return;
+  const prev = sel.value;
+  const emps = buildEmpProjects();
+  sel.innerHTML = `<option value="">Alle ansatte</option>` +
+    emps.map((e) => `<option value="${esc(e.navn)}">${esc(e.navn)} (${num(e.total)} t)</option>`).join("");
+  if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
+  if (!sel.dataset.wired) {
+    sel.addEventListener("change", renderEmpResource);
+    sel.dataset.wired = "1";
+  }
+}
+
+function renderEmpResource() {
+  const wrap = document.getElementById("pmEmpResource");
+  if (!wrap || !lastData) return;
+  const sel = document.getElementById("pmEmpFilter");
+  const filter = sel ? sel.value : "";
+  let emps = buildEmpProjects();
+  if (filter) emps = emps.filter((e) => e.navn === filter);
+  if (!emps.length) { wrap.innerHTML = `<div class="empty">Ingen timer ført siste 4 uker.</div>`; return; }
+  wrap.innerHTML = emps.map((e) => `
+    <div class="emp-res-group">
+      <div class="emp-res-head"><span>${esc(e.navn)}</span><span class="emp-res-tot">${num(e.total)} t</span></div>
+      <table class="emp-res-tbl"><tbody>${e.projects.map((p) => `
+        <tr><td>${esc(p.name)}${p.customer ? `<span class="emp-res-cust">${esc(p.customer)}</span>` : ""}</td>
+        <td class="num">${num(p.hours)} t</td></tr>`).join("")}</tbody></table>
+    </div>`).join("");
 }
 
 /* ---- Hovedlasting ---- */
@@ -388,6 +486,7 @@ async function load() {
     }
     renderHero(d);
     renderProjectsMarquee(d.projects);
+    renderFocusMarquee(d.employeeFocus);
     renderBilling(d.billing);
     renderRevenueChart(d.monthlyRevenue);
     renderOutstanding(d);
@@ -411,7 +510,7 @@ document.getElementById("refreshBtn").addEventListener("click", async () => {
 });
 
 /* ---- Økonomi-fane (lazy-lastet ved første åpning) ---- */
-let economyLoaded = false, ecoTrendChart, ecoBillChart;
+let economyLoaded = false, ecoTrendChart, ecoBillChart, ecoBillTrendChart;
 const cls = (n) => (n < 0 ? "neg" : "pos");
 function plRow(label, value, { total = false, sub = false, color = false } = {}) {
   const c = `pl-row ${total ? "total" : ""} ${sub ? "sub" : ""}`;
@@ -421,6 +520,23 @@ function plRow(label, value, { total = false, sub = false, color = false } = {})
 
 function renderEconomy(d) {
   document.getElementById("ecoYear").textContent = d.period.yearLabel;
+
+  // Nøkkeltall-stripe
+  const ok = (lastData && lastData.kpis) || {};
+  const rev = d.resultYTD.revenue, opres = d.resultYTD.operatingResult;
+  const margin = rev > 0 ? opres / rev : 0;
+  document.getElementById("ecoKpis2").innerHTML = [
+    kpiCard({ label: "Fakturert i år", value: nok(rev), accent: true }),
+    kpiCard({ label: "Utestående", value: nok(ok.outstandingTotal || 0), sub: ok.overdueTotal > 0 ? `forfalt ${nok(ok.overdueTotal)}` : "" }),
+    kpiCard({ label: "Driftsresultat", value: nok(opres), cls: opres < 0 ? "bad" : "good", sub: "dekningsgrad " + pct(margin) }),
+    kpiCard({ label: "Aktive prosjekter", value: ok.activeProjects || 0 }),
+    kpiCard({ label: "Timer denne uka", value: num(d.hoursThisWeek) }),
+  ].join("");
+  // Tilbud-verdier
+  const tb = d.tilbud || { sendt: 0, vunnet: 0, tapt: 0 };
+  if (!document.getElementById("tbSendt").matches(":focus")) document.getElementById("tbSendt").value = tb.sendt;
+  if (!document.getElementById("tbVunnet").matches(":focus")) document.getElementById("tbVunnet").value = tb.vunnet;
+  if (!document.getElementById("tbTapt").matches(":focus")) document.getElementById("tbTapt").value = tb.tapt;
   const pl = (r) =>
     plRow("Driftsinntekter", r.revenue) +
     plRow("Driftskostnader", r.opex) +
@@ -464,6 +580,33 @@ function renderEconomy(d) {
   if (ecoTrendChart) { ecoTrendChart.data = data; ecoTrendChart.update(); }
   else ecoTrendChart = new Chart(ctx, { type: "bar", data, options: opts });
 
+  // Graf: faktureringsgrad-utvikling siste 6 mnd (samlet, viser fremdrift)
+  const bt = d.billingTrend || [];
+  const ctx3 = document.getElementById("ecoBillTrend");
+  if (ctx3) {
+    const btData = {
+      labels: bt.map((t) => t.label),
+      datasets: [{
+        label: "Faktureringsgrad", data: bt.map((t) => Math.round(t.billingRate * 100)),
+        borderColor: css("--accent"), backgroundColor: "rgba(30,139,111,.12)",
+        fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: css("--accent"),
+      }],
+    };
+    const btOpts = {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (c) => `${c.raw} %  (${num((bt[c.dataIndex] || {}).hours || 0)} t)` } },
+      },
+      scales: {
+        x: { ticks: { color: css("--muted") }, grid: { display: false } },
+        y: { suggestedMin: 0, suggestedMax: 100, ticks: { color: css("--muted"), callback: (v) => v + " %" }, grid: { color: css("--grid") } },
+      },
+    };
+    if (ecoBillTrendChart) { ecoBillTrendChart.data = btData; ecoBillTrendChart.update(); }
+    else ecoBillTrendChart = new Chart(ctx3, { type: "line", data: btData, options: btOpts });
+  }
+
   const rateBar = (v) => `<div class="ratebar"><span style="width:${Math.min(100, Math.round(v * 100))}%"></span></div>`;
   const b3 = d.billing3m || { employees: [], total: { billingRate: 0, hours: 0, billable: 0 } };
   const emps = b3.employees;
@@ -490,6 +633,7 @@ function renderEconomy(d) {
 
   // ---- Optimaliseringstips (utledet fra tallene) ----
   const tips = [];
+  tips.push(["ok", "Sterk vekst", "Selskapet har vokst fra 3 til 15 ansatte på ett år. Det gir naturlig økte kostnader (rekruttering, lønn og markedsføring) — viktig kontekst når resultat og likviditet vurderes."]);
   const k = (lastData && lastData.kpis) || {};
   if (k.overdueTotal > 0) tips.push(["warn", "Forfalte fakturaer", `${nok(k.overdueTotal)} er forfalt. Send purring (Oversikt → Utestående → «Purr»).`]);
   if (d.balance.bank < 0) tips.push(["warn", "Negativ bank", `Bankbeholdning ${nok(d.balance.bank)}. Vurder likviditetstiltak: raskere fakturering, kortere forfall (20 dager), evt. innbetaling fra eier.`]);
@@ -541,6 +685,44 @@ async function loadEconomy(force = false) {
   }
 }
 
+/* ---- Intern kommunikasjon ---- */
+async function loadMessages() {
+  const feed = document.getElementById("commFeed");
+  if (!feed) return;
+  try {
+    const res = await fetch("/api/messages");
+    if (!res.ok) return;
+    const d = await res.json();
+    const atBottom = feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 30;
+    feed.innerHTML = (d.messages || []).map((m) => {
+      const t = new Date(m.ts);
+      const when = t.toLocaleString("nb-NO", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+      return `<div class="comm-msg"><span class="comm-meta"><b>${esc(m.name)}</b> · ${when}</span><div class="comm-text">${esc(m.text)}</div></div>`;
+    }).join("") || `<div class="empty">Ingen meldinger ennå. Skriv den første!</div>`;
+    if (atBottom) feed.scrollTop = feed.scrollHeight;
+  } catch { /* stille */ }
+}
+(function () {
+  const send = document.getElementById("commSend");
+  if (!send) return;
+  const nameEl = document.getElementById("commName");
+  const textEl = document.getElementById("commText");
+  if (nameEl) nameEl.value = localStorage.getItem("bk_comm_name") || "";
+  async function post() {
+    const text = textEl.value.trim(); if (!text) return;
+    if (nameEl.value) localStorage.setItem("bk_comm_name", nameEl.value.trim());
+    send.disabled = true;
+    try {
+      const res = await fetch("/api/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: nameEl.value.trim(), text }) });
+      if (!res.ok) throw new Error("Sending feilet");
+      textEl.value = ""; await loadMessages();
+      document.getElementById("commFeed").scrollTop = document.getElementById("commFeed").scrollHeight;
+    } catch (e) { showError("Kunne ikke sende: " + e.message); } finally { send.disabled = false; }
+  }
+  send.addEventListener("click", post);
+  textEl.addEventListener("keydown", (e) => { if (e.key === "Enter") post(); });
+})();
+
 /* ---- Siste nytt (RSS fra aviser) ---- */
 async function loadRss() {
   const el = document.getElementById("rssFeed");
@@ -563,6 +745,8 @@ setInterval(tickClock, 1000);
 renderReminders();
 loadRss();
 setInterval(loadRss, 15 * 60 * 1000);
+loadMessages();
+setInterval(loadMessages, 20 * 1000);
 setInterval(renderReminders, 60 * 60 * 1000);
 load();
 timer = setInterval(load, refreshMs);

@@ -60,12 +60,14 @@ export async function buildEconomy() {
     });
   }
 
-  const [accounts, employees, ytdRows, monthRows, yearTime] = await Promise.all([
+  const sixMoStart = months[6].from; // start på måneden for 5 mnd siden (kan være i fjor)
+  const [accounts, employees, ytdRows, monthRows, yearTime, sixMoTime] = await Promise.all([
     getAccounts(),
     getEmployees(),
     getBalanceSheet(yearStart, todayStr),
     Promise.all(months.map((m) => getBalanceSheet(m.from, m.to, 3000, 8299))),
     getTimeEntries(yearStart, todayStr),
+    getTimeEntries(sixMoStart, todayStr),
   ]);
 
   const accById = new Map(accounts.map((a) => [a.id, a]));
@@ -102,7 +104,12 @@ export async function buildEconomy() {
   const weeksElapsed = Math.max(1, (today - startOfYear(today)) / (7 * 24 * 3600 * 1000));
   const capacityYTD = (cfg.weeklyCapacityHours || 37.5) * weeksElapsed;
   const empById = new Map(employees.map((e) => [e.id, fullName(e)]));
-  // Faktureringsgrad siste 3 måneder, per ansatt som faktisk er i jobb (har ført timer i perioden + finnes i ansattlista)
+  // "Ansatt per i dag" = har ført timer siste 4 uker. Brukes til å filtrere
+  // bort folk som har sluttet, slik at faktureringsgraden kun viser nåværende ansatte.
+  const cutoff28 = ymd(daysAgo(28, today));
+  const activeIds = new Set();
+  for (const e of yearTime) { if (e.date >= cutoff28 && e.employee?.id != null) activeIds.add(e.employee.id); }
+  // Faktureringsgrad siste 3 måneder, per ansatt som faktisk er i jobb i dag
   const cutoff90 = ymd(daysAgo(90, today));
   const last3m = yearTime.filter((e) => e.date >= cutoff90);
   const byEmp = new Map();
@@ -116,7 +123,7 @@ export async function buildEconomy() {
     byEmp.set(id, cur);
   }
   const billing3mEmployees = [...byEmp.values()]
-    .filter((e) => empById.has(e.id) && e.hours > 0)
+    .filter((e) => activeIds.has(e.id) && empById.has(e.id) && e.hours > 0)
     .map((e) => ({ name: e.name, hours: e.hours, billable: e.billable, billingRate: e.hours > 0 ? e.billable / e.hours : 0 }))
     .sort((a, b) => b.billingRate - a.billingRate);
   for (const e of billing3mEmployees) { total3mHours += e.hours; total3mBillable += e.billable; }
@@ -124,13 +131,30 @@ export async function buildEconomy() {
     employees: billing3mEmployees,
     total: { hours: total3mHours, billable: total3mBillable, billingRate: total3mHours > 0 ? total3mBillable / total3mHours : 0 },
   };
+
+  // Faktureringsgrad per måned siste 6 mnd (samlet for selskapet) – viser fremdrift
+  const billingTrend = months.slice(6).map((m) => {
+    let h = 0, b = 0;
+    for (const e of sixMoTime) {
+      if (e.date >= m.from && e.date <= m.to) { h += e.hours || 0; b += e.chargeableHours || 0; }
+    }
+    return { label: m.label, billingRate: h > 0 ? b / h : 0, hours: Math.round(h), billable: Math.round(b) };
+  });
   // (beholder årstall for "timer i år"-KPI)
   let totalHours = 0, totalBillable = 0;
   for (const e of yearTime) { totalHours += e.hours || 0; totalBillable += e.chargeableHours || 0; }
 
+  // Timer registrert denne uka (man–søn)
+  const dow0 = (today.getDay() + 6) % 7; // 0 = mandag
+  const weekStart = new Date(today); weekStart.setDate(today.getDate() - dow0);
+  const weekStartStr = ymd(weekStart);
+  const hoursThisWeek = yearTime.filter((e) => e.date >= weekStartStr).reduce((s, e) => s + (e.hours || 0), 0);
+
   return {
     updatedAt: new Date().toISOString(),
     period: { yearLabel: String(today.getFullYear()), today: todayStr },
+    hoursThisWeek,
+    tilbud: cfg.tilbud || { sendt: 0, vunnet: 0, tapt: 0 },
     resultYTD: ytd,
     resultLTM: ltm,
     trend,
@@ -141,5 +165,6 @@ export async function buildEconomy() {
     liquidity,
     hours: { totalHours, totalBillable, billingRate: totalHours > 0 ? totalBillable / totalHours : 0 },
     billing3m,
+    billingTrend,
   };
 }

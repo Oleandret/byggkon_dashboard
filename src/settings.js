@@ -51,7 +51,10 @@ function defaults() {
     hrOnboarding: defaultOnboarding(),
     cvs: [],
     marketing: defaultMarketing(),
+    tilbud: { sendt: 0, vunnet: 0, tapt: 0 },
     news: [{ date: "2026-05-25", text: "Velkommen til Bygg-Kon sitt nye interne dashboard!" }],
+    messages: [],
+    calendar: [],
     newsFeeds: [
       { name: "Aftenbladet", url: "https://www.aftenbladet.no/rss" },
       { name: "VG", url: "https://www.vg.no/rss/feed/" },

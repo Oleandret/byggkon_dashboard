@@ -295,6 +295,32 @@ app.post("/api/hr/upload", requireAuth, (req, res) => {
   }
 });
 
+// ---- Tilbud-status (sendt / vunnet / tapt) ----
+app.get("/api/tilbud", requireAuth, (req, res) => res.json(getConfig().tilbud || { sendt: 0, vunnet: 0, tapt: 0 }));
+app.post("/api/tilbud", requireAuth, (req, res) => {
+  try {
+    const b = req.body || {};
+    saveConfig({ tilbud: { sendt: Math.max(0, Number(b.sendt) || 0), vunnet: Math.max(0, Number(b.vunnet) || 0), tapt: Math.max(0, Number(b.tapt) || 0) } });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Intern kommunikasjon (felles meldingsvegg) ----
+app.get("/api/messages", requireAuth, (req, res) => {
+  res.json({ messages: (getConfig().messages || []).slice(-100) });
+});
+app.post("/api/messages", requireAuth, (req, res) => {
+  try {
+    const name = String(req.body?.name || "").slice(0, 60) || "Anonym";
+    const text = String(req.body?.text || "").trim().slice(0, 800);
+    if (!text) return res.status(400).json({ error: "Tom melding" });
+    const msgs = (getConfig().messages || []).slice(-199);
+    msgs.push({ name, text, ts: Date.now() });
+    saveConfig({ messages: msgs });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
 // ---- Nyheter internt ----
 app.get("/api/news", requireAuth, (req, res) => res.json({ news: getConfig().news || [] }));
 app.post("/api/news", requireAuth, (req, res) => {
@@ -303,6 +329,37 @@ app.post("/api/news", requireAuth, (req, res) => {
     if (!list) return res.status(400).json({ error: "Mangler news-liste" });
     const clean = list.map((n) => ({ date: String(n.date || "").slice(0, 10), text: String(n.text || "").slice(0, 2000) }));
     saveConfig({ news: clean });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Felles kalender (alle innloggede kan legge inn) ----
+app.get("/api/calendar", requireAuth, (req, res) => {
+  res.json({ events: getConfig().calendar || [] });
+});
+app.post("/api/calendar", requireAuth, (req, res) => {
+  try {
+    const date = String(req.body?.date || "").slice(0, 10);
+    const title = String(req.body?.title || "").trim().slice(0, 200);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: "Ugyldig dato" });
+    if (!title) return res.status(400).json({ error: "Tittel mangler" });
+    const allowed = ["bursdag", "oppstart", "mote", "frist", "annet"];
+    let type = String(req.body?.type || "annet");
+    if (!allowed.includes(type)) type = "annet";
+    const by = String(req.body?.by || "").trim().slice(0, 60);
+    const ev = { id: "c" + Date.now().toString(36) + Math.floor(Math.random() * 1000), date, title, type, by, ts: Date.now() };
+    const list = (getConfig().calendar || []).slice(-499);
+    list.push(ev);
+    saveConfig({ calendar: list });
+    res.json({ ok: true, event: ev });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post("/api/calendar/delete", requireAuth, (req, res) => {
+  try {
+    const id = String(req.body?.id || "");
+    if (!id) return res.status(400).json({ error: "Mangler id" });
+    const list = (getConfig().calendar || []).filter((e) => e.id !== id);
+    saveConfig({ calendar: list });
     res.json({ ok: true });
   } catch (err) { res.status(400).json({ error: err.message }); }
 });

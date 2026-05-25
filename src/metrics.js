@@ -185,6 +185,35 @@ export async function buildOverview() {
     hours4w: p.hours4w,
   }));
 
+  // ---- Hva jobber hver ansatt med? (siste 2 uker) ----
+  const twoWeeksAgoStr = ymd(daysAgo(14, today));
+  const focusMap = new Map(); // eid -> { name, total, proj: Map(pid -> {name, customer, hours}) }
+  for (const e of timeEntries) {
+    if (e.date < twoWeeksAgoStr || !e.project) continue;
+    const eid = e.employee?.id;
+    if (eid == null) continue;
+    const name = employeesById.get(Number(eid)) || fullName(e.employee) || `#${eid}`;
+    const cur = focusMap.get(eid) || { name, total: 0, proj: new Map() };
+    cur.total += e.hours || 0;
+    const pid = e.project.id;
+    const meta = projectsById.get(pid);
+    const pj = cur.proj.get(pid) || { name: e.project.name || meta?.name || `Prosjekt ${pid}`, customer: meta?.customer?.name || "", hours: 0 };
+    pj.hours += e.hours || 0;
+    cur.proj.set(pid, pj);
+    focusMap.set(eid, cur);
+  }
+  const employeeFocus = [...focusMap.values()]
+    .filter((e) => e.total > 0)
+    .map((e) => {
+      const projects = [...e.proj.values()].sort((a, b) => b.hours - a.hours);
+      return {
+        name: e.name,
+        totalHours: Math.round(e.total * 10) / 10,
+        projects: projects.slice(0, 4).map((p) => ({ name: p.name, customer: p.customer, hours: Math.round(p.hours * 10) / 10 })),
+      };
+    })
+    .sort((a, b) => b.totalHours - a.totalHours);
+
   // ---- Bursdager ----
   const md = (d) => `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const todayMD = md(today);
@@ -228,6 +257,7 @@ export async function buildOverview() {
     outstanding: outstanding.slice(0, 30),
     billing,
     projects: projects4Scroll,
+    employeeFocus,
     projectsDetailed,
     orders: orders
       .map((o) => ({

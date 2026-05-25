@@ -214,6 +214,15 @@ body.sidebar-locked .topbar, body.sidebar-locked .tab-panel { margin-left: 240px
 .hero-kpi .value.warn { color: #ffd9a8; }
 .hero-kpi .value.bad { color: #ffb4ab; }
 
+/* ---- Intern kommunikasjon ---- */
+.comm-feed { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.comm-msg { background: var(--mint); border-radius: 9px; padding: 8px 12px; }
+.comm-meta { font-size: 11.5px; color: var(--muted); }
+.comm-text { font-size: 14px; margin-top: 2px; white-space: pre-wrap; word-break: break-word; }
+.comm-input { display: flex; gap: 8px; flex-wrap: wrap; }
+.comm-input #commName { max-width: 140px; }
+.comm-input #commText { flex: 1; min-width: 160px; }
+
 .report-output { white-space: pre-wrap; background: #fbfdfc; border: 1px solid var(--border); border-radius: 10px;
   padding: 16px; margin-top: 14px; font-size: 14px; line-height: 1.55; }
 
@@ -284,6 +293,22 @@ body.sidebar-locked .topbar, body.sidebar-locked .tab-panel { margin-left: 240px
 .proj-item .nm { font-weight: 600; font-size: 14px; margin: 1px 0 3px; }
 .proj-item .meta { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
 
+/* ---- Hva jobber hver ansatt med? (rullende kolonne) ---- */
+.focus-card .marquee.marquee-tall { height: 300px; }
+.focus-item { display: grid; grid-template-columns: 190px 1fr; gap: 14px; align-items: center;
+  border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 10px; padding: 11px 14px; background: #fff; }
+.focus-head { display: flex; flex-direction: column; }
+.focus-name { font-weight: 700; font-size: 14px; }
+.focus-tot { font-size: 12px; color: var(--accent-dark); font-weight: 600; margin-top: 1px; }
+.focus-projs { display: flex; flex-wrap: wrap; gap: 8px; }
+.focus-proj { display: inline-flex; align-items: baseline; gap: 8px; background: var(--mint);
+  border: 1px solid var(--mint-2); border-radius: 999px; padding: 4px 12px; font-size: 12px; }
+.focus-proj.top { background: var(--accent); color: #fff; border-color: var(--accent); }
+.focus-proj .fp-cust { color: var(--muted); }
+.focus-proj.top .fp-cust { color: rgba(255,255,255,.82); }
+.focus-proj .fp-hours { font-weight: 700; white-space: nowrap; }
+@media (max-width: 720px) { .focus-item { grid-template-columns: 1fr; gap: 8px; } }
+
 /* ---- Faktureringsgrad-liste ---- */
 .billing-list { display: flex; flex-direction: column; gap: 11px; max-height: 460px; overflow-y: auto; }
 .billing-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; }
@@ -346,6 +371,10 @@ tbody tr:hover td { background: var(--mint); }
 .salg-list li { font-size: 13.5px; line-height: 1.5; margin-bottom: 6px; break-inside: avoid; }
 @media (max-width: 760px) { .salg-list { columns: 1; } }
 /* Økonomi: 2-kolonne med tips-sidebar */
+.tilbud-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.tilbud-title { font-weight: 700; font-size: 13px; }
+.tilbud-row label { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.tilbud-row input { width: 70px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; font-family: inherit; text-align: right; }
 .eco-layout { display: grid; grid-template-columns: 1fr 320px; gap: 18px; align-items: start; }
 @media (max-width: 1100px) { .eco-layout { grid-template-columns: 1fr; } }
 .eco-tips .card { position: sticky; top: 84px; }
@@ -396,6 +425,29 @@ tbody tr:hover td { background: var(--mint); }
 .org-node .on-tools button:hover { background: var(--mint); }
 .org-node.drag-over { outline: 2px dashed var(--accent); outline-offset: 2px; }
 .org-node.dragging { opacity: .45; }
+
+/* ---- Kompakt innrykket organisasjonskart (plass på én side) ---- */
+.org-indent { display: block; text-align: left; min-width: 100%; }
+.org-indent ul { list-style: none; margin: 0; padding-left: 24px; position: relative; }
+.org-indent > ul { padding-left: 0; }
+.org-indent li { list-style: none; position: relative; padding: 3px 0; }
+/* loddrett hjelpelinje langs barna */
+.org-indent ul ul::before { content: ""; position: absolute; left: 9px; top: -3px; bottom: 14px;
+  border-left: 2px solid var(--mint-2); }
+/* vannrett stubbe inn til hvert kort */
+.org-indent ul ul > li::before { content: ""; position: absolute; left: -15px; top: 16px;
+  width: 13px; border-top: 2px solid var(--mint-2); }
+/* kompakt kort: navn + rolle på én linje */
+.org-indent .org-node { display: inline-flex; flex-direction: row; align-items: baseline;
+  gap: 8px; min-width: 0; max-width: none; padding: 4px 11px; border-top-width: 1px;
+  border-left: 3px solid var(--accent); border-radius: 7px; box-shadow: none; }
+.org-indent .org-node.lead { border-left-color: var(--ink); }
+.org-indent .org-node .on-name { font-size: 12px; line-height: 1.2; }
+.org-indent .org-node .on-title { font-size: 10.5px; margin-top: 0; line-height: 1.2; }
+.org-indent .org-node .on-title::before { content: "· "; color: var(--muted); font-weight: 400; }
+.org-indent.editing .org-node { cursor: grab; padding-right: 78px; }
+.org-indent.editing .org-node:hover .on-tools { display: flex; }
+.org-indent .org-node .on-tools { top: 50%; transform: translateY(-50%); right: 6px; }
 
 /* Modal */
 .modal { position: fixed; inset: 0; background: rgba(3,2,19,.45); display: flex; align-items: center;
@@ -457,3 +509,69 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .matrix.editing td.cell { cursor: pointer; }
 .matrix.editing td.cell:hover { outline: 2px solid var(--ink); outline-offset: -2px; }
 .namecol .nm-sub { display: block; font-weight: 400; font-size: 11px; color: var(--muted); }
+
+/* ---- Side-veiledning (kort forklaring øverst på hver fane) ---- */
+.page-intro { display: flex; gap: 11px; align-items: flex-start; background: var(--mint);
+  border: 1px solid var(--mint-2); border-left: 4px solid var(--accent); border-radius: 10px;
+  padding: 11px 14px; margin-bottom: 16px; }
+.page-intro .pi-ico { font-size: 18px; line-height: 1.4; flex: none; }
+.page-intro .pi-txt { font-size: 13px; line-height: 1.5; color: var(--ink); }
+.page-intro .pi-txt b { color: var(--accent-dark); }
+
+/* ---- Intro/hensikt-kort ---- */
+.intro-card { border-left: 4px solid var(--accent); background: linear-gradient(180deg, var(--mint) 0%, #fff 60%); margin-bottom: 16px; }
+.intro-card h2 { margin-top: 0; }
+.intro-card p { margin: 0 0 10px; line-height: 1.55; max-width: 80ch; }
+.intro-card p:last-child { margin-bottom: 0; }
+
+/* ---- Per ansatt – prosjekter (prosjektmøter) ---- */
+.emp-res { display: flex; flex-direction: column; gap: 12px; max-height: 620px; overflow: auto; }
+.emp-res-group { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.emp-res-head { display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  padding: 7px 11px; background: var(--mint); font-weight: 700; font-size: 13px; border-bottom: 1px solid var(--border); }
+.emp-res-tot { color: var(--accent-dark); white-space: nowrap; }
+.emp-res-tbl { width: 100%; border-collapse: collapse; }
+.emp-res-tbl td { padding: 6px 11px; border-top: 1px solid var(--grid); font-size: 12.5px; vertical-align: top; }
+.emp-res-tbl tr:first-child td { border-top: 0; }
+.emp-res-tbl td.num { text-align: right; white-space: nowrap; font-weight: 600; }
+.emp-res-cust { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+/* ---- Felles kalender ---- */
+.cal-nav { display: flex; align-items: center; gap: 6px; }
+.cal-month-lbl { font-weight: 700; text-transform: capitalize; min-width: 130px; text-align: center; font-size: 14px; }
+.cal-layout { display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; align-items: start; }
+@media (max-width: 820px) { .cal-layout { grid-template-columns: 1fr; } }
+.cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
+.cal-weekdays span { text-align: center; font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-cell { position: relative; aspect-ratio: 1 / 1; min-height: 46px; border: 1px solid var(--border); border-radius: 8px;
+  background: #fff; padding: 4px 5px; text-align: left; cursor: pointer; display: flex; flex-direction: column;
+  justify-content: space-between; font: inherit; color: var(--ink); }
+.cal-cell:hover { border-color: var(--accent-soft); background: var(--mint); }
+.cal-cell.cal-empty { border: 0; background: transparent; cursor: default; }
+.cal-cell.is-today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.cal-cell.has-ev { background: var(--mint); }
+.cal-num { font-size: 12px; font-weight: 600; color: var(--muted); }
+.cal-cell.is-today .cal-num { color: var(--accent-dark); }
+.cal-dots { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; }
+.cal-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: inline-block; }
+.cal-dot.t-bursdag { background: #e8590c; }
+.cal-dot.t-oppstart { background: #1e8b6f; }
+.cal-dot.t-mote { background: #2f6fed; }
+.cal-dot.t-frist { background: #b42318; }
+.cal-dot.t-annet { background: #8a6d3b; }
+.cal-more { font-size: 9px; color: var(--muted); font-weight: 700; }
+.cal-side-h { margin: 0 0 8px; font-size: 13px; }
+.cal-upcoming { display: flex; flex-direction: column; gap: 5px; max-height: 240px; overflow: auto; margin-bottom: 12px; }
+.cal-up-item { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center;
+  padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: #fff; font-size: 12.5px; }
+.cal-up-date { font-weight: 700; color: var(--accent-dark); white-space: nowrap; font-size: 11.5px; }
+.cal-up-main { overflow: hidden; text-overflow: ellipsis; }
+.cal-up-ico { margin-right: 4px; }
+.cal-by { color: var(--muted); font-size: 10.5px; margin-left: 4px; }
+.cal-del { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; line-height: 1; padding: 2px 4px; border-radius: 6px; }
+.cal-del:hover { background: var(--bad-bg); color: var(--bad); }
+.cal-form { display: flex; flex-direction: column; gap: 7px; border-top: 1px solid var(--border); padding-top: 12px; }
+.cal-form-row { display: flex; gap: 7px; }
+.cal-form-row > .kon-f { flex: 1; min-width: 0; }
+.cal-form .btn-primary { white-space: nowrap; }

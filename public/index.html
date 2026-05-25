@@ -100,9 +100,62 @@
         </div>
         <div class="card">
           <h2>Påminnelser</h2>
+          <a class="sc-link" href="https://tripletex.no/execute/timeRegistration" target="_blank" rel="noopener" style="margin:0 0 10px">⏱️ Før timer i Tripletex ↗</a>
           <div id="remindersList"></div>
         </div>
       </div>
+      <div class="card">
+        <h2>Intern kommunikasjon</h2>
+        <p class="subnote">Felles vegg — alle som er innlogget ser det samme.</p>
+        <div id="commFeed" class="comm-feed"></div>
+        <div class="comm-input">
+          <input id="commName" class="search" placeholder="Navn" />
+          <input id="commText" class="search" placeholder="Skriv en melding …" />
+          <button id="commSend" class="btn-primary">Send</button>
+        </div>
+      </div>
+      <div class="card cal-card">
+        <div class="proj-head">
+          <h2>Felles kalender</h2>
+          <div class="cal-nav">
+            <button id="calPrev" class="btn-ghost" title="Forrige måned">‹</button>
+            <span id="calMonthLbl" class="cal-month-lbl"></span>
+            <button id="calNext" class="btn-ghost" title="Neste måned">›</button>
+            <button id="calToday" class="btn-ghost">I dag</button>
+          </div>
+        </div>
+        <p class="subnote">Bursdager, oppstart for nye folk, frister og møter — alle innloggede kan legge inn.</p>
+        <div class="cal-layout">
+          <div class="cal-grid-wrap">
+            <div class="cal-weekdays">
+              <span>Man</span><span>Tir</span><span>Ons</span><span>Tor</span><span>Fre</span><span>Lør</span><span>Søn</span>
+            </div>
+            <div id="calGrid" class="cal-grid"></div>
+          </div>
+          <div class="cal-side">
+            <h3 class="cal-side-h">Kommende</h3>
+            <div id="calUpcoming" class="cal-upcoming"></div>
+            <form id="calForm" class="cal-form">
+              <div class="cal-form-row">
+                <input id="calDate" class="kon-f" type="date" required />
+                <select id="calType" class="kon-f">
+                  <option value="bursdag">🎂 Bursdag</option>
+                  <option value="oppstart">🚀 Oppstart</option>
+                  <option value="mote">📅 Møte</option>
+                  <option value="frist">⏰ Frist</option>
+                  <option value="annet" selected>📌 Annet</option>
+                </select>
+              </div>
+              <input id="calTitle" class="kon-f" type="text" placeholder="Hva skjer? (f.eks. «Karis bursdag»)" required />
+              <div class="cal-form-row">
+                <input id="calBy" class="kon-f" type="text" placeholder="Ditt navn (valgfritt)" />
+                <button type="submit" class="btn-primary">Legg til</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
       <div class="wall-grid">
         <!-- Venstre: rullende prosjekter -->
         <div class="card scroll-card">
@@ -127,6 +180,13 @@
         </div>
       </div>
 
+      <div class="card scroll-card focus-card">
+        <h2>Hva jobber hver ansatt med? <span class="subnote">siste 2 uker — flest timer øverst</span></h2>
+        <div class="marquee marquee-tall" id="focusMarquee">
+          <div class="marquee-track" id="focusTrack"></div>
+        </div>
+      </div>
+
       <div class="grid-2">
         <div class="card">
           <h2>Utestående fakturaer</h2>
@@ -147,6 +207,7 @@
   <!-- ============ FANE: PROSJEKTER ============ -->
   <section class="tab-panel" id="panel-prosjekter">
     <main class="container">
+      <div class="page-intro"><span class="pi-ico">📋</span><span class="pi-txt"><b>Hva siden gjør:</b> Live oversikt over alle prosjekter med timer, prosjektleder og siste aktivitet. <b>Hensikt:</b> Se hvor innsatsen ligger, hvem som leder hva, og hvilke prosjekter som er mest aktive akkurat nå.</span></div>
       <div class="card">
         <div class="proj-head">
           <h2>Prosjekter med aktivitet</h2>
@@ -163,9 +224,22 @@
   <!-- ============ FANE: ØKONOMI ============ -->
   <section class="tab-panel" id="panel-okonomi">
     <main class="container">
+      <div class="page-intro"><span class="pi-ico">💰</span><span class="pi-txt"><b>Hva siden gjør:</b> Live økonomi hentet rett fra regnskapet — resultat, balanse, likviditet og faktureringsgrad. <b>Hensikt:</b> Gi ledelsen en alltid oppdatert finansiell status og konkrete tips til å optimalisere driften.</span></div>
       <div id="ecoStatus" class="eco-status">Laster økonomi …</div>
       <div id="ecoContent" hidden>
         <p class="subnote" style="margin:0 0 14px">Live tall hentet rett fra hovedboken i Tripletex. Kan avvike noe fra økonomiansvarliges manuelt justerte rapport (f.eks. skatt, periodiseringer og prognoser).</p>
+        <div class="card">
+          <h2>Nøkkeltall</h2>
+          <div class="kpi-grid" id="ecoKpis2"></div>
+          <div class="tilbud-row">
+            <span class="tilbud-title">Status tilbud:</span>
+            <label>Sendt <input id="tbSendt" type="number" min="0" disabled /></label>
+            <label>Vunnet <input id="tbVunnet" type="number" min="0" disabled /></label>
+            <label>Tapt <input id="tbTapt" type="number" min="0" disabled /></label>
+            <button id="tbEdit" class="btn-ghost">🔓 Rediger</button>
+            <button id="tbSave" class="btn-primary" hidden>Lagre</button>
+          </div>
+        </div>
         <div class="eco-layout">
         <div class="eco-main">
         <div class="grid-2">
@@ -185,8 +259,13 @@
           </div>
         </div>
         <div class="card">
+          <h2>Faktureringsgrad — utvikling siste 6 måneder</h2>
+          <p class="subnote">Samlet for firmaet per måned — viser fremdrift over tid.</p>
+          <div class="chart-box"><canvas id="ecoBillTrend"></canvas></div>
+        </div>
+        <div class="card">
           <h2>Faktureringsgrad — siste 3 måneder</h2>
-          <p class="subnote">Per ansatt, og samlet for hele firmaet.</p>
+          <p class="subnote">Per ansatt (kun de som er i jobb i dag — har ført timer siste 4 uker), og samlet for hele firmaet.</p>
           <div class="value-note">💚 <b>Bærekraftige relasjoner:</b> Vi er ett team. Har en kollega ledig kapasitet, hjelper vi hverandre å finne arbeid — lav faktureringsgrad er en mulighet, ikke en pekefinger.</div>
           <div class="chart-box" style="height:340px"><canvas id="ecoBillChart"></canvas></div>
           <div class="table-wrap tall"><table id="ecoUtil"></table></div>
@@ -208,6 +287,7 @@
   <!-- ============ FANE: PROSJEKTMØTER ============ -->
   <section class="tab-panel" id="panel-prosjektmoter">
     <main class="container">
+      <div class="page-intro"><span class="pi-ico">🗓️</span><span class="pi-txt"><b>Hva siden gjør:</b> Samler referater, saker og ressursfordeling for prosjektmøtene (annenhver uke, 1 time). <b>Hensikt:</b> Felles status på prosjektene og riktig fordeling av folk — slik at ingen blir flaskehals og ledig kapasitet finner arbeid.</span></div>
       <div class="grid-2">
         <div class="card">
           <div class="proj-head">
@@ -228,10 +308,20 @@
           <div id="pmSuggestions"></div>
         </div>
       </div>
-      <div class="card">
-        <h2>Ressursfordeling — timer per prosjekt (siste 4 uker)</h2>
-        <p class="subnote">Prosjektene med flest timer øverst, og hvem som jobber på dem.</p>
-        <div class="table-wrap tall"><table id="pmResource"></table></div>
+      <div class="grid-2">
+        <div class="card">
+          <h2>Ressursfordeling — timer per prosjekt (siste 4 uker)</h2>
+          <p class="subnote">Prosjektene med flest timer øverst, og hvem som jobber på dem.</p>
+          <div class="table-wrap tall"><table id="pmResource"></table></div>
+        </div>
+        <div class="card">
+          <div class="proj-head">
+            <h2>Per ansatt — prosjekter (siste 4 uker)</h2>
+            <select id="pmEmpFilter" class="kon-f" style="max-width:200px"></select>
+          </div>
+          <p class="subnote">Hver ansatt og prosjektene de har ført timer på, med flest timer øverst.</p>
+          <div id="pmEmpResource" class="emp-res"></div>
+        </div>
       </div>
     </main>
   </section>
@@ -239,6 +329,7 @@
   <!-- ============ FANE: KONTAKTER ============ -->
   <section class="tab-panel" id="panel-kontakter">
     <main class="container">
+      <div class="page-intro"><span class="pi-ico">📇</span><span class="pi-txt"><b>Hva siden gjør:</b> Samler viktige kontaktpersoner — internt, hos leverandører og kunder fra Tripletex. <b>Hensikt:</b> Finne riktig person raskt, uten å lete i flere systemer.</span></div>
       <div class="card">
         <div class="proj-head">
           <h2>Viktige kontaktpersoner</h2>
@@ -266,10 +357,12 @@
   <!-- ============ FANE: HR ============ -->
   <section class="tab-panel" id="panel-hr">
     <main class="container">
+      <div class="page-intro"><span class="pi-ico">👥</span><span class="pi-txt"><b>Hva siden gjør:</b> Samler alt rundt folk — kontorplassering, kompetansematrise, organisasjonskart, onboarding, verneombud og rekruttering. <b>Hensikt:</b> Ett sted for HR-arbeidet og for å bygge et godt arbeidsmiljø i tråd med verdiene våre.</span></div>
       <div class="subtabs" id="hrSubtabs">
         <button class="subtab active" data-sub="plassering">Kontorplassering</button>
         <button class="subtab" data-sub="ansatte">Ansatte / kompetanse</button>
         <button class="subtab" data-sub="organisasjon">Organisasjon</button>
+        <button class="subtab" data-sub="hms">HMS / verneombud</button>
         <button class="subtab" data-sub="rekruttering">Rekruttering</button>
         <button class="subtab" data-sub="onboarding">Onboarding</button>
         <button class="subtab" data-sub="cv">CV-er</button>
@@ -330,7 +423,28 @@
             </div>
           </div>
           <p class="subnote" id="orgHint">Skrivebeskyttet. Klikk «Rediger» for å flytte personer, legge til eller endre.</p>
-          <div class="org-scroll"><div class="orgchart tree" id="orgChart"></div></div>
+          <div class="org-scroll"><div class="orgchart org-indent" id="orgChart"></div></div>
+        </div>
+      </div>
+
+      <div class="hr-sub" id="hrsub-hms">
+        <div class="grid-2">
+          <div class="card">
+            <h2>Verneombud</h2>
+            <div class="scaffold-card" style="border-left-color:var(--accent)">
+              <div class="sc-title">Bendik Kråkenes Selmer-Anderssen</div>
+              <div class="sc-sub">Verneombud</div>
+              <div class="sc-note">Ivaretar de ansattes interesser i HMS-saker: sikkerhet, arbeidsmiljø og at rutiner følges. Ta kontakt med Bendik ved bekymringer rundt helse, miljø og sikkerhet.</div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>HR-leder</h2>
+            <div class="scaffold-card" style="border-left-color:var(--ink)">
+              <div class="sc-title">Svjetlana «Lana» Milic-Baros</div>
+              <div class="sc-sub">HR-leder</div>
+              <div class="sc-note">Lana har jobbet i Bygg-Kon i 25 år og er HR-leder for selskapet. Hun er kontaktpunkt for personalsaker, oppfølging av ansatte og sosiale arrangementer.</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -369,6 +483,12 @@
   <!-- ============ FANE: FAGMØTER ============ -->
   <section class="tab-panel" id="panel-fagmoter">
     <main class="container">
+      <div class="card intro-card">
+        <h2>Hvorfor fagmøter?</h2>
+        <p>Fagmøtene er der vi deler kunnskap på tvers og vokser sammen. Bygg-Kon er <b>ett selskap</b> med bred kompetanse — fra prosjektledelse og byggherrerådgivning til fagprosjektering — og fagmøtene er arenaen hvor vi løfter den kompetansen videre, lærer av hverandres prosjekter og bygger en felles faglig standard.</p>
+        <p>Målet er å utvikle oss kontinuerlig, i tråd med verdiene våre: <b>yrkesstolthet</b> i det vi leverer, <b>kvalitet</b> og <b>nøyaktighet</b> i faget, og <b>bærekraftige relasjoner</b> der vi deler raust og hjelper hverandre fram. Når én av oss blir bedre, blir hele Bygg-Kon bedre.</p>
+        <p class="subnote">Alle oppfordres til å bidra — foreslå tema, del erfaringer fra egne prosjekter og still spørsmål.</p>
+      </div>
       <div class="grid-2">
         <div class="card">
           <div class="proj-head">
@@ -395,6 +515,7 @@
   <!-- ============ FANE: KOSTNADER ============ -->
   <section class="tab-panel" id="panel-kostnader">
     <main class="container">
+      <div class="page-intro"><span class="pi-ico">🧾</span><span class="pi-txt"><b>Hva siden gjør:</b> Viser de største kostnadene per leverandør siste 12 mnd, hentet fra regnskapet. <b>Hensikt:</b> Ha kontroll på hvor pengene går, og fange opp kostnader som bør reforhandles eller viderefaktureres.</span></div>
       <div class="card">
         <h2>Kostnader per leverandør — siste 12 måneder</h2>
         <p class="subnote">Hentet fra leverandørfakturaer i Tripletex. Høyeste kostnader øverst.</p>
@@ -412,6 +533,7 @@
   <!-- ============ FANE: KUNDER ============ -->
   <section class="tab-panel" id="panel-kunder">
     <main class="container">
+      <div class="page-intro"><span class="pi-ico">🤝</span><span class="pi-txt"><b>Hva siden gjør:</b> Rangerer kundene etter omsetning siste 12 mnd, med kontaktinfo og salgsstrategi. <b>Hensikt:</b> Prioritere salgsarbeidet mot de beste kundene og selge inn mer av kompetansen vår.</span></div>
       <div class="card">
         <h2>Salg — Bygg-Kon</h2>
         <p class="subnote">Strategi for arbeid mot de beste kundene.</p>
@@ -427,6 +549,7 @@
           <li>Fredager: oppfølging av gode kunder — ring den som skal ha leveransen.</li>
           <li>Hold prisene til de beste kundene.</li>
           <li>Kartlegg hva slags kunder de beste er — vi vil ha mer av dem.</li>
+          <li>Selg inn mer kompetanse fra kolleger i prosjektene du allerede er involvert i (mersalg på tvers av fag — RIB, RIBr, ARK, prosjektledelse).</li>
         </ul>
       </div>
       <div class="kunder-layout">
@@ -447,6 +570,7 @@
   <!-- ============ FANE: MARKEDSFØRING ============ -->
   <section class="tab-panel" id="panel-markedsforing">
     <main class="container">
+      <div class="page-intro"><span class="pi-ico">📣</span><span class="pi-txt"><b>Hva siden gjør:</b> Samler markedsarbeidet — synlighet i sosiale medier, e-postmarkedsføring, kundepleie og potensielle kundelister. <b>Hensikt:</b> Holde markedsføringen målrettet og koordinert så vi blir mer synlige og vinner nye oppdrag.</span></div>
       <div class="card">
         <div class="proj-head">
           <h2>Markedsføring</h2>
@@ -464,6 +588,7 @@
   <!-- ============ FANE: AVDELINGER ============ -->
   <section class="tab-panel" id="panel-avdelinger">
     <main class="container">
+      <div class="page-intro"><span class="pi-ico">🏢</span><span class="pi-txt"><b>Hva siden gjør:</b> Viser avdelingene våre og hvordan vi er organisert. <b>Hensikt:</b> Gi en rask oversikt over fagområdene og hvem som hører hjemme hvor.</span></div>
       <div class="card">
         <h2>Avdelinger</h2>
         <p class="subnote">Hver avdeling får etter hvert sitt eget dashboard. Klikk «⚙ Innstillinger» for å endre avdelingslista.</p>
@@ -475,6 +600,7 @@
   <!-- ============ FANE: KI-AGENTER ============ -->
   <section class="tab-panel" id="panel-kiagenter">
     <main class="container">
+      <div class="page-intro"><span class="pi-ico">🤖</span><span class="pi-txt"><b>Hva siden gjør:</b> Oversikt over KI-agentene våre fra byggkon.ai-plattformen og hva de brukes til. <b>Hensikt:</b> Gjøre det enkelt for alle å ta i bruk KI-verktøyene i det daglige arbeidet.</span></div>
       <div class="card">
         <h2>KI-agenter</h2>
         <p class="subnote">Oversikt over Bygg-Kons AI-agenter. Frontend/innlogging til hver agent kobles på her etter hvert. (Passord vises ikke her av sikkerhetshensyn.)</p>
@@ -486,6 +612,7 @@
   <!-- ============ FANE: KVALITETSSIKRING ============ -->
   <section class="tab-panel" id="panel-kvalitet">
     <main class="container">
+      <div class="page-intro"><span class="pi-ico">✅</span><span class="pi-txt"><b>Hva siden gjør:</b> Samler kvalitetssikring og KI-agenter som støtter KS-arbeidet. <b>Hensikt:</b> Sikre at leveransene holder god standard — i tråd med kvalitet og nøyaktighet.</span></div>
       <div class="card">
         <h2>Kvalitetssikring</h2>
         <p class="subnote">KI-agenter som hjelper med kvalitetssikring (sidemannskontroll, samsvar med TEK/standarder, dokumentkontroll).</p>
@@ -497,6 +624,7 @@
   <!-- ============ FANE: RAPPORTER ============ -->
   <section class="tab-panel" id="panel-rapporter">
     <main class="container">
+      <div class="page-intro"><span class="pi-ico">📈</span><span class="pi-txt"><b>Hva siden gjør:</b> Genererer rapporter automatisk og med KI ut fra tallene i systemet. <b>Hensikt:</b> Få rask innsikt og ferdige sammendrag uten manuelt arbeid.</span></div>
       <div class="card">
         <h2>Lag ny rapport med KI</h2>
         <p class="subnote">Beskriv hva slags rapport du vil ha — KI henter relevante tall fra systemet og skriver rapporten.</p>
@@ -515,6 +643,7 @@
   <!-- ============ FANE: OFFICE 365 ============ -->
   <section class="tab-panel" id="panel-office365">
     <main class="container">
+      <div class="page-intro"><span class="pi-ico">📁</span><span class="pi-txt"><b>Hva siden gjør:</b> Direkte snarveier til SharePoint, OneDrive og Office-tjenestene. <b>Hensikt:</b> Komme raskt til felles dokumenter og filer fra dashbordet.</span></div>
       <div class="card">
         <h2>Office 365</h2>
         <p class="subnote">Microsoft 365 kan ikke vises inni dashbordet (Microsoft blokkerer innramming), så lenkene åpner tjenestene i ny fane — du er allerede innlogget.</p>
@@ -535,6 +664,7 @@
   <!-- ============ FANE: LEDELSE (kun leder) ============ -->
   <section class="tab-panel" id="panel-ledelse">
     <main class="container">
+      <div class="page-intro"><span class="pi-ico">🔒</span><span class="pi-txt"><b>Hva siden gjør:</b> Passordbeskyttet område for ledelsesrapporter og referater fra ledermøter. <b>Hensikt:</b> Samle sensitiv ledelsesinformasjon ett sted, kun for de som skal ha tilgang.</span></div>
       <div id="ledLocked" class="card" hidden>
         <h2>Ledelse</h2>
         <p class="subnote">Denne fanen er kun for ledelsen og krever leder-pålogging.</p>
@@ -556,6 +686,7 @@
   <!-- ============ FANE: IT-SYSTEM ============ -->
   <section class="tab-panel" id="panel-itsystem">
     <main class="container">
+      <div class="page-intro"><span class="pi-ico">💻</span><span class="pi-txt"><b>Hva siden gjør:</b> Alfabetisk oversikt over IT-systemene og lisensene våre, med kort forklaring på hvert. <b>Hensikt:</b> Vite hvilke verktøy vi har og hvem som eier dem. Passord ligger i 1Password — aldri her.</span></div>
       <div class="card">
         <h2>IT-system og verktøy</h2>
         <p class="subnote">Oversikt over systemene vi bruker, hva de er til, og raske lenker. (Brukernavn og passord ligger ikke her – de finnes i 1Password.)</p>
@@ -603,6 +734,7 @@
   <script src="/licenses.js"></script>
   <script src="/ledelse.js"></script>
   <script src="/news.js"></script>
+  <script src="/calendar.js"></script>
   <script src="/marketing.js"></script>
 
   <!-- Nova AI-widget -->
