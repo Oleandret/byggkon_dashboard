@@ -807,6 +807,44 @@
   <section class="tab-panel" id="panel-kiagenter">
     <main class="container">
       <div class="page-intro"><span class="pi-ico">🤖</span><span class="pi-txt"><b>Hva siden gjør:</b> Oversikt over KI-agentene våre fra byggkon.ai-plattformen og hva de brukes til. <b>Hensikt:</b> Gjøre det enkelt for alle å ta i bruk KI-verktøyene i det daglige arbeidet.</span></div>
+
+      <div class="card">
+        <h2>Operative AI-agenter <span class="subnote">— i bruk nå</span></h2>
+        <p class="subnote">Klikk for å åpne. «Slik kobler du til» forklarer hvordan du tar agenten i bruk.</p>
+        <div class="agent-list">
+          <div class="agent-item">
+            <div class="agent-head"><span class="agent-name">BYGG-KON.ai (plattform)</span><a class="sc-link" href="https://byggkon-ai-platform-production.up.railway.app" target="_blank" rel="noopener">Åpne ↗</a></div>
+            <div class="agent-desc">Samlet AI-plattform – produserer dispensasjonssøknader, UAK-sjekklister, KS-planer og befaringsrapporter.</div>
+            <div class="agent-how">Slik kobler du til: Åpne lenken og logg inn med din byggkon-konto (ai@byggkon.no for delt tilgang).</div>
+          </div>
+          <div class="agent-item">
+            <div class="agent-head"><span class="agent-name">Loki</span><a class="sc-link" href="https://byggkon-loki-ai-production.up.railway.app" target="_blank" rel="noopener">Åpne ↗</a></div>
+            <div class="agent-desc">Søker i faktisk innhold på tvers av alle prosjekter (OneDrive/SharePoint indeksert i vektordatabase).</div>
+            <div class="agent-how">Slik kobler du til: Bruk web-grensesnittet, eller legg Loki sin MCP-URL inn under Innstillinger → MCP-servere så den kan brukes av rapporter/chat.</div>
+          </div>
+          <div class="agent-item">
+            <div class="agent-head"><span class="agent-name">Nova</span><a class="sc-link" href="https://nova-ai-agent-bygg-kon-production.up.railway.app" target="_blank" rel="noopener">Åpne ↗</a></div>
+            <div class="agent-desc">Fagassistent på bygging og regelverk. Svarer via chat, Teams, e-post og webhook.</div>
+            <div class="agent-how">Slik kobler du til: Åpne lenken, eller skriv til Nova i Teams. Inviter ai@byggkon.no i møter/tråder der Nova skal svare.</div>
+          </div>
+          <div class="agent-item">
+            <div class="agent-head"><span class="agent-name">Hilde</span><a class="sc-link" href="https://byggkon.bluemint.dev" target="_blank" rel="noopener">Åpne ↗</a></div>
+            <div class="agent-desc">Eiendom og eier fra Kartverket og Brønnøysund – matrikkel, grunnbok og kontaktinfo.</div>
+            <div class="agent-how">Slik kobler du til: Åpne lenken og søk på adresse/gnr/bnr.</div>
+          </div>
+          <div class="agent-item">
+            <div class="agent-head"><span class="agent-name">KI Tilbud (Embla)</span><a class="sc-link" href="https://bk-tilbud.aiki.as/login" target="_blank" rel="noopener">Åpne ↗</a></div>
+            <div class="agent-desc">Produserer komplette tilbud etter NS 8400 og NS 3450 – kombinerer Loki, Nova og Tripletex.</div>
+            <div class="agent-how">Slik kobler du til: Logg inn med byggkon-konto på lenken.</div>
+          </div>
+          <div class="agent-item">
+            <div class="agent-head"><span class="agent-name">Regnskapsagent (Tripletex)</span><span class="agent-badge">MCP</span></div>
+            <div class="agent-desc">Faktura, regnskap, prosjektøkonomi og timer – datakilden bak dette dashbordet.</div>
+            <div class="agent-how">Slik kobler du til: MCP-URL ligger under Innstillinger → MCP & datakilder. Skriveoperasjoner krever alltid bekreftelse.</div>
+          </div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="proj-head">
           <h2>KI-agenter — status</h2>
@@ -820,14 +858,20 @@
         <div id="kiBoard" class="ki-board"></div>
       </div>
       <div class="card">
-        <h2>Foreslå en KI-agent</h2>
-        <p class="subnote">Hva trenger du hjelp til? Foreslå en agent – så vurderer vi å bygge den.</p>
+        <div class="proj-head">
+          <h2>Foreslå en KI-agent</h2>
+          <div class="org-actions">
+            <button id="kiSugEdit" class="btn-ghost">🔓 Rediger / ranger</button>
+            <button id="kiSugSave" class="btn-primary" hidden>Lagre</button>
+          </div>
+        </div>
+        <p class="subnote">Hva trenger du hjelp til? Foreslå en agent – så vurderer vi å bygge den. Lås opp for å redigere, rangere etter viktighet/produksjon og merke om den kan selges videre.</p>
         <div class="fm-suggest">
           <input id="kiSuggestInput" class="search" type="text" placeholder="Hva bør agenten gjøre? …" />
           <input id="kiSuggestBy" class="search" type="text" placeholder="Ditt navn (valgfritt)" />
           <button id="kiSuggestBtn" class="btn-primary">Foreslå</button>
         </div>
-        <div id="kiSuggestions"></div>
+        <div id="kiSuggestions" class="ki-sug-list"></div>
       </div>
     </main>
   </section>

@@ -602,6 +602,15 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .req-del { color: var(--muted); }
 .req-del:hover { color: var(--bad); }
 
+/* ---- Operative AI-agenter ---- */
+.agent-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.agent-item { border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 10px; padding: 11px 13px; background: #fff; }
+.agent-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.agent-name { font-weight: 700; font-size: 14px; }
+.agent-badge { font-size: 10.5px; font-weight: 700; background: var(--mint); color: var(--accent-dark); border: 1px solid var(--mint-2); border-radius: 999px; padding: 1px 8px; }
+.agent-desc { font-size: 12.5px; color: var(--ink); margin: 5px 0; line-height: 1.45; }
+.agent-how { font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+
 /* ---- KI-agenter statusoversikt ---- */
 .ki-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 @media (max-width: 820px) { .ki-board { grid-template-columns: 1fr; } }
@@ -619,6 +628,20 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .ki-del { align-self: flex-end; }
 .sug-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; margin-top: 6px; font-size: 13px; }
 .sug-by { color: var(--muted); font-size: 11.5px; }
+.ki-sug-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.ki-sug { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: #fff; }
+.ki-sug-top { display: flex; align-items: baseline; gap: 9px; }
+.ki-sug-text { font-size: 13.5px; font-weight: 600; }
+.ki-sug-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; align-items: center; }
+.ki-tag { font-size: 11.5px; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; color: var(--muted); }
+.ki-tag.sell-yes { background: var(--mint); border-color: var(--mint-2); color: var(--accent-dark); font-weight: 700; }
+.imp-badge { font-size: 11px; font-weight: 800; border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+.imp-high { background: #b42318; color: #fff; }
+.imp-mid { background: #e8a33d; color: #3a2a06; }
+.imp-low { background: var(--mint-2); color: var(--accent-dark); }
+.ki-sug.edit { display: flex; flex-direction: column; gap: 8px; }
+.ki-sug-fields { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.ki-sug-fields label { display: flex; flex-direction: column; font-size: 11px; color: var(--muted); gap: 2px; }
 .sug-del { border: 0; background: transparent; color: var(--muted); cursor: pointer; border-radius: 6px; padding: 2px 6px; }
 .sug-del:hover { background: var(--bad-bg); color: var(--bad); }
 

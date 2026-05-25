@@ -633,8 +633,29 @@ app.post("/api/kisuggestions", requireAuth, (req, res) => {
     if (!text) return res.status(400).json({ error: "Tomt forslag" });
     const by = String(req.body?.by || "").trim().slice(0, 60);
     const list = (getConfig().kiSuggestions || []).slice(-99);
-    list.push({ id: "k" + Date.now().toString(36), text, by, ts: Date.now() });
+    list.push({ id: "k" + Date.now().toString(36), text, by, ts: Date.now(), importance: "Middels", production: "Idé", sellable: "Nei" });
     saveConfig({ kiSuggestions: list });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+// Full lagring (rediger/ranger alle forslag)
+app.post("/api/kisuggestions/save", requireAuth, (req, res) => {
+  try {
+    const list = Array.isArray(req.body?.suggestions) ? req.body.suggestions : null;
+    if (!list) return res.status(400).json({ error: "Mangler suggestions-liste" });
+    const imp = ["Høy", "Middels", "Lav"];
+    const prod = ["Idé", "Under utvikling", "Klar", "I produksjon"];
+    const sell = ["Ja", "Kanskje", "Nei"];
+    const clean = list.map((s) => ({
+      id: String(s.id || "k" + Date.now().toString(36) + Math.floor(Math.random() * 1000)),
+      text: String(s.text || "").slice(0, 600),
+      by: String(s.by || "").slice(0, 60),
+      ts: Number(s.ts) || Date.now(),
+      importance: imp.includes(s.importance) ? s.importance : "Middels",
+      production: prod.includes(s.production) ? s.production : "Idé",
+      sellable: sell.includes(s.sellable) ? s.sellable : "Nei",
+    }));
+    saveConfig({ kiSuggestions: clean });
     res.json({ ok: true });
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
