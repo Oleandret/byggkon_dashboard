@@ -59,6 +59,11 @@
     }
     const addr = document.getElementById("dsAddr");
     if (addr && disp && disp.companyAddress) addr.textContent = "📍 " + disp.companyAddress;
+    const head = document.getElementById("dsHeader");
+    if (head && disp && disp.heroImageUrl) {
+      head.style.backgroundImage = `linear-gradient(90deg, rgba(3,2,19,.78), rgba(3,2,19,.45)), url('${disp.heroImageUrl}')`;
+      head.classList.add("has-hero");
+    }
   }
   function renderCapacity(billing) {
     const el = document.getElementById("dsCapacity");

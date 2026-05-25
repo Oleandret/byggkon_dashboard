@@ -574,6 +574,15 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 
 /* ---- Driftssentral (public skjerm) ---- */
 .ds-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+/* Banner med byggbildet (samme som forsiden) */
+.ds-header.has-hero { background-size: cover; background-position: center; border-radius: 14px; padding: 22px 26px; box-shadow: var(--shadow); }
+.ds-header.has-hero .ds-title { color: #fff; }
+.ds-header.has-hero .ds-sub { color: rgba(255,255,255,.85); }
+.ds-header.has-hero .ds-addr { color: rgba(255,255,255,.8); }
+.ds-header.has-hero .ds-clock { color: #fff; }
+.ds-header.has-hero .ds-weather { color: #fff; }
+.ds-header.has-hero .ds-weather .hw-place,
+.ds-header.has-hero .ds-weather .hw-day { color: rgba(255,255,255,.82); }
 .ds-title { margin: 0; font-size: 28px; letter-spacing: -.5px; }
 .ds-sub { margin: 4px 0 0; color: var(--muted); }
 .ds-clock { font-size: 16px; font-weight: 700; color: var(--accent-dark); text-transform: capitalize; }
