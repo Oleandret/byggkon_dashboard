@@ -652,7 +652,15 @@ async function load() {
     populateProjEmp();
     renderProjectsTable();
     renderResource();
-    document.getElementById("updated").textContent = "Oppdatert " + new Date(d.updatedAt).toLocaleTimeString("nb-NO");
+    const upd = document.getElementById("updated");
+    const snap = d._snapshot;
+    if (snap && snap.stale) {
+      upd.textContent = "⚠ Viser sist kjente data (når ikke Tripletex) — sist oppdatert " + new Date(snap.savedAt).toLocaleString("nb-NO");
+      upd.classList.add("stale");
+    } else {
+      upd.textContent = "Oppdatert " + new Date(d.updatedAt || (snap && snap.savedAt) || Date.now()).toLocaleTimeString("nb-NO");
+      upd.classList.remove("stale");
+    }
   } catch (err) {
     showError("Kunne ikke hente data: " + err.message);
     document.getElementById("updated").textContent = "Feil ved oppdatering";

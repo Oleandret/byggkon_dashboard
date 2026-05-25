@@ -511,6 +511,8 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .matrix.editing td.cell:hover { outline: 2px solid var(--ink); outline-offset: -2px; }
 .namecol .nm-sub { display: block; font-weight: 400; font-size: 11px; color: var(--muted); }
 
+#updated.stale { color: var(--bad); font-weight: 600; }
+
 /* ---- Sidemeny: grupper ---- */
 .nav-group { margin-bottom: 4px; }
 .nav-group-head { width: 100%; text-align: left; background: transparent; border: 0; cursor: pointer;

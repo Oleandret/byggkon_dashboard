@@ -9,6 +9,8 @@ import { buildEconomy } from "./src/economy.js";
 import { getNewsFeed } from "./src/newsfeed.js";
 import { clearCache, resetClient, getInvoices, getCustomers, getSupplierInvoices, getProjects, getTimeEntries, ymd } from "./src/tripletex.js";
 import { geocodeOne, sleep } from "./src/geocode.js";
+import { serveWithSnapshot, expireSnapshots } from "./src/snapshot.js";
+const snapTtl = () => getConfig().cacheTtlMs || 300000;
 import { getConfig, saveConfig, getConfigForAdmin, SETTINGS_PATH } from "./src/settings.js";
 
 // Mappe for opplastede filer (ved siden av innstillingsfila – legg på Volume på Railway).
@@ -137,7 +139,7 @@ app.post("/api/admin/settings", requireAdmin, (req, res) => {
 // ---- Dashboard-API ----
 app.get("/api/overview", requireAuth, async (req, res) => {
   try {
-    res.json(await buildOverview());
+    res.json(await serveWithSnapshot("overview", () => buildOverview(), snapTtl()));
   } catch (err) {
     console.error("Feil i /api/overview:", err.message);
     res.status(502).json({ error: err.message });
@@ -146,21 +148,23 @@ app.get("/api/overview", requireAuth, async (req, res) => {
 // ---- Kostnader per leverandør (siste 12 mnd, fra Tripletex) ----
 app.get("/api/costs", requireAuth, async (req, res) => {
   try {
-    const today = new Date();
-    const to = ymd(today);
-    const from = ymd(new Date(today.getFullYear() - 1, today.getMonth(), today.getDate()));
-    const sis = await getSupplierInvoices(from, to);
-    const bySup = new Map();
-    let total = 0;
-    for (const s of sis) {
-      const name = s.supplier?.name || "Ukjent";
-      const cost = Math.abs(s.amount || 0);
-      const cur = bySup.get(name) || { name, cost: 0, count: 0 };
-      cur.cost += cost; cur.count += 1; total += cost;
-      bySup.set(name, cur);
-    }
-    const suppliers = [...bySup.values()].sort((a, b) => b.cost - a.cost);
-    res.json({ suppliers, total });
+    res.json(await serveWithSnapshot("costs", async () => {
+      const today = new Date();
+      const to = ymd(today);
+      const from = ymd(new Date(today.getFullYear() - 1, today.getMonth(), today.getDate()));
+      const sis = await getSupplierInvoices(from, to);
+      const bySup = new Map();
+      let total = 0;
+      for (const s of sis) {
+        const name = s.supplier?.name || "Ukjent";
+        const cost = Math.abs(s.amount || 0);
+        const cur = bySup.get(name) || { name, cost: 0, count: 0 };
+        cur.cost += cost; cur.count += 1; total += cost;
+        bySup.set(name, cur);
+      }
+      const suppliers = [...bySup.values()].sort((a, b) => b.cost - a.cost);
+      return { suppliers, total };
+    }, snapTtl()));
   } catch (err) {
     console.error("Feil i /api/costs:", err.message);
     res.status(502).json({ error: err.message });
@@ -170,16 +174,18 @@ app.get("/api/costs", requireAuth, async (req, res) => {
 // Markedsføring: full kontaktliste (alle kunder fra Tripletex, all tilgjengelig data).
 app.get("/api/marketing-contacts", requireAuth, async (req, res) => {
   try {
-    const custList = await getCustomers().catch(() => []);
-    const contacts = custList.map((c) => ({
-      kilde: "Tripletex",
-      navn: c.name || "",
-      epost: c.email || "",
-      fakturaEpost: c.invoiceEmail || "",
-      telefon: c.phoneNumber || "",
-    })).sort((a, b) => a.navn.localeCompare(b.navn, "nb"));
-    const lokiConfigured = (getConfig().mcpServers || []).some((m) => /loki/i.test(m.name));
-    res.json({ updatedAt: new Date().toISOString(), contacts, lokiConfigured });
+    res.json(await serveWithSnapshot("marketing-contacts", async () => {
+      const custList = await getCustomers();
+      const contacts = custList.map((c) => ({
+        kilde: "Tripletex",
+        navn: c.name || "",
+        epost: c.email || "",
+        fakturaEpost: c.invoiceEmail || "",
+        telefon: c.phoneNumber || "",
+      })).sort((a, b) => a.navn.localeCompare(b.navn, "nb"));
+      const lokiConfigured = (getConfig().mcpServers || []).some((m) => /loki/i.test(m.name));
+      return { updatedAt: new Date().toISOString(), contacts, lokiConfigured };
+    }, snapTtl()));
   } catch (err) {
     console.error("Feil i /api/marketing-contacts:", err.message);
     res.status(502).json({ error: err.message });
@@ -190,22 +196,24 @@ app.get("/api/marketing-contacts", requireAuth, async (req, res) => {
 const IT_SUPPLIER_RE = /microsoft|office\s?365|azure|adobe|autodesk|revit|autocad|google|openai|chatgpt|anthropic|claude|atlassian|jira|slack|dropbox|github|gitlab|1password|fokus|statcon|sletten|mercell|prosjektagent|holte|norsk\s?prisbok|byggforsk|standard\s?online|fireflies|fyxer|n8n|webflow|nextify|nova|phonero|telenor|telia|\bice\b|altibox|remarkable|domene|itrelasjon|it relasjon|linkedin/i;
 app.get("/api/it-costs", requireAuth, async (req, res) => {
   try {
-    const today = new Date();
-    const to = ymd(today);
-    const from = ymd(new Date(today.getFullYear() - 1, today.getMonth(), today.getDate()));
-    const sis = await getSupplierInvoices(from, to);
-    const bySup = new Map();
-    let total = 0;
-    for (const s of sis) {
-      const name = s.supplier?.name || "Ukjent";
-      if (!IT_SUPPLIER_RE.test(name)) continue;
-      const cost = Math.abs(s.amount || 0);
-      const cur = bySup.get(name) || { name, cost: 0, count: 0 };
-      cur.cost += cost; cur.count += 1; total += cost;
-      bySup.set(name, cur);
-    }
-    const suppliers = [...bySup.values()].sort((a, b) => b.cost - a.cost);
-    res.json({ suppliers, total });
+    res.json(await serveWithSnapshot("it-costs", async () => {
+      const today = new Date();
+      const to = ymd(today);
+      const from = ymd(new Date(today.getFullYear() - 1, today.getMonth(), today.getDate()));
+      const sis = await getSupplierInvoices(from, to);
+      const bySup = new Map();
+      let total = 0;
+      for (const s of sis) {
+        const name = s.supplier?.name || "Ukjent";
+        if (!IT_SUPPLIER_RE.test(name)) continue;
+        const cost = Math.abs(s.amount || 0);
+        const cur = bySup.get(name) || { name, cost: 0, count: 0 };
+        cur.cost += cost; cur.count += 1; total += cost;
+        bySup.set(name, cur);
+      }
+      const suppliers = [...bySup.values()].sort((a, b) => b.cost - a.cost);
+      return { suppliers, total };
+    }, snapTtl()));
   } catch (err) {
     console.error("Feil i /api/it-costs:", err.message);
     res.status(502).json({ error: err.message });
@@ -307,7 +315,7 @@ app.post("/api/report", requireAuth, async (req, res) => {
 
 app.get("/api/economy", requireAuth, async (req, res) => {
   try {
-    res.json(await buildEconomy());
+    res.json(await serveWithSnapshot("economy", () => buildEconomy(), snapTtl()));
   } catch (err) {
     console.error("Feil i /api/economy:", err.message);
     res.status(502).json({ error: err.message });
@@ -317,6 +325,7 @@ app.get("/api/economy", requireAuth, async (req, res) => {
 // ---- Beste kunder siste 12 måneder ----
 app.get("/api/customers", requireAuth, async (req, res) => {
   try {
+    res.json(await serveWithSnapshot("customers", async () => {
     const today = new Date();
     const to = ymd(today);
     const from = ymd(new Date(today.getFullYear() - 1, today.getMonth(), today.getDate()));
@@ -361,7 +370,8 @@ app.get("/api/customers", requireAuth, async (req, res) => {
       const info = custById.get(c.id) || {};
       return { name: c.name, revenue: c.revenue, invoices: c.invoices, email: info.email || info.invoiceEmail || "", phone: info.phoneNumber || "", topProjectManager: topPm(c.id) };
     }).sort((a, b) => b.revenue - a.revenue);
-    res.json({ updatedAt: new Date().toISOString(), customers });
+    return { updatedAt: new Date().toISOString(), customers };
+    }, snapTtl()));
   } catch (err) {
     console.error("Feil i /api/customers:", err.message);
     res.status(502).json({ error: err.message });
@@ -370,6 +380,7 @@ app.get("/api/customers", requireAuth, async (req, res) => {
 
 app.post("/api/refresh", requireAuth, (req, res) => {
   clearCache();
+  expireSnapshots();
   res.json({ ok: true });
 });
 
