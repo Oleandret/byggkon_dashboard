@@ -20,6 +20,7 @@
       <button class="tab active" data-tab="oversikt">Oversikt</button>
       <button class="tab" data-tab="prosjekter">Prosjekter</button>
       <button class="tab" data-tab="okonomi">Økonomi</button>
+      <button class="tab" data-tab="ansatte">Ansatte</button>
       <button class="tab" data-tab="organisasjon">Organisasjon</button>
     </nav>
     <div class="topbar-right">
@@ -54,6 +55,15 @@
     </div>
 
     <main class="container">
+      <div class="values-strip">
+        <span class="values-title">Våre verdier</span>
+        <div class="value"><span class="vl">B</span><span class="vw">Bærekraftige relasjoner</span></div>
+        <div class="value"><span class="vl">Y</span><span class="vw">Yrkesstolthet</span></div>
+        <div class="value"><span class="vl">G</span><span class="vw">Gjensidig tillit</span></div>
+        <div class="value"><span class="vl">G</span><span class="vw">Gjennomføringskraft</span></div>
+        <div class="value"><span class="vl">K</span><span class="vw">Kvalitet</span></div>
+        <div class="value"><span class="vl">N</span><span class="vw">Nøyaktighet</span></div>
+      </div>
       <div class="wall-grid">
         <!-- Venstre: rullende prosjekter -->
         <div class="card scroll-card">
@@ -153,6 +163,28 @@
     </main>
   </section>
 
+  <!-- ============ FANE: ANSATTE (kompetansematrise) ============ -->
+  <section class="tab-panel" id="panel-ansatte">
+    <main class="container-wide">
+      <div class="card">
+        <div class="proj-head">
+          <h2>Kompetansematrise</h2>
+          <div class="org-actions">
+            <input id="kompSearch" class="search" type="search" placeholder="Søk ansatt eller ferdighet …" />
+            <button id="kompEdit" class="btn-ghost">✎ Rediger</button>
+            <button id="kompAddSkill" class="btn-ghost" hidden>+ Ferdighet</button>
+            <button id="kompAddPerson" class="btn-ghost" hidden>+ Person</button>
+            <button id="kompSave" class="btn-primary" hidden>Lagre</button>
+          </div>
+        </div>
+        <p class="subnote" id="kompHint">Nivå 0–4 per ferdighet. Klikk «Rediger», så øker du nivået ved å klikke i en celle. Lagres live for alle.</p>
+        <div id="kompLegend" class="komp-legend"></div>
+        <div id="kompStatus" class="eco-status">Laster kompetansematrise …</div>
+        <div class="matrix-wrap"><table id="kompTable" class="matrix"></table></div>
+      </div>
+    </main>
+  </section>
+
   <!-- Modal for å redigere/legge til person -->
   <div id="orgModal" class="modal" hidden>
     <div class="modal-card">
@@ -172,6 +204,7 @@
 
   <script src="/app.js"></script>
   <script src="/org.js"></script>
+  <script src="/ansatte.js"></script>
 
   <!-- Nova AI-widget -->
   <script src="https://nova-ai-agent-bygg-kon-production.up.railway.app/widget.js"

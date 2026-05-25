@@ -90,6 +90,19 @@ body { margin: 0; background: var(--bg); color: var(--text); font-size: 15px; -w
 .hero-kpi .value.warn { color: #ffd9a8; }
 .hero-kpi .value.bad { color: #ffb4ab; }
 
+/* ---- Verdier-stripe (forside) ---- */
+.values-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px 18px; margin-bottom: 18px; box-shadow: var(--shadow); }
+.values-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted);
+  font-weight: 700; margin-right: 6px; }
+.values-strip .value { display: flex; align-items: center; gap: 9px; padding: 7px 14px 7px 8px;
+  background: var(--mint); border-radius: 999px; }
+.values-strip .vl { display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 7px; background: var(--accent); color: #fff;
+  font-weight: 800; font-size: 14px; }
+.values-strip .vw { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+
 /* ---- Layout ---- */
 .container { max-width: 1320px; margin: 0 auto; padding: 22px 26px 40px; }
 .wall-grid { display: grid; grid-template-columns: 1.05fr 1.15fr 1.2fr; gap: 18px; margin-bottom: 18px; }
@@ -232,3 +245,33 @@ tbody tr:hover td { background: var(--mint); }
 .btn-primary:hover { filter: brightness(1.05); }
 .admin-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .saved-msg { color: var(--accent-dark); font-weight: 600; font-size: 14px; }
+
+/* ---- Kompetansematrise (Ansatte) ---- */
+.container-wide { max-width: 100%; margin: 0 auto; padding: 22px 26px 40px; }
+.komp-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; font-size: 12px; color: var(--muted); align-items: center; }
+.komp-legend .lg { display: flex; align-items: center; gap: 6px; }
+.komp-legend .sw { width: 16px; height: 16px; border-radius: 4px; display: inline-block; border: 1px solid var(--border); }
+.matrix-wrap { overflow: auto; max-height: 76vh; border: 1px solid var(--border); border-radius: 10px; }
+table.matrix { border-collapse: separate; border-spacing: 0; font-size: 12.5px; }
+table.matrix th, table.matrix td { border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
+table.matrix thead th { position: sticky; background: var(--card); z-index: 3; }
+table.matrix thead tr.groups th { top: 0; height: 28px; }
+table.matrix thead tr.skills th { top: 28px; }
+.group-th { text-align: center; background: var(--mint); color: var(--accent-dark); font-weight: 700;
+  padding: 5px 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; }
+.skill-th { writing-mode: vertical-rl; transform: rotate(180deg); height: 160px; vertical-align: bottom;
+  padding: 8px 3px; font-weight: 600; color: var(--text); font-size: 12px; }
+.namecol { position: sticky; left: 0; background: var(--card); z-index: 2; text-align: left;
+  padding: 8px 12px; min-width: 210px; font-weight: 600; }
+thead .namecol { z-index: 5; }
+.matrix tbody tr:hover .namecol { background: var(--mint); }
+td.cell { width: 36px; min-width: 36px; text-align: center; padding: 0; height: 30px;
+  font-variant-numeric: tabular-nums; font-weight: 600; }
+.lvl0 { background: #ffffff; color: #cfd8d5; }
+.lvl1 { background: #e9f5f1; color: #5f6f74; }
+.lvl2 { background: #bfe3d8; color: #14674f; }
+.lvl3 { background: #5cc1a6; color: #06402f; }
+.lvl4 { background: var(--accent); color: #fff; }
+.matrix.editing td.cell { cursor: pointer; }
+.matrix.editing td.cell:hover { outline: 2px solid var(--ink); outline-offset: -2px; }
+.namecol .nm-sub { display: block; font-weight: 400; font-size: 11px; color: var(--muted); }

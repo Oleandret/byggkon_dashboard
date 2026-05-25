@@ -5,6 +5,7 @@ import {
   getOpenOrders,
   getEmployees,
   getTimeEntries,
+  getBalanceSheet,
   ymd,
 } from "./tripletex.js";
 import { getConfig } from "./settings.js";
@@ -35,17 +36,33 @@ export async function buildOverview() {
   // Tidligste dato vi trenger timer fra (året, eller 4 uker tilbake om det er tidligere).
   const timeFrom = ymd(daysAgo(28, today) < yearStart ? daysAgo(28, today) : yearStart);
 
-  const [projects, invoices, orders, employees, timeEntries] = await Promise.all([
+  // Månedene hittil i år (for omsetning per måned)
+  const monthsYTD = [];
+  for (let m = 0; m <= today.getMonth(); m++) {
+    const d = new Date(today.getFullYear(), m, 1);
+    const end = new Date(today.getFullYear(), m + 1, 0);
+    monthsYTD.push({ m, from: ymd(d), to: ymd(end > today ? today : end) });
+  }
+
+  const [projects, invoices, orders, employees, timeEntries, monthRevRows] = await Promise.all([
     getProjects({ isClosed: false }),
     getInvoices(ymd(yearStart), todayStr),
     getOpenOrders(ymd(yearStart), todayStr),
     getEmployees(),
     getTimeEntries(timeFrom, todayStr),
+    // Omsetning per måned fra hovedboken (konto 3xxx, eks. mva) – samme grunnlag som Økonomi-fanen
+    Promise.all(monthsYTD.map((mo) => getBalanceSheet(mo.from, mo.to, 3000, 3999))),
   ]);
 
   // ---- Økonomi ----
-  const realInvoices = invoices.filter((i) => !i.isCredited);
-  const revenueYTD = realInvoices.reduce((s, i) => s + (i.amount || 0), 0);
+  // Omsetning = sum inntekter (3xxx). Inntekt er kredit (negativ balanceChange) → snu fortegn.
+  const monthlyRevenue = Array(12).fill(0);
+  monthsYTD.forEach((mo, i) => {
+    monthlyRevenue[mo.m] = Math.round(
+      (monthRevRows[i] || []).reduce((s, r) => s + -(r.balanceChange || 0), 0)
+    );
+  });
+  const revenueYTD = monthlyRevenue.reduce((a, b) => a + b, 0);
 
   const outstanding = invoices
     .filter((i) => (i.amountOutstanding || 0) > 0)
@@ -60,13 +77,6 @@ export async function buildOverview() {
 
   const outstandingTotal = outstanding.reduce((s, i) => s + i.outstanding, 0);
   const overdueTotal = outstanding.filter((i) => i.overdue).reduce((s, i) => s + i.outstanding, 0);
-
-  const monthlyRevenue = Array(12).fill(0);
-  for (const i of realInvoices) {
-    if (!i.invoiceDate) continue;
-    const m = Number(i.invoiceDate.slice(5, 7)) - 1;
-    if (m >= 0 && m < 12) monthlyRevenue[m] += i.amount || 0;
-  }
 
   // ---- Timer denne kalendermåneden (KPI) ----
   const monthEntries = timeEntries.filter((e) => e.date >= monthStart);

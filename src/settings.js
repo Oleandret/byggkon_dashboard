@@ -7,9 +7,21 @@
 // permanente. Se README.
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const SETTINGS_PATH =
   process.env.SETTINGS_PATH || path.join(process.cwd(), "data", "settings.json");
+
+// Startdata for kompetansematrisen (generert fra opplastet Excel).
+function defaultCompetence() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, "competence-seed.json"), "utf8"));
+  } catch {
+    return { scale: [], groups: [], employees: [] };
+  }
+}
 
 // Standard hentes fra miljøvariabler (eller fornuftige defaults).
 function defaults() {
@@ -24,6 +36,7 @@ function defaults() {
     cacheTtlMs: Number(process.env.CACHE_TTL_MS || 5 * 60 * 1000),
     refreshSeconds: Number(process.env.REFRESH_SECONDS || 60),
     orgChart: defaultOrgChart(),
+    competence: defaultCompetence(),
   };
 }
 

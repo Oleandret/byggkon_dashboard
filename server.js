@@ -126,6 +126,23 @@ app.post("/api/refresh", requireAuth, (req, res) => {
 app.get("/api/org", requireAuth, (req, res) => {
   res.json({ nodes: getConfig().orgChart || [] });
 });
+// ---- Kompetansematrise (Ansatte-fanen) ----
+app.get("/api/competence", requireAuth, (req, res) => {
+  res.json(getConfig().competence || { scale: [], groups: [], employees: [] });
+});
+app.post("/api/competence", requireAuth, (req, res) => {
+  try {
+    const c = req.body || {};
+    if (!Array.isArray(c.groups) || !Array.isArray(c.employees)) {
+      return res.status(400).json({ error: "Ugyldig kompetansestruktur" });
+    }
+    saveConfig({ competence: { scale: c.scale || [], groups: c.groups, employees: c.employees } });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.post("/api/org", requireAuth, (req, res) => {
   try {
     const nodes = Array.isArray(req.body?.nodes) ? req.body.nodes : null;
