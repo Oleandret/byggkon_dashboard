@@ -185,9 +185,24 @@ export async function buildOverview() {
     hours4w: p.hours4w,
   }));
 
+  // ---- Bursdager ----
+  const md = (d) => `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const todayMD = md(today);
+  const in7 = new Date(today); in7.setDate(in7.getDate() + 7);
+  const in7MD = md(in7);
+  const bdayToday = [], bdayInWeek = [];
+  for (const e of employees) {
+    if (!e.dateOfBirth || String(e.dateOfBirth).length < 10) continue;
+    const emd = String(e.dateOfBirth).slice(5, 10); // MM-DD
+    const name = fullName(e);
+    if (emd === todayMD) bdayToday.push(name);
+    if (emd === in7MD) bdayInWeek.push(name);
+  }
+
   return {
     updatedAt: new Date().toISOString(),
     display: {
+      birthdays: { today: bdayToday, inWeek: bdayInWeek },
       companyName: cfg.companyName,
       heroImageUrl: cfg.heroImageUrl,
       refreshSeconds: cfg.refreshSeconds,

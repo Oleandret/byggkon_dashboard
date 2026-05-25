@@ -3,6 +3,7 @@ let revenueChart;
 let refreshMs = 60 * 1000;
 let timer;
 let lastData = null;
+let cakeReminders = [];
 
 const nok = (n) => new Intl.NumberFormat("nb-NO", { style: "currency", currency: "NOK", maximumFractionDigits: 0 }).format(n || 0);
 const nokShort = (n) => {
@@ -30,7 +31,7 @@ function renderReminders() {
   const dow = now.getDay(); // 0=søn ... 5=fre
   const day = now.getDate();
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const items = [];
+  const items = [...cakeReminders];
   if (dow === 5) {
     items.push("⏱️ Husk å føre timer for denne uka.");
     items.push("📣 Send prosjektene du jobber med til Daniel (sosiale medier).");
@@ -165,6 +166,16 @@ function renderHero(d) {
         ).join("")
       : `<div class="sc-note">Ingen avdelinger satt opp ennå.</div>`;
   }
+
+  // Bursdager — blinkende banner + kake-påminnelse til Lana
+  const bd = d.display?.birthdays || { today: [], inWeek: [] };
+  const banner = document.getElementById("birthdayBanner");
+  if (banner) {
+    if (bd.today.length) { banner.hidden = false; banner.innerHTML = `🎉 Gratulerer med dagen, ${bd.today.map(esc).join(" & ")}! 🎂`; }
+    else banner.hidden = true;
+  }
+  cakeReminders = (bd.inWeek || []).map((n) => `🎂 Lana: bestill kake til ${esc(n)} — bursdag om en uke.`);
+  renderReminders();
 }
 
 /* ---- Rullende prosjekter ---- */
@@ -411,6 +422,23 @@ function renderEconomy(d) {
   if (ecoBillChart) { ecoBillChart.data = cfg2.data; ecoBillChart.update(); }
   else ecoBillChart = new Chart(ctx2, cfg2);
 
+  // ---- Optimaliseringstips (utledet fra tallene) ----
+  const tips = [];
+  const k = (lastData && lastData.kpis) || {};
+  if (k.overdueTotal > 0) tips.push(["warn", "Forfalte fakturaer", `${nok(k.overdueTotal)} er forfalt. Send purring (Oversikt → Utestående → «Purr»).`]);
+  if (d.balance.bank < 0) tips.push(["warn", "Negativ bank", `Bankbeholdning ${nok(d.balance.bank)}. Vurder likviditetstiltak: raskere fakturering, kortere forfall (20 dager), evt. innbetaling fra eier.`]);
+  if (d.resultYTD.ebt < 0) tips.push(["warn", "Negativt resultat i år", `Resultat før skatt ${nok(d.resultYTD.ebt)}. Gå gjennom kostnadene opp mot fakturerbar tid.`]);
+  const br = d.billing3m.total.billingRate;
+  if (br < 0.65) tips.push(["warn", "Lav faktureringsgrad", `Samlet ${pct(br)} siste 3 mnd (bransjenorm 65–75 %). Fordel arbeid til ledig kapasitet og øk salgsinnsatsen.`]);
+  else tips.push(["ok", "God faktureringsgrad", `Samlet ${pct(br)} siste 3 mnd — i tråd med bransjenorm.`]);
+  const low = d.billing3m.employees.filter((e) => e.billingRate < 0.5).length;
+  if (low > 0) tips.push(["info", "Ledig kapasitet", `${low} ansatt(e) under 50 % faktureringsgrad. Finn fakturerbart arbeid til dem (Bærekraftige relasjoner).`]);
+  if (d.balance.receivables > 0) tips.push(["info", "Kundefordringer", `${nok(d.balance.receivables)} utestående hos kunder. Følg opp betaling jevnlig.`]);
+  tips.push(["info", "Pris", "Hold og øk timeprisene på nye prosjekter og rammeavtaler."]);
+  tips.push(["info", "Salg", "Prioriter de beste kundene (se Kunder-fanen) — vi vil ha mer av dem."]);
+  const tipsEl = document.getElementById("ecoTips");
+  if (tipsEl) tipsEl.innerHTML = tips.map(([t, h, b]) => `<div class="tip tip-${t}"><div class="tip-h">${esc(h)}</div><div class="tip-b">${esc(b)}</div></div>`).join("");
+
   // Tabell
   const ut = document.getElementById("ecoUtil");
   if (!emps.length) {
@@ -447,9 +475,28 @@ async function loadEconomy(force = false) {
   }
 }
 
+/* ---- Siste nytt (RSS fra aviser) ---- */
+async function loadRss() {
+  const el = document.getElementById("rssFeed");
+  if (!el) return;
+  try {
+    const res = await fetch("/api/news-feed");
+    if (!res.ok) return;
+    const d = await res.json();
+    const items = d.items || [];
+    if (!items.length) { el.innerHTML = `<div class="empty">Ingen nyheter tilgjengelig nå.</div>`; return; }
+    el.innerHTML = items.map((n) =>
+      `<a class="rss-item" href="${esc(n.link)}" target="_blank" rel="noopener">
+        <span class="rss-src">${esc(n.source)}</span><span class="rss-title">${esc(n.title)}</span>
+      </a>`).join("");
+  } catch { /* stille */ }
+}
+
 tickClock();
 setInterval(tickClock, 1000);
 renderReminders();
+loadRss();
+setInterval(loadRss, 15 * 60 * 1000);
 setInterval(renderReminders, 60 * 60 * 1000);
 load();
 timer = setInterval(load, refreshMs);

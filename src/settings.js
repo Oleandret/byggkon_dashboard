@@ -49,6 +49,13 @@ function defaults() {
     hrOnboarding: defaultOnboarding(),
     cvs: [],
     news: [{ date: "2026-05-25", text: "Velkommen til Bygg-Kon sitt nye interne dashboard!" }],
+    newsFeeds: [
+      { name: "Aftenbladet", url: "https://www.aftenbladet.no/rss" },
+      { name: "VG", url: "https://www.vg.no/rss/feed/" },
+      { name: "Dagbladet", url: "https://www.dagbladet.no/rss" },
+      { name: "TV 2", url: "https://www.tv2.no/rss/nyheter" },
+      { name: "Nettavisen", url: "https://www.nettavisen.no/service/rich-rss" },
+    ],
     fagmoter: { meetings: [], suggestions: [] },
     prosjektmoter: { meetings: [], suggestions: [] },
     ledelse: { meetings: defaultLedermoter() },

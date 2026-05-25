@@ -210,6 +210,22 @@ body.sidebar-locked .topbar, body.sidebar-locked .tab-panel { margin-left: 240px
 .hero-kpi .value.warn { color: #ffd9a8; }
 .hero-kpi .value.bad { color: #ffb4ab; }
 
+/* ---- Siste nytt (RSS) ---- */
+.rss-feed { max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; }
+.rss-item { display: flex; align-items: baseline; gap: 10px; padding: 9px 4px; border-bottom: 1px solid var(--border);
+  text-decoration: none; color: var(--text); }
+.rss-item:last-child { border-bottom: none; }
+.rss-item:hover { background: var(--mint); }
+.rss-src { flex: none; min-width: 86px; font-size: 11px; font-weight: 700; color: var(--accent-dark);
+  text-transform: uppercase; letter-spacing: .3px; }
+.rss-title { font-size: 13.5px; }
+
+/* ---- Bursdagsbanner (blinker) ---- */
+.bday-banner { text-align: center; font-size: 18px; font-weight: 800; color: #fff;
+  background: linear-gradient(90deg, var(--accent), #f6a609); border-radius: var(--radius);
+  padding: 14px 18px; margin-bottom: 18px; animation: bdayBlink 1s ease-in-out infinite; }
+@keyframes bdayBlink { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+
 /* ---- Verdier-stripe (forside) ---- */
 .values-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
@@ -222,6 +238,14 @@ body.sidebar-locked .topbar, body.sidebar-locked .tab-panel { margin-left: 240px
   width: 26px; height: 26px; border-radius: 7px; background: var(--accent); color: #fff;
   font-weight: 800; font-size: 14px; }
 .values-strip .vw { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+
+/* Verdier i toppbaren (ved siden av BYGG-KON) */
+.topbar { flex-wrap: wrap; row-gap: 8px; }
+.values-strip.topbar-values { background: transparent; border: none; box-shadow: none; padding: 0; margin: 0; gap: 5px; }
+.values-strip.topbar-values .values-title { font-size: 10px; }
+.values-strip.topbar-values .value { padding: 3px 9px 3px 5px; gap: 6px; }
+.values-strip.topbar-values .vl { width: 20px; height: 20px; font-size: 12px; border-radius: 5px; }
+.values-strip.topbar-values .vw { font-size: 11.5px; }
 
 /* ---- Layout ---- */
 .container { max-width: 1320px; margin: 0 auto; padding: 22px 26px 40px; }
@@ -307,6 +331,21 @@ tbody tr:hover td { background: var(--mint); }
 .pl-row .val.pos { color: var(--good); }
 .pl-row .val.neg { color: var(--bad); }
 .pl-row.sub .lbl { padding-left: 14px; font-size: 13px; }
+.salg-list { margin: 6px 0 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+.salg-list li { font-size: 13.5px; line-height: 1.5; margin-bottom: 6px; break-inside: avoid; }
+@media (max-width: 760px) { .salg-list { columns: 1; } }
+/* Økonomi: 2-kolonne med tips-sidebar */
+.eco-layout { display: grid; grid-template-columns: 1fr 320px; gap: 18px; align-items: start; }
+@media (max-width: 1100px) { .eco-layout { grid-template-columns: 1fr; } }
+.eco-tips .card { position: sticky; top: 84px; }
+.tip { border-left: 3px solid var(--accent); background: #fff; border: 1px solid var(--border);
+  border-left-width: 3px; border-radius: 9px; padding: 10px 12px; margin-bottom: 10px; }
+.tip-h { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+.tip-b { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.tip-warn { border-left-color: var(--warn); background: var(--warn-bg); }
+.tip-warn .tip-b { color: #7a4d09; }
+.tip-ok { border-left-color: var(--good); background: var(--mint); }
+
 .value-note { background: var(--mint); border: 1px solid var(--mint-2); border-radius: 10px;
   padding: 11px 14px; font-size: 13.5px; color: var(--ink); margin-bottom: 14px; line-height: 1.45; }
 .ratecell { display: flex; align-items: center; gap: 8px; }

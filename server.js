@@ -6,6 +6,7 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { buildOverview } from "./src/metrics.js";
 import { buildEconomy } from "./src/economy.js";
+import { getNewsFeed } from "./src/newsfeed.js";
 import { clearCache, resetClient, getInvoices, getCustomers, ymd } from "./src/tripletex.js";
 import { getConfig, saveConfig, getConfigForAdmin, SETTINGS_PATH } from "./src/settings.js";
 
@@ -155,6 +156,14 @@ app.get("/api/overview", requireAuth, async (req, res) => {
     res.status(502).json({ error: err.message });
   }
 });
+app.get("/api/news-feed", requireAuth, async (req, res) => {
+  try {
+    res.json({ items: await getNewsFeed() });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
 app.get("/api/economy", requireAuth, async (req, res) => {
   try {
     res.json(await buildEconomy());

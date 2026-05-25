@@ -17,6 +17,7 @@
       <span class="brand-mark" id="brandName">BYGG-KON</span>
       <span class="brand-sub">Sanntidsoversikt</span>
     </div>
+    <div class="values-strip topbar-values" id="valuesStrip"></div>
     <div class="topbar-right">
       <span id="updated" class="updated">Laster …</span>
       <button id="refreshBtn" class="btn-ghost" title="Hent ferske tall">↻</button>
@@ -77,6 +78,7 @@
     </div>
 
     <main class="container">
+      <div id="birthdayBanner" class="bday-banner" hidden></div>
       <div class="grid-2">
         <div class="card">
           <div class="proj-head">
@@ -93,9 +95,6 @@
           <h2>Påminnelser</h2>
           <div id="remindersList"></div>
         </div>
-      </div>
-      <div class="values-strip" id="valuesStrip">
-        <span class="values-title">Våre verdier</span>
       </div>
       <div class="wall-grid">
         <!-- Venstre: rullende prosjekter -->
@@ -131,6 +130,10 @@
           <div class="table-wrap"><table id="ordersTable"></table></div>
         </div>
       </div>
+      <div class="card">
+        <h2>Siste nytt <span class="subnote">— norske aviser</span></h2>
+        <div id="rssFeed" class="rss-feed"><div class="empty">Laster nyheter …</div></div>
+      </div>
     </main>
   </section>
 
@@ -156,6 +159,8 @@
       <div id="ecoStatus" class="eco-status">Laster økonomi …</div>
       <div id="ecoContent" hidden>
         <p class="subnote" style="margin:0 0 14px">Live tall hentet rett fra hovedboken i Tripletex. Kan avvike noe fra økonomiansvarliges manuelt justerte rapport (f.eks. skatt, periodiseringer og prognoser).</p>
+        <div class="eco-layout">
+        <div class="eco-main">
         <div class="grid-2">
           <div class="card"><h2>Resultat hittil i år (<span id="ecoYear"></span>)</h2><div id="ecoResYTD" class="pl"></div></div>
           <div class="card"><h2>Resultat siste 12 måneder (LTM)</h2><div id="ecoResLTM" class="pl"></div></div>
@@ -179,6 +184,15 @@
           <div class="chart-box" style="height:340px"><canvas id="ecoBillChart"></canvas></div>
           <div class="table-wrap tall"><table id="ecoUtil"></table></div>
         </div>
+        </div><!-- /eco-main -->
+        <aside class="eco-tips">
+          <div class="card">
+            <h2>Optimalisere økonomi</h2>
+            <p class="subnote">Tips basert på tallene i systemet akkurat nå.</p>
+            <div id="ecoTips"></div>
+          </div>
+        </aside>
+        </div><!-- /eco-layout -->
       </div>
     </main>
   </section>
@@ -369,6 +383,23 @@
   <!-- ============ FANE: KUNDER ============ -->
   <section class="tab-panel" id="panel-kunder">
     <main class="container">
+      <div class="card">
+        <h2>Salg — Bygg-Kon</h2>
+        <p class="subnote">Strategi for arbeid mot de beste kundene.</p>
+        <ul class="salg-list">
+          <li>Fokus på topp-kundene.</li>
+          <li>Synliggjør kompetansen vår.</li>
+          <li>Kunden vil kjøpe av de beste.</li>
+          <li>Øk prisene på de laveste kundene.</li>
+          <li>Bruk ansattes tid på salg, ikke på kunder med lav omsetning.</li>
+          <li>Geografisk mulighet for innkjøp og salg.</li>
+          <li>Hvordan påvirke ansatte til mersalg?</li>
+          <li>Mandager: prioritet 1 = gode kunder.</li>
+          <li>Fredager: oppfølging av gode kunder — ring den som skal ha leveransen.</li>
+          <li>Hold prisene til de beste kundene.</li>
+          <li>Kartlegg hva slags kunder de beste er — vi vil ha mer av dem.</li>
+        </ul>
+      </div>
       <div class="card">
         <h2>Beste kunder — siste 12 måneder</h2>
         <p class="subnote">Sortert på omsetning siste 12 måneder, høyest øverst.</p>

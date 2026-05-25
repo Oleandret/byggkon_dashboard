@@ -81,7 +81,7 @@ export async function getOpenOrders(fromDate, toDate) {
 
 export async function getEmployees() {
   return fetchAll("search_employees", {
-    fields: "id,firstName,lastName,email,employeeNumber,department(id,name)",
+    fields: "id,firstName,lastName,email,employeeNumber,dateOfBirth,department(id,name)",
   });
 }
 
