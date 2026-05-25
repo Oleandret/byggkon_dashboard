@@ -12,26 +12,47 @@
 </head>
 <body>
   <header class="topbar">
+    <button id="menuToggle" class="btn-ghost menu-btn" title="Meny">☰</button>
     <div class="brand">
       <span class="brand-mark" id="brandName">BYGG-KON</span>
       <span class="brand-sub">Sanntidsoversikt</span>
     </div>
-    <nav class="tabs">
-      <button class="tab active" data-tab="oversikt">Oversikt</button>
-      <button class="tab" data-tab="prosjekter">Prosjekter</button>
-      <button class="tab" data-tab="okonomi">Økonomi</button>
-      <button class="tab" data-tab="ansatte">Ansatte</button>
-      <button class="tab" data-tab="organisasjon">Organisasjon</button>
-    </nav>
     <div class="topbar-right">
       <span id="updated" class="updated">Laster …</span>
       <button id="refreshBtn" class="btn-ghost" title="Hent ferske tall">↻</button>
-      <a href="/admin" class="btn-ghost" title="Innstillinger">⚙ Admin</a>
       <form method="POST" action="/logout" class="logout-form">
         <button type="submit" class="btn-ghost">Logg ut</button>
       </form>
     </div>
   </header>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-head">
+      <span class="sidebar-title">Meny</span>
+      <button id="sidebarLock" class="btn-ghost" title="Lås menyen åpen">📌</button>
+      <button id="sidebarClose" class="btn-ghost" title="Lukk">✕</button>
+    </div>
+    <nav class="tabs vertical">
+      <button class="tab active" data-tab="oversikt">Oversikt</button>
+      <button class="tab" data-tab="prosjekter">Prosjekter</button>
+      <button class="tab" data-tab="okonomi">Økonomi</button>
+      <button class="tab" data-tab="ansatte">Ansatte</button>
+      <button class="tab" data-tab="kunder">Kunder</button>
+      <button class="tab" data-tab="avdelinger">Avdelinger</button>
+      <button class="tab" data-tab="organisasjon">Organisasjon</button>
+      <button class="tab" data-tab="hr">HR</button>
+      <button class="tab" data-tab="fagmoter">Fagmøter</button>
+      <button class="tab" data-tab="prosjektmoter">Prosjektmøter</button>
+      <button class="tab" data-tab="kontakter">Kontakter</button>
+      <button class="tab" data-tab="kiagenter">KI-agenter</button>
+      <button class="tab" data-tab="kvalitet">Kvalitetssikring</button>
+      <button class="tab" data-tab="rapporter">Rapporter</button>
+      <button class="tab" data-tab="itsystem">IT-system</button>
+      <button class="tab" data-tab="ledelse">Ledelse 🔒</button>
+      <a class="tab" href="/admin">⚙ Innstillinger</a>
+    </nav>
+  </aside>
+  <div id="sidebarOverlay" class="sidebar-overlay" hidden></div>
 
   <!-- ============ FANE: OVERSIKT ============ -->
   <section class="tab-panel active" id="panel-oversikt">
@@ -48,6 +69,8 @@
           <div class="hero-clock">
             <div id="clock" class="clock">--:--</div>
             <div id="date" class="date">—</div>
+            <div id="heroAddress" class="hero-addr"></div>
+            <div id="heroWeather" class="hero-weather"></div>
           </div>
         </div>
         <div class="hero-kpis" id="heroKpis"></div>
@@ -55,14 +78,25 @@
     </div>
 
     <main class="container">
-      <div class="values-strip">
+      <div class="grid-2">
+        <div class="card">
+          <div class="proj-head">
+            <h2>Nyheter internt</h2>
+            <div class="org-actions">
+              <button id="newsEdit" class="btn-ghost">🔓 Lås opp</button>
+              <button id="newsAdd" class="btn-ghost" hidden>+ Nyhet</button>
+              <button id="newsSave" class="btn-primary" hidden>Lagre</button>
+            </div>
+          </div>
+          <div id="newsList"></div>
+        </div>
+        <div class="card">
+          <h2>Påminnelser</h2>
+          <div id="remindersList"></div>
+        </div>
+      </div>
+      <div class="values-strip" id="valuesStrip">
         <span class="values-title">Våre verdier</span>
-        <div class="value"><span class="vl">B</span><span class="vw">Bærekraftige relasjoner</span></div>
-        <div class="value"><span class="vl">Y</span><span class="vw">Yrkesstolthet</span></div>
-        <div class="value"><span class="vl">G</span><span class="vw">Gjensidig tillit</span></div>
-        <div class="value"><span class="vl">G</span><span class="vw">Gjennomføringskraft</span></div>
-        <div class="value"><span class="vl">K</span><span class="vw">Kvalitet</span></div>
-        <div class="value"><span class="vl">N</span><span class="vw">Nøyaktighet</span></div>
       </div>
       <div class="wall-grid">
         <!-- Venstre: rullende prosjekter -->
@@ -106,8 +140,11 @@
     <main class="container">
       <div class="card">
         <div class="proj-head">
-          <h2>Alle aktive prosjekter</h2>
-          <input id="projSearch" class="search" type="search" placeholder="Søk prosjekt, kunde eller leder …" />
+          <h2>Prosjekter med aktivitet</h2>
+          <div class="org-actions">
+            <select id="projEmp" class="search"><option value="">Alle ansatte</option></select>
+            <input id="projSearch" class="search" type="search" placeholder="Søk prosjekt, kunde eller leder …" />
+          </div>
         </div>
         <div class="table-wrap tall"><table id="projectsTable"></table></div>
       </div>
@@ -126,7 +163,7 @@
         </div>
         <div class="card">
           <h2>Resultattrend — sum inntekter og EBT (siste 12 mnd)</h2>
-          <canvas id="ecoTrend" height="200"></canvas>
+          <div class="chart-box"><canvas id="ecoTrend"></canvas></div>
         </div>
         <div class="grid-2">
           <div class="card"><h2>Balanse (pr. i dag)</h2><div id="ecoBalance" class="pl"></div></div>
@@ -171,7 +208,7 @@
           <h2>Kompetansematrise</h2>
           <div class="org-actions">
             <input id="kompSearch" class="search" type="search" placeholder="Søk ansatt eller ferdighet …" />
-            <button id="kompEdit" class="btn-ghost">✎ Rediger</button>
+            <button id="kompEdit" class="btn-ghost">🔓 Lås opp arket</button>
             <button id="kompAddSkill" class="btn-ghost" hidden>+ Ferdighet</button>
             <button id="kompAddPerson" class="btn-ghost" hidden>+ Person</button>
             <button id="kompSave" class="btn-primary" hidden>Lagre</button>
@@ -181,6 +218,236 @@
         <div id="kompLegend" class="komp-legend"></div>
         <div id="kompStatus" class="eco-status">Laster kompetansematrise …</div>
         <div class="matrix-wrap"><table id="kompTable" class="matrix"></table></div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============ FANE: PROSJEKTMØTER ============ -->
+  <section class="tab-panel" id="panel-prosjektmoter">
+    <main class="container">
+      <div class="grid-2">
+        <div class="card">
+          <div class="proj-head">
+            <h2>Referater fra prosjektmøter</h2>
+            <button id="pmAddMeeting" class="btn-ghost">+ Nytt referat</button>
+          </div>
+          <p class="subnote">Annenhver uke, 1 time: status på prosjekter og ressursfordeling.</p>
+          <div id="pmMeetings"></div>
+        </div>
+        <div class="card">
+          <h2>Saker til neste prosjektmøte</h2>
+          <p class="subnote">Legg inn saker som bør tas opp.</p>
+          <div class="fm-suggest">
+            <input id="pmSuggestInput" class="search" type="text" placeholder="Sak / tema …" />
+            <input id="pmSuggestBy" class="search" type="text" placeholder="Ditt navn (valgfritt)" />
+            <button id="pmSuggestBtn" class="btn-primary">Legg til</button>
+          </div>
+          <div id="pmSuggestions"></div>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============ FANE: KONTAKTER ============ -->
+  <section class="tab-panel" id="panel-kontakter">
+    <main class="container">
+      <div class="card">
+        <div class="proj-head">
+          <h2>Viktige kontaktpersoner</h2>
+          <div class="org-actions">
+            <button id="konEdit" class="btn-ghost">🔓 Lås opp</button>
+            <button id="konAdd" class="btn-ghost" hidden>+ Kontakt</button>
+            <button id="konSave" class="btn-primary" hidden>Lagre</button>
+          </div>
+        </div>
+        <p class="subnote">Eksterne kontaktpersoner: utleier, IT-support, samarbeidspartnere m.m.</p>
+        <div class="scaffold-grid" id="konGrid"></div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============ FANE: HR ============ -->
+  <section class="tab-panel" id="panel-hr">
+    <main class="container">
+      <div class="subtabs" id="hrSubtabs">
+        <button class="subtab active" data-sub="plassering">Kontorplassering</button>
+        <button class="subtab" data-sub="rekruttering">Rekruttering</button>
+        <button class="subtab" data-sub="onboarding">Onboarding</button>
+        <button class="subtab" data-sub="cv">CV-er</button>
+      </div>
+
+      <div class="hr-sub active" id="hrsub-plassering">
+        <div class="card">
+          <div class="proj-head">
+            <h2>Kontorplassering</h2>
+            <div class="org-actions">
+              <button id="hrEdit" class="btn-ghost">🔓 Lås opp</button>
+              <button id="hrSave" class="btn-primary" hidden>Lagre</button>
+            </div>
+          </div>
+          <p class="subnote" id="hrHint">Plantegning over kontoret. Lås opp for å plassere ansatte: klikk på tegningen for å sette en markør.</p>
+          <div class="floorplan-wrap" id="floorWrap">
+            <img id="floorImg" alt="Plantegning" />
+            <div id="floorPins"></div>
+          </div>
+          <p class="subnote" id="floorMissing" hidden>Fant ikke plantegningen. Legg bildet som <code>public/floorplan.png</code> i prosjektet, eller sett en bilde-URL under «⚙ Innstillinger».</p>
+        </div>
+      </div>
+
+      <div class="hr-sub" id="hrsub-rekruttering">
+        <div class="card">
+          <div class="proj-head"><h2>Rekruttering</h2>
+            <div class="org-actions"><button id="recEdit" class="btn-ghost">🔓 Lås opp</button><button id="recSave" class="btn-primary" hidden>Lagre</button></div>
+          </div>
+          <p class="subnote">Aktive rekrutteringsprosesser, kandidater og notater.</p>
+          <textarea id="recText" class="doc-text" rows="16" disabled placeholder="Skriv inn rekrutteringsstatus, kandidater, neste steg …"></textarea>
+        </div>
+      </div>
+
+      <div class="hr-sub" id="hrsub-onboarding">
+        <div class="card">
+          <div class="proj-head"><h2>Onboarding</h2>
+            <div class="org-actions"><button id="onbEdit" class="btn-ghost">🔓 Lås opp</button><button id="onbSave" class="btn-primary" hidden>Lagre</button></div>
+          </div>
+          <p class="subnote">Sjekkliste og rutiner for nye ansatte.</p>
+          <textarea id="onbText" class="doc-text" rows="16" disabled placeholder="Onboarding-sjekkliste: utstyr, tilganger, fadder, opplæring …"></textarea>
+        </div>
+      </div>
+
+      <div class="hr-sub" id="hrsub-cv">
+        <div class="card">
+          <div class="proj-head"><h2>CV-er</h2>
+            <div class="org-actions"><button id="cvEdit" class="btn-ghost">🔓 Lås opp</button><button id="cvAdd" class="btn-ghost" hidden>+ CV</button><button id="cvSave" class="btn-primary" hidden>Lagre</button></div>
+          </div>
+          <p class="subnote">Lenker til ansattes CV-er (f.eks. i OneDrive/SharePoint). Selve filene lagres i deres filsystem.</p>
+          <div class="scaffold-grid" id="cvGrid"></div>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============ FANE: FAGMØTER ============ -->
+  <section class="tab-panel" id="panel-fagmoter">
+    <main class="container">
+      <div class="grid-2">
+        <div class="card">
+          <div class="proj-head">
+            <h2>Referater fra fagmøter</h2>
+            <button id="fmAddMeeting" class="btn-ghost">+ Nytt referat</button>
+          </div>
+          <p class="subnote">2 fagmøter per måned. Nyeste øverst.</p>
+          <div id="fmMeetings"></div>
+        </div>
+        <div class="card">
+          <h2>Forslag til fagmøter</h2>
+          <p class="subnote">Alle ansatte kan foreslå tema til neste fagmøte.</p>
+          <div class="fm-suggest">
+            <input id="fmSuggestInput" class="search" type="text" placeholder="Foreslå et tema …" />
+            <input id="fmSuggestBy" class="search" type="text" placeholder="Ditt navn (valgfritt)" />
+            <button id="fmSuggestBtn" class="btn-primary">Legg til</button>
+          </div>
+          <div id="fmSuggestions"></div>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============ FANE: KUNDER ============ -->
+  <section class="tab-panel" id="panel-kunder">
+    <main class="container">
+      <div class="card">
+        <h2>Beste kunder — siste 12 måneder</h2>
+        <p class="subnote">Sortert på omsetning siste 12 måneder, høyest øverst.</p>
+        <div id="kunderStatus" class="eco-status">Laster kunder …</div>
+        <div class="table-wrap tall"><table id="kunderTable"></table></div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============ FANE: AVDELINGER ============ -->
+  <section class="tab-panel" id="panel-avdelinger">
+    <main class="container">
+      <div class="card">
+        <h2>Avdelinger</h2>
+        <p class="subnote">Hver avdeling får etter hvert sitt eget dashboard. Klikk «⚙ Innstillinger» for å endre avdelingslista.</p>
+        <div class="scaffold-grid" id="avdGrid"></div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============ FANE: KI-AGENTER ============ -->
+  <section class="tab-panel" id="panel-kiagenter">
+    <main class="container">
+      <div class="card">
+        <h2>KI-agenter</h2>
+        <p class="subnote">Oversikt over Bygg-Kons AI-agenter. Frontend/innlogging til hver agent kobles på her etter hvert. (Passord vises ikke her av sikkerhetshensyn.)</p>
+        <div class="scaffold-grid" id="kiGrid"></div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============ FANE: KVALITETSSIKRING ============ -->
+  <section class="tab-panel" id="panel-kvalitet">
+    <main class="container">
+      <div class="card">
+        <h2>Kvalitetssikring</h2>
+        <p class="subnote">KI-agenter som hjelper med kvalitetssikring (sidemannskontroll, samsvar med TEK/standarder, dokumentkontroll).</p>
+        <div class="scaffold-grid" id="ksGrid"></div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============ FANE: RAPPORTER ============ -->
+  <section class="tab-panel" id="panel-rapporter">
+    <main class="container">
+      <div class="card">
+        <h2>Rapporter</h2>
+        <p class="subnote">Automatiske rapporter som lages på fast intervall (recurring) ved at en KI trekker ut data fra systemene.</p>
+        <div class="scaffold-grid" id="rapGrid"></div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============ FANE: LEDELSE (kun leder) ============ -->
+  <section class="tab-panel" id="panel-ledelse">
+    <main class="container">
+      <div id="ledLocked" class="card" hidden>
+        <h2>Ledelse</h2>
+        <p class="subnote">Denne fanen er kun for ledelsen og krever leder-pålogging.</p>
+        <a href="/admin/login" class="btn-primary" style="display:inline-block;text-decoration:none">Logg inn som leder</a>
+      </div>
+      <div id="ledContent" hidden>
+        <div class="card">
+          <div class="proj-head">
+            <h2>Ledermøte-referater</h2>
+            <button id="ledAdd" class="btn-ghost">+ Nytt referat</button>
+          </div>
+          <p class="subnote">Månedlige ledermøter. Kun synlig for ledelsen.</p>
+          <div id="ledMeetings"></div>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============ FANE: IT-SYSTEM ============ -->
+  <section class="tab-panel" id="panel-itsystem">
+    <main class="container">
+      <div class="card">
+        <h2>IT-system og verktøy</h2>
+        <p class="subnote">Oversikt over systemene vi bruker, hva de er til, og raske lenker. (Brukernavn og passord ligger ikke her – de finnes i 1Password.)</p>
+        <div class="scaffold-grid" id="itGrid"></div>
+      </div>
+      <div class="card">
+        <div class="proj-head">
+          <h2>Lisenskostnader</h2>
+          <div class="org-actions">
+            <button id="licEdit" class="btn-ghost">🔓 Lås opp</button>
+            <button id="licAdd" class="btn-ghost" hidden>+ Lisens</button>
+            <button id="licSave" class="btn-primary" hidden>Lagre</button>
+          </div>
+        </div>
+        <p class="subnote">Fyll inn kostnad per system; totalen regnes om til årlig. (Kan også hentes fra Tripletex-fakturaer senere.)</p>
+        <div class="table-wrap"><table id="licTable"></table></div>
       </div>
     </main>
   </section>
@@ -205,11 +472,18 @@
   <script src="/app.js"></script>
   <script src="/org.js"></script>
   <script src="/ansatte.js"></script>
+  <script src="/scaffold.js"></script>
+  <script src="/hr.js"></script>
+  <script src="/fagmoter.js"></script>
+  <script src="/contacts.js"></script>
+  <script src="/licenses.js"></script>
+  <script src="/ledelse.js"></script>
+  <script src="/news.js"></script>
 
   <!-- Nova AI-widget -->
   <script src="https://nova-ai-agent-bygg-kon-production.up.railway.app/widget.js"
           data-brand="Nova"
-          data-label="Spør oss"
+          data-label="Spør Nova"
           data-color="#030213"
           data-accent="#1e8b6f"
           data-welcome="Hei, jeg er Nova AI og kan hjelpe deg med fagspørsmål om bygging, regelverk og prosjektarbeid. Hva lurer du på?"

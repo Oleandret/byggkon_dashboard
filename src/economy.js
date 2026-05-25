@@ -5,6 +5,7 @@ import { getAccounts, getBalanceSheet, getEmployees, getTimeEntries, ymd } from 
 import { getConfig } from "./settings.js";
 
 function startOfYear(d = new Date()) { return new Date(d.getFullYear(), 0, 1); }
+function daysAgo(n, d = new Date()) { const x = new Date(d); x.setDate(x.getDate() - n); return x; }
 function fullName(p) { return p ? `${p.firstName || ""} ${p.lastName || ""}`.trim() : ""; }
 
 // Grupperer en saldobalanse (liste fra get_balance_sheet) i resultat- og balansetall.
@@ -101,20 +102,23 @@ export async function buildEconomy() {
   const weeksElapsed = Math.max(1, (today - startOfYear(today)) / (7 * 24 * 3600 * 1000));
   const capacityYTD = (cfg.weeklyCapacityHours || 37.5) * weeksElapsed;
   const empById = new Map(employees.map((e) => [e.id, fullName(e)]));
+  // Kun personer som faktisk er i jobb: har ført timer siste 2 måneder og finnes i ansattlista
+  const cutoff60 = ymd(daysAgo(60, today));
+  const activeIds = new Set(yearTime.filter((e) => e.date >= cutoff60 && e.employee?.id != null).map((e) => e.employee.id));
   const byEmp = new Map();
   let totalHours = 0, totalBillable = 0;
   for (const e of yearTime) {
-    const id = e.employee?.id;
-    const name = empById.get(id) || fullName(e.employee) || "Ukjent";
-    const key = id ?? name;
-    const cur = byEmp.get(key) || { name, hours: 0, billable: 0 };
-    cur.hours += e.hours || 0;
-    cur.billable += e.chargeableHours || 0;
-    byEmp.set(key, cur);
     totalHours += e.hours || 0;
     totalBillable += e.chargeableHours || 0;
+    const id = e.employee?.id;
+    if (id == null) continue;
+    const cur = byEmp.get(id) || { id, name: empById.get(id) || fullName(e.employee) || `#${id}`, hours: 0, billable: 0 };
+    cur.hours += e.hours || 0;
+    cur.billable += e.chargeableHours || 0;
+    byEmp.set(id, cur);
   }
   const utilization = [...byEmp.values()]
+    .filter((e) => activeIds.has(e.id) && empById.has(e.id))
     .map((e) => ({
       name: e.name,
       hours: e.hours,
@@ -122,7 +126,7 @@ export async function buildEconomy() {
       billingRate: e.hours > 0 ? e.billable / e.hours : 0,
       utilization: capacityYTD > 0 ? e.billable / capacityYTD : 0,
     }))
-    .sort((a, b) => b.utilization - a.utilization);
+    .sort((a, b) => b.billingRate - a.billingRate);
 
   return {
     updatedAt: new Date().toISOString(),

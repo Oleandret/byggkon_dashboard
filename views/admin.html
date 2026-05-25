@@ -42,6 +42,33 @@
         <div class="hint">Bildet som vises som banner. Standard er bygg-bildet fra byggkon.no.</div>
       </div>
 
+      <div class="section-title">Firmaopplysninger</div>
+      <div class="field"><label for="companyOrgNr">Organisasjonsnummer</label><input id="companyOrgNr" name="companyOrgNr" /></div>
+      <div class="field"><label for="companyAddress">Adresse</label><input id="companyAddress" name="companyAddress" /></div>
+      <div class="field"><label for="companyEmail">E-post</label><input id="companyEmail" name="companyEmail" /></div>
+      <div class="field"><label for="companyPhone">Telefon</label><input id="companyPhone" name="companyPhone" /></div>
+      <div class="field"><label for="companyWebsite">Nettside</label><input id="companyWebsite" name="companyWebsite" /></div>
+
+      <div class="section-title">Verdier (vises på forsiden)</div>
+      <div class="field">
+        <label for="valuesText">Én verdi per linje, format: <code>Bokstav - Tekst</code></label>
+        <textarea id="valuesText" rows="8" placeholder="B - Bærekraftige relasjoner"></textarea>
+        <div class="hint">F.eks. «B - Bærekraftige relasjoner». Tomme linjer hoppes over.</div>
+      </div>
+
+      <div class="section-title">HR / plantegning</div>
+      <div class="field">
+        <label for="floorPlanUrl">Plantegning (URL eller /floorplan.png)</label>
+        <input id="floorPlanUrl" name="floorPlanUrl" placeholder="/floorplan.png" />
+        <div class="hint">Legg bildet som <code>public/floorplan.png</code> i prosjektet, eller lim inn en bilde-URL her.</div>
+      </div>
+
+      <div class="section-title">Avdelinger</div>
+      <div class="field">
+        <label for="departmentsText">Én avdeling per linje</label>
+        <textarea id="departmentsText" rows="6" placeholder="RIB"></textarea>
+      </div>
+
       <div class="section-title">Datakilde (Regnskapsagent MCP)</div>
       <div class="field">
         <label for="regnskapsagentMcpUrl">Regnskapsagent MCP-URL <span id="mcpSet" class="set" hidden>· satt</span></label>

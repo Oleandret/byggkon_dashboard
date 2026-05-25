@@ -9,6 +9,7 @@ import {
   ymd,
 } from "./tripletex.js";
 import { getConfig } from "./settings.js";
+import { getWeather } from "./weather.js";
 
 function startOfYear(d = new Date()) {
   return new Date(d.getFullYear(), 0, 1);
@@ -44,7 +45,7 @@ export async function buildOverview() {
     monthsYTD.push({ m, from: ymd(d), to: ymd(end > today ? today : end) });
   }
 
-  const [projects, invoices, orders, employees, timeEntries, monthRevRows] = await Promise.all([
+  const [projects, invoices, orders, employees, timeEntries, monthRevRows, weather] = await Promise.all([
     getProjects({ isClosed: false }),
     getInvoices(ymd(yearStart), todayStr),
     getOpenOrders(ymd(yearStart), todayStr),
@@ -52,6 +53,7 @@ export async function buildOverview() {
     getTimeEntries(timeFrom, todayStr),
     // Omsetning per måned fra hovedboken (konto 3xxx, eks. mva) – samme grunnlag som Økonomi-fanen
     Promise.all(monthsYTD.map((mo) => getBalanceSheet(mo.from, mo.to, 3000, 3999))),
+    getWeather().catch(() => null), // vær skal ikke kunne velte dashbordet
   ]);
 
   // ---- Økonomi ----
@@ -131,11 +133,15 @@ export async function buildOverview() {
   for (const e of timeEntries) {
     if (!e.project) continue;
     const id = e.project.id;
-    const cur = projAgg.get(id) || { id, name: e.project.name || "", ytd: 0, ytdBillable: 0, last4w: 0, last8w: 0, lastActivity: "" };
+    const cur = projAgg.get(id) || { id, name: e.project.name || "", ytd: 0, ytdBillable: 0, last4w: 0, last8w: 0, lastActivity: "", emp4wById: {} };
     if (!cur.name && e.project.name) cur.name = e.project.name;
     cur.ytd += e.hours || 0;
     cur.ytdBillable += e.chargeableHours || 0;
-    if (e.date >= fourWeeksAgoStr) cur.last4w += e.hours || 0;
+    if (e.date >= fourWeeksAgoStr) {
+      cur.last4w += e.hours || 0;
+      const eid = e.employee?.id ?? "?";
+      cur.emp4wById[eid] = (cur.emp4wById[eid] || 0) + (e.hours || 0);
+    }
     if (e.date >= activeCutoff) cur.last8w += e.hours || 0;
     if (e.date > cur.lastActivity) cur.lastActivity = e.date;
     projAgg.set(id, cur);
@@ -143,6 +149,11 @@ export async function buildOverview() {
 
   const enrich = (a) => {
     const p = projectsById.get(a.id);
+    const byEmp4w = {};
+    for (const [eid, h] of Object.entries(a.emp4wById || {})) {
+      const nm = employeesById.get(Number(eid)) || "Ukjent";
+      byEmp4w[nm] = (byEmp4w[nm] || 0) + h;
+    }
     return {
       number: p?.number || "",
       name: a.name || p?.name || `Prosjekt ${a.id}`,
@@ -152,6 +163,7 @@ export async function buildOverview() {
       hoursYTD: a.ytd,
       billableYTD: a.ytdBillable,
       lastActivity: a.lastActivity || null,
+      byEmp4w,
     };
   };
 
@@ -179,6 +191,10 @@ export async function buildOverview() {
       heroImageUrl: cfg.heroImageUrl,
       refreshSeconds: cfg.refreshSeconds,
       weeklyCapacityHours: cfg.weeklyCapacityHours,
+      values: cfg.values || [],
+      companyAddress: cfg.companyAddress || "",
+      weather,
+      departments: cfg.departments || [],
     },
     kpis: {
       revenueYTD,

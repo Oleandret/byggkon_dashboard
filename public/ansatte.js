@@ -79,11 +79,11 @@
 
   function setEditing(on) {
     editing = on;
-    editBtn.textContent = on ? "✓ Ferdig" : "✎ Rediger";
+    editBtn.textContent = on ? "🔒 Lås arket" : "🔓 Lås opp arket";
     saveBtn.hidden = !on; addSkillBtn.hidden = !on; addPersonBtn.hidden = !on;
     document.getElementById("kompHint").textContent = on
-      ? "Klikk i en celle for å øke nivået (0→4→0). + Ferdighet / + Person legger til. Husk å lagre."
-      : "Nivå 0–4 per ferdighet. Klikk «Rediger» for å endre. Lagres live for alle.";
+      ? "Arket er åpent: klikk i en celle for å øke nivået (0→4→0). + Ferdighet / + Person legger til. Husk å lagre, og lås arket igjen når du er ferdig."
+      : "Arket er låst (skrivebeskyttet). Trykk «Lås opp arket» for å legge inn eller endre kompetanse.";
     tbl.classList.toggle("editing", on);
   }
   editBtn.addEventListener("click", () => setEditing(!editing));
