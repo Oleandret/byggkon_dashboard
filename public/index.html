@@ -38,29 +38,62 @@
       <button id="sidebarLock" class="btn-ghost" title="Lås menyen åpen">📌</button>
       <button id="sidebarClose" class="btn-ghost" title="Lukk">✕</button>
     </div>
-    <nav class="tabs vertical">
-      <button class="tab active" data-tab="oversikt">Oversikt</button>
-      <button class="tab" data-tab="driftssentral">📺 Driftssentral</button>
-      <button class="tab" data-tab="prosjekter">Prosjekter</button>
-      <button class="tab" data-tab="okonomi">Økonomi</button>
-      <button class="tab" data-tab="kostnader">Kostnader</button>
-      <button class="tab" data-tab="kunder">Kunder</button>
-      <button class="tab" data-tab="intensjonsavtaler">Intensjonsavtaler</button>
-      <button class="tab" data-tab="markedsforing">Markedsføring</button>
-      <button class="tab" data-tab="avdelinger">Avdelinger</button>
-      <button class="tab" data-tab="hr">HR</button>
-      <button class="tab" data-tab="fagmoter">Fagmøter</button>
-      <button class="tab" data-tab="prosjektmoter">Prosjektmøter</button>
-      <button class="tab" data-tab="kontakter">Kontakter</button>
-      <button class="tab" data-tab="kiagenter">KI-agenter</button>
-      <!-- Organisasjon ligger nå under HR -->
-      <!-- (fjernet topp-fane) -->
-      <button class="tab" data-tab="kvalitet">Kvalitetssikring</button>
-      <button class="tab" data-tab="rapporter">Rapporter</button>
-      <button class="tab" data-tab="itsystem">IT-system</button>
-      <button class="tab" data-tab="office365">Office 365</button>
-      <button class="tab" data-tab="ledelse">Ledelse 🔒</button>
-      <a class="tab" href="/admin">⚙ Innstillinger</a>
+    <nav class="tabs vertical" id="navGroups">
+      <div class="nav-group">
+        <button type="button" class="nav-group-head">Oversikt</button>
+        <div class="nav-group-items">
+          <button class="tab active" data-tab="oversikt">Oversikt</button>
+          <button class="tab" data-tab="driftssentral">📺 Driftssentral</button>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button type="button" class="nav-group-head">Prosjekt &amp; produksjon</button>
+        <div class="nav-group-items">
+          <button class="tab" data-tab="prosjekter">Prosjekter</button>
+          <button class="tab" data-tab="prosjektmoter">Prosjektmøter</button>
+          <button class="tab" data-tab="fagmoter">Fagmøter</button>
+          <button class="tab" data-tab="avdelinger">Avdelinger</button>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button type="button" class="nav-group-head">Økonomi</button>
+        <div class="nav-group-items">
+          <button class="tab" data-tab="okonomi">Økonomi</button>
+          <button class="tab" data-tab="kostnader">Kostnader</button>
+          <button class="tab" data-tab="rapporter">Rapporter</button>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button type="button" class="nav-group-head">Salg &amp; marked</button>
+        <div class="nav-group-items">
+          <button class="tab" data-tab="kunder">Kunder</button>
+          <button class="tab" data-tab="intensjonsavtaler">Intensjonsavtaler</button>
+          <button class="tab" data-tab="markedsforing">Markedsføring</button>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button type="button" class="nav-group-head">Folk (HR)</button>
+        <div class="nav-group-items">
+          <button class="tab" data-tab="hr">HR</button>
+          <button class="tab" data-tab="kontakter">Kontakter</button>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button type="button" class="nav-group-head">KI &amp; IT</button>
+        <div class="nav-group-items">
+          <button class="tab" data-tab="kiagenter">KI-agenter</button>
+          <button class="tab" data-tab="kvalitet">Kvalitetssikring</button>
+          <button class="tab" data-tab="itsystem">IT-system</button>
+          <button class="tab" data-tab="office365">Office 365</button>
+        </div>
+      </div>
+      <div class="nav-group">
+        <button type="button" class="nav-group-head">Ledelse</button>
+        <div class="nav-group-items">
+          <button class="tab" data-tab="ledelse">Ledelse 🔒</button>
+          <a class="tab" href="/admin">⚙ Innstillinger</a>
+        </div>
+      </div>
     </nav>
   </aside>
   <div id="sidebarOverlay" class="sidebar-overlay" hidden></div>

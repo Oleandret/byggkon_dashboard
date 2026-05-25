@@ -511,6 +511,17 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .matrix.editing td.cell:hover { outline: 2px solid var(--ink); outline-offset: -2px; }
 .namecol .nm-sub { display: block; font-weight: 400; font-size: 11px; color: var(--muted); }
 
+/* ---- Sidemeny: grupper ---- */
+.nav-group { margin-bottom: 4px; }
+.nav-group-head { width: 100%; text-align: left; background: transparent; border: 0; cursor: pointer;
+  font: inherit; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--muted); padding: 9px 12px 5px; display: flex; align-items: center; justify-content: space-between; }
+.nav-group-head::after { content: "▾"; font-size: 10px; transition: transform .15s; }
+.nav-group.collapsed .nav-group-head::after { transform: rotate(-90deg); }
+.nav-group.collapsed .nav-group-items { display: none; }
+.nav-group-items { display: flex; flex-direction: column; gap: 2px; }
+.nav-group-items .tab { padding-left: 18px; }
+
 /* ---- Innstillinger: faner ---- */
 .set-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
 .set-tab { border: 0; background: transparent; padding: 9px 14px; font: inherit; font-weight: 600; font-size: 13.5px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }

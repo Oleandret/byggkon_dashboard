@@ -139,6 +139,17 @@ function renderReminders() {
   document.getElementById("sidebarLock").addEventListener("click", () => { locked = !locked; localStorage.setItem("bk_sidebar_locked", locked ? "1" : "0"); apply(); if (locked) open(); });
   overlay.addEventListener("click", close);
   sb.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => { if (!locked) close(); }));
+  // Sammenleggbare grupper i menyen (husker tilstand)
+  const collapsed = JSON.parse(localStorage.getItem("bk_nav_collapsed") || "[]");
+  sb.querySelectorAll(".nav-group").forEach((g, i) => {
+    const head = g.querySelector(".nav-group-head");
+    if (collapsed.includes(i)) g.classList.add("collapsed");
+    head.addEventListener("click", () => {
+      g.classList.toggle("collapsed");
+      const c = [...sb.querySelectorAll(".nav-group")].map((x, j) => (x.classList.contains("collapsed") ? j : -1)).filter((j) => j >= 0);
+      localStorage.setItem("bk_nav_collapsed", JSON.stringify(c));
+    });
+  });
   apply();
   if (locked) sb.classList.add("open");
 })();
