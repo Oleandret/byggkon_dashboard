@@ -268,9 +268,15 @@ app.get("/api/driftssentral", requireAuth, async (req, res) => {
 });
 
 // ---- Live status for AI-agentene (sjekker at sidene svarer) ----
+// check:true => sjekkes live mot adressen. check:false => antas operativ (alltid grønn).
 const STATUS_AGENTS = [
-  { key: "loki", name: "Loki AI", url: "https://byggkon-loki-ai-production.up.railway.app/" },
-  { key: "nova", name: "Nova AI", url: "https://nova-ai-agent-bygg-kon-production.up.railway.app/" },
+  { key: "loki", name: "Loki AI", url: "https://byggkon-loki-ai-production.up.railway.app/", check: true },
+  { key: "nova", name: "Nova AI", url: "https://nova-ai-agent-bygg-kon-production.up.railway.app/", check: true },
+  { key: "hilde", name: "Hilde", url: "https://byggkon.bluemint.dev", check: false },
+  { key: "embla", name: "KI Tilbud (Embla)", url: "https://bk-tilbud.aiki.as/login", check: false },
+  { key: "stein", name: "Stein (kalkyle)", url: "", check: false },
+  { key: "eira", name: "Eira (kundeoppfølging)", url: "", check: false },
+  { key: "regnskap", name: "Regnskapsagent", url: "", check: false },
 ];
 let agentStatusCache = { ts: 0, agents: [] };
 app.get("/api/agent-status", requireAuth, async (req, res) => {
@@ -280,6 +286,7 @@ app.get("/api/agent-status", requireAuth, async (req, res) => {
       return res.json({ agents: agentStatusCache.agents, cached: true });
     }
     const agents = await Promise.all(STATUS_AGENTS.map(async (a) => {
+      if (!a.check) return { key: a.key, name: a.name, url: a.url, up: true };
       try {
         const r = await fetch(a.url, { method: "GET", signal: AbortSignal.timeout(6000) });
         return { key: a.key, name: a.name, url: a.url, up: r.status < 500 };
