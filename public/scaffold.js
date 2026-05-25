@@ -14,14 +14,15 @@
     if (el) el.innerHTML = items.map(card).join("");
   }
 
-  // KI-agenter (fra intern oversikt – uten passord)
+  // KI-agenter – BYGG-KON.ai-plattformen (6 agenter koblet til Claude via MCP)
   fill("kiGrid", [
-    { title: "Nova", sub: "nova@byggkon.ai", status: "Aktiv", statusCls: "ok", note: "Fagspørsmål om bygging og regelverk. Tilgjengelig via «Spør Nova» nede til høyre." },
-    { title: "Hilde", sub: "hilde@byggkon.ai", status: "Utvikling", note: "Kartverketsdata – eiendom, tomter, eiere." },
-    { title: "Stein", sub: "stein@byggkon.ai", status: "Planlagt", note: "Kalkyle og kostnader på bygg." },
-    { title: "Eira", sub: "eira@byggkon.ai", status: "Planlagt", note: "Kundeoppfølging / Tripletex-integrasjon." },
-    { title: "Saga", sub: "saga@byggkon.ai", status: "Utvikling", note: "Energiberegning." },
-    { title: "Embla", sub: "embla@byggkon.ai", status: "Planlagt", note: "Generell agent." },
+    { title: "BYGG-KON.ai (plattform)", url: "byggkon-ai-platform-production.up.railway.app", status: "Aktiv", statusCls: "ok", note: "Samlet AI-plattform: 6 agenter koblet til Claude via MCP. Produserer dispensasjonssøknader, UAK-sjekklister, KS-planer og befaringsrapporter på sekunder." },
+    { title: "Loki", url: "byggkon-loki-ai-production.up.railway.app", status: "Aktiv", statusCls: "ok", note: "Synkroniserer hele OneDrive/SharePoint til en Pinecone-vektorindeks. Søk i faktisk innhold på tvers av alle prosjekter." },
+    { title: "Nova", url: "nova-ai-agent-bygg-kon-production.up.railway.app", status: "Aktiv", statusCls: "ok", note: "RAG-assistent som svarer ansatte via chat, Teams, e-post og webhook. Indekserer Drive og parser vedlegg. (Også «Spør Nova» nede til høyre.)" },
+    { title: "Hilde", url: "byggkon.bluemint.dev", status: "Aktiv", statusCls: "ok", note: "Eiendom og eier fra Kartverket og Brønnøysund — matrikkel, grunnbok og kontaktinfo, automatisk." },
+    { title: "Tripletex-agent", status: "Aktiv", statusCls: "ok", note: "Faktura, regnskap, prosjektøkonomi og timer via MCP — alltid med bekreftelse før skriveoperasjoner." },
+    { title: "Epostagent", status: "Utvikling", note: "Lærer av hvert svar og foreslår svar på lignende henvendelser fra kunde/byggherre/intern." },
+    { title: "KI Tilbud", url: "bk-tilbud.aiki.as/login", status: "Aktiv", statusCls: "ok", note: "Produserer komplette tilbud etter NS 8400 og NS 3450 — kombinerer Loki, Nova og Tripletex." },
   ]);
 
   // Kvalitetssikring
@@ -31,8 +32,27 @@
     { title: "Dokumentkontroll", status: "Planlagt", note: "Gjennomgang av prosjektdokumenter for mangler og avvik." },
   ]);
 
-  // IT-system og verktøy (uten passord) – raske lenker
-  fill("itGrid", [
+  // IT-system og verktøy (uten passord) – alfabetisk liste, klikk for detaljer
+  function renderItList(items) {
+    const el = document.getElementById("itGrid");
+    if (!el) return;
+    const sorted = items.slice().sort((a, b) => a.title.localeCompare(b.title, "nb"));
+    el.className = "it-list";
+    el.innerHTML = sorted.map((c, i) => `
+      <div class="it-item" data-i="${i}">
+        <button class="it-head" type="button">
+          <span class="it-name">${esc(c.title)}</span>
+          ${c.status ? `<span class="sc-badge ${c.statusCls || ""}">${esc(c.status)}</span>` : ""}
+          <span class="it-caret">▸</span>
+        </button>
+        <div class="it-body">
+          <div class="it-note">${esc(c.note || "")}</div>
+          ${c.url ? `<a class="sc-link" href="${esc(linkUrl(c.url))}" target="_blank" rel="noopener">Åpne ↗</a>` : ""}
+        </div>
+      </div>`).join("");
+    el.addEventListener("click", (e) => { const b = e.target.closest(".it-head"); if (b) b.parentElement.classList.toggle("open"); });
+  }
+  renderItList([
     { title: "Tripletex", url: "tripletex.no", note: "Timeføring, fakturering og regnskap. Datakilden bak dette dashbordet." },
     { title: "Office 365", url: "portal.office.com", note: "E-post, Teams, OneNote, Office-pakken. Alle ansatte." },
     { title: "Fireflies AI", url: "fireflies.ai", note: "Møtereferat automatisk for Teams-møter. Inviter ai@byggkon.no, så lages referat og skrives til delt OneNote-mappe.", status: "Auto", statusCls: "ok" },

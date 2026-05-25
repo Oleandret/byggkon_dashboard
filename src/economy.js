@@ -102,14 +102,12 @@ export async function buildEconomy() {
   const weeksElapsed = Math.max(1, (today - startOfYear(today)) / (7 * 24 * 3600 * 1000));
   const capacityYTD = (cfg.weeklyCapacityHours || 37.5) * weeksElapsed;
   const empById = new Map(employees.map((e) => [e.id, fullName(e)]));
-  // Kun personer som faktisk er i jobb: har ført timer siste 2 måneder og finnes i ansattlista
-  const cutoff60 = ymd(daysAgo(60, today));
-  const activeIds = new Set(yearTime.filter((e) => e.date >= cutoff60 && e.employee?.id != null).map((e) => e.employee.id));
+  // Faktureringsgrad siste 3 måneder, per ansatt som faktisk er i jobb (har ført timer i perioden + finnes i ansattlista)
+  const cutoff90 = ymd(daysAgo(90, today));
+  const last3m = yearTime.filter((e) => e.date >= cutoff90);
   const byEmp = new Map();
-  let totalHours = 0, totalBillable = 0;
-  for (const e of yearTime) {
-    totalHours += e.hours || 0;
-    totalBillable += e.chargeableHours || 0;
+  let total3mHours = 0, total3mBillable = 0;
+  for (const e of last3m) {
     const id = e.employee?.id;
     if (id == null) continue;
     const cur = byEmp.get(id) || { id, name: empById.get(id) || fullName(e.employee) || `#${id}`, hours: 0, billable: 0 };
@@ -117,16 +115,18 @@ export async function buildEconomy() {
     cur.billable += e.chargeableHours || 0;
     byEmp.set(id, cur);
   }
-  const utilization = [...byEmp.values()]
-    .filter((e) => activeIds.has(e.id) && empById.has(e.id))
-    .map((e) => ({
-      name: e.name,
-      hours: e.hours,
-      billable: e.billable,
-      billingRate: e.hours > 0 ? e.billable / e.hours : 0,
-      utilization: capacityYTD > 0 ? e.billable / capacityYTD : 0,
-    }))
+  const billing3mEmployees = [...byEmp.values()]
+    .filter((e) => empById.has(e.id) && e.hours > 0)
+    .map((e) => ({ name: e.name, hours: e.hours, billable: e.billable, billingRate: e.hours > 0 ? e.billable / e.hours : 0 }))
     .sort((a, b) => b.billingRate - a.billingRate);
+  for (const e of billing3mEmployees) { total3mHours += e.hours; total3mBillable += e.billable; }
+  const billing3m = {
+    employees: billing3mEmployees,
+    total: { hours: total3mHours, billable: total3mBillable, billingRate: total3mHours > 0 ? total3mBillable / total3mHours : 0 },
+  };
+  // (beholder årstall for "timer i år"-KPI)
+  let totalHours = 0, totalBillable = 0;
+  for (const e of yearTime) { totalHours += e.hours || 0; totalBillable += e.chargeableHours || 0; }
 
   return {
     updatedAt: new Date().toISOString(),
@@ -140,6 +140,6 @@ export async function buildEconomy() {
     },
     liquidity,
     hours: { totalHours, totalBillable, billingRate: totalHours > 0 ? totalBillable / totalHours : 0 },
-    utilization,
+    billing3m,
   };
 }

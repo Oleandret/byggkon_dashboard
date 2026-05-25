@@ -94,6 +94,11 @@ export async function getTimeEntries(fromDate, toDate) {
   });
 }
 
+// Kunder (id -> navn, e-post, telefon) – til kunde-oversikten.
+export async function getCustomers() {
+  return fetchAll("search_customers", { fields: "id,name,email,phoneNumber,invoiceEmail" });
+}
+
 // Kontoplan (id -> number/name), brukes til å gruppere balanse/resultat.
 export async function getAccounts() {
   return fetchAll("search_accounts", { fields: "id,number,name" });

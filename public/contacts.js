@@ -75,7 +75,32 @@
     } catch (e2) { err("Kunne ikke hente kontakter: " + e2.message); }
   }
 
+  // ---- Tripletex-kontakter (kunder), alfabetisk ----
+  let ttList = [], ttLoaded = false;
+  const ttSearch = document.getElementById("ttSearch");
+  function renderTt() {
+    const q = (ttSearch.value || "").toLowerCase().trim();
+    const rows = ttList.filter((c) => !q || c.name.toLowerCase().includes(q));
+    const t = document.getElementById("ttContacts");
+    if (!rows.length) { t.innerHTML = `<tbody><tr><td class="empty">Ingen treff.</td></tr></tbody>`; return; }
+    t.innerHTML = `<thead><tr><th>Kunde</th><th>E-post</th><th>Telefon</th></tr></thead><tbody>${
+      rows.map((c) => `<tr><td>${esc(c.name)}</td><td>${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : "—"}</td><td>${esc(c.phone || "—")}</td></tr>`).join("")
+    }</tbody>`;
+  }
+  if (ttSearch) ttSearch.addEventListener("input", renderTt);
+  async function loadTt() {
+    if (ttLoaded) return;
+    const status = document.getElementById("ttStatus");
+    try {
+      const res = await fetch("/api/tripletex-contacts");
+      if (res.status === 401) { location.href = "/login"; return; }
+      if (!res.ok) throw new Error("Feil " + res.status);
+      const d = await res.json();
+      ttList = d.contacts || []; ttLoaded = true; status.hidden = true; renderTt();
+    } catch (e2) { status.hidden = false; status.textContent = "Kunne ikke hente Tripletex-kontakter: " + e2.message; }
+  }
+
   window.addEventListener("beforeunload", (e) => { if (editing && dirty) { e.preventDefault(); e.returnValue = ""; } });
   const tab = document.querySelector('.tab[data-tab="kontakter"]');
-  if (tab) tab.addEventListener("click", loadContacts);
+  if (tab) tab.addEventListener("click", () => { loadContacts(); loadTt(); });
 })();

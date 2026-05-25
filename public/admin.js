@@ -67,4 +67,30 @@ document.getElementById("settingsForm").addEventListener("submit", async (e) => 
   loadSettings();
 });
 
+// ---- Opplasting av plantegning ----
+const upBtn = document.getElementById("floorPlanUpload");
+if (upBtn) {
+  upBtn.addEventListener("click", () => {
+    const f = document.getElementById("floorPlanFile").files[0];
+    const msg = document.getElementById("floorPlanUploadMsg");
+    if (!f) { msg.textContent = "Velg en bildefil først."; return; }
+    if (f.size > 12 * 1024 * 1024) { msg.textContent = "Bildet er for stort (maks 12 MB)."; return; }
+    msg.textContent = "Laster opp …";
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const res = await fetch("/api/admin/upload-floorplan", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dataUrl: reader.result }),
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(d.error || "Opplasting feilet");
+        document.getElementById("floorPlanUrl").value = d.floorPlanUrl || "";
+        msg.textContent = "✓ Lastet opp og lagret.";
+      } catch (e) { msg.textContent = "Feil: " + e.message; }
+    };
+    reader.readAsDataURL(f);
+  });
+}
+
 loadSettings();

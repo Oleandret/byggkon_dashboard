@@ -98,8 +98,13 @@ async function loadCustomers(force = false) {
     status.hidden = true;
     customersLoaded = true;
     fillTable("kunderTable",
-      [{ label: "#" }, { label: "Kunde" }, { label: "Omsetning 12 mnd", num: true }, { label: "Fakturaer", num: true }],
-      d.customers.map((c, i) => [String(i + 1), esc(c.name), nok(c.revenue), num(c.invoices)]),
+      [{ label: "#" }, { label: "Kunde" }, { label: "Kontakt / e-post" }, { label: "Telefon" }, { label: "Omsetning 12 mnd", num: true }, { label: "Fakturaer", num: true }],
+      d.customers.map((c, i) => [
+        String(i + 1), esc(c.name),
+        c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : "—",
+        esc(c.phone || "—"),
+        nok(c.revenue), num(c.invoices),
+      ]),
       "Ingen kunder funnet.");
   } catch (err) {
     status.hidden = false; status.textContent = "Kunne ikke hente kunder: " + err.message;
@@ -228,10 +233,11 @@ function fillTable(id, headers, rows, emptyMsg) {
 
 function renderOutstanding(d) {
   fillTable("outstandingTable",
-    [{ label: "Faktura" }, { label: "Kunde" }, { label: "Forfall" }, { label: "Utestående", num: true }, { label: "Status" }],
+    [{ label: "Faktura" }, { label: "Kunde" }, { label: "Forfall" }, { label: "Utestående", num: true }, { label: "Status" }, { label: "Purr" }],
     d.outstanding.map((o) => [
       esc(o.invoiceNumber), esc(o.customer), o.dueDate || "—", nok(o.outstanding),
       o.overdue ? `<span class="pill overdue">Forfalt</span>` : `<span class="pill ok">Åpen</span>`,
+      o.id ? `<a class="pill purr" href="https://tripletex.no/execute/invoiceMenu?invoiceId=${o.id}" target="_blank" rel="noopener" title="Åpne i Tripletex for å sende purring">Purr ↗</a>` : "—",
     ]),
     "Ingen utestående fakturaer.");
 }
@@ -276,6 +282,21 @@ function renderProjectsTable() {
 document.getElementById("projSearch").addEventListener("input", renderProjectsTable);
 document.getElementById("projEmp").addEventListener("change", renderProjectsTable);
 
+function renderResource() {
+  if (!lastData) return;
+  const rows = lastData.projectsDetailed
+    .filter((p) => (p.hours4w || 0) > 0)
+    .sort((a, b) => (b.hours4w || 0) - (a.hours4w || 0));
+  fillTable("pmResource",
+    [{ label: "Prosjekt" }, { label: "Kunde" }, { label: "Timer 4 uker", num: true }, { label: "Hvem jobber på det (timer)" }],
+    rows.map((p) => {
+      const who = Object.entries(p.byEmp4w || {}).sort((a, b) => b[1] - a[1])
+        .map(([navn, t]) => `${esc(navn)} (${num(t)} t)`).join(", ");
+      return [esc(p.name), esc(p.customer), num(p.hours4w), who || "—"];
+    }),
+    "Ingen timer ført siste 4 uker.");
+}
+
 /* ---- Hovedlasting ---- */
 async function load() {
   try {
@@ -296,6 +317,7 @@ async function load() {
     renderOrders(d);
     populateProjEmp();
     renderProjectsTable();
+    renderResource();
     document.getElementById("updated").textContent = "Oppdatert " + new Date(d.updatedAt).toLocaleTimeString("nb-NO");
   } catch (err) {
     showError("Kunne ikke hente data: " + err.message);
@@ -312,7 +334,7 @@ document.getElementById("refreshBtn").addEventListener("click", async () => {
 });
 
 /* ---- Økonomi-fane (lazy-lastet ved første åpning) ---- */
-let economyLoaded = false, ecoTrendChart;
+let economyLoaded = false, ecoTrendChart, ecoBillChart;
 const cls = (n) => (n < 0 ? "neg" : "pos");
 function plRow(label, value, { total = false, sub = false, color = false } = {}) {
   const c = `pl-row ${total ? "total" : ""} ${sub ? "sub" : ""}`;
@@ -366,19 +388,43 @@ function renderEconomy(d) {
   else ecoTrendChart = new Chart(ctx, { type: "bar", data, options: opts });
 
   const rateBar = (v) => `<div class="ratebar"><span style="width:${Math.min(100, Math.round(v * 100))}%"></span></div>`;
+  const b3 = d.billing3m || { employees: [], total: { billingRate: 0, hours: 0, billable: 0 } };
+  const emps = b3.employees;
+
+  // Graf: faktureringsgrad per ansatt + samlet
+  const ctx2 = document.getElementById("ecoBillChart");
+  const labels = emps.map((e) => e.name.split(" ")[0]).concat(["SAMLET"]);
+  const data2 = emps.map((e) => Math.round(e.billingRate * 100)).concat([Math.round(b3.total.billingRate * 100)]);
+  const colors = emps.map(() => css("--accent")).concat([css("--ink")]);
+  const cfg2 = {
+    type: "bar",
+    data: { labels, datasets: [{ data: data2, backgroundColor: colors, borderRadius: 5 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => c.raw + " %" } } },
+      scales: {
+        x: { ticks: { color: css("--muted"), maxRotation: 60, minRotation: 45 }, grid: { display: false } },
+        y: { suggestedMax: 100, ticks: { color: css("--muted"), callback: (v) => v + " %" }, grid: { color: css("--grid") } },
+      },
+    },
+  };
+  if (ecoBillChart) { ecoBillChart.data = cfg2.data; ecoBillChart.update(); }
+  else ecoBillChart = new Chart(ctx2, cfg2);
+
+  // Tabell
   const ut = document.getElementById("ecoUtil");
-  if (!d.utilization.length) {
-    ut.innerHTML = `<tbody><tr><td class="empty">Ingen ansatte med timer siste 2 måneder.</td></tr></tbody>`;
+  if (!emps.length) {
+    ut.innerHTML = `<tbody><tr><td class="empty">Ingen ansatte med timer siste 3 måneder.</td></tr></tbody>`;
   } else {
     ut.innerHTML =
-      `<thead><tr><th>Ansatt</th><th class="num">Timer i år</th><th class="num">Fakturerbart</th><th>Faktureringsgrad</th><th>Utilization</th></tr></thead>` +
-      `<tbody>${d.utilization.map((u) => `<tr>
+      `<thead><tr><th>Ansatt</th><th class="num">Timer (3 mnd)</th><th class="num">Fakturerbart</th><th>Faktureringsgrad</th></tr></thead>` +
+      `<tbody>${emps.map((u) => `<tr>
         <td>${esc(u.name)}</td>
         <td class="num">${num(u.hours)}</td>
         <td class="num">${num(u.billable)}</td>
         <td><div class="ratecell"><b>${pct(u.billingRate)}</b>${rateBar(u.billingRate)}</div></td>
-        <td><div class="ratecell"><b>${pct(u.utilization)}</b>${rateBar(u.utilization)}</div></td>
-      </tr>`).join("")}</tbody>`;
+      </tr>`).join("")}
+      <tr class="lic-total"><td><b>Samlet</b></td><td class="num"><b>${num(b3.total.hours)}</b></td><td class="num"><b>${num(b3.total.billable)}</b></td><td><div class="ratecell"><b>${pct(b3.total.billingRate)}</b>${rateBar(b3.total.billingRate)}</div></td></tr></tbody>`;
   }
 }
 

@@ -36,7 +36,6 @@
       <button class="tab active" data-tab="oversikt">Oversikt</button>
       <button class="tab" data-tab="prosjekter">Prosjekter</button>
       <button class="tab" data-tab="okonomi">Økonomi</button>
-      <button class="tab" data-tab="ansatte">Ansatte</button>
       <button class="tab" data-tab="kunder">Kunder</button>
       <button class="tab" data-tab="avdelinger">Avdelinger</button>
       <button class="tab" data-tab="organisasjon">Organisasjon</button>
@@ -174,7 +173,10 @@
           </div>
         </div>
         <div class="card">
-          <h2>Timeregnskap & utilization per ansatt (hittil i år)</h2>
+          <h2>Faktureringsgrad — siste 3 måneder</h2>
+          <p class="subnote">Per ansatt, og samlet for hele firmaet.</p>
+          <div class="value-note">💚 <b>Bærekraftige relasjoner:</b> Vi er ett team. Har en kollega ledig kapasitet, hjelper vi hverandre å finne arbeid — lav faktureringsgrad er en mulighet, ikke en pekefinger.</div>
+          <div class="chart-box" style="height:340px"><canvas id="ecoBillChart"></canvas></div>
           <div class="table-wrap tall"><table id="ecoUtil"></table></div>
         </div>
       </div>
@@ -196,28 +198,6 @@
         </div>
         <p class="subnote" id="orgHint">Skrivebeskyttet. Klikk «Rediger» for å flytte personer, legge til eller endre.</p>
         <div class="org-scroll"><div class="orgchart tree" id="orgChart"></div></div>
-      </div>
-    </main>
-  </section>
-
-  <!-- ============ FANE: ANSATTE (kompetansematrise) ============ -->
-  <section class="tab-panel" id="panel-ansatte">
-    <main class="container-wide">
-      <div class="card">
-        <div class="proj-head">
-          <h2>Kompetansematrise</h2>
-          <div class="org-actions">
-            <input id="kompSearch" class="search" type="search" placeholder="Søk ansatt eller ferdighet …" />
-            <button id="kompEdit" class="btn-ghost">🔓 Lås opp arket</button>
-            <button id="kompAddSkill" class="btn-ghost" hidden>+ Ferdighet</button>
-            <button id="kompAddPerson" class="btn-ghost" hidden>+ Person</button>
-            <button id="kompSave" class="btn-primary" hidden>Lagre</button>
-          </div>
-        </div>
-        <p class="subnote" id="kompHint">Nivå 0–4 per ferdighet. Klikk «Rediger», så øker du nivået ved å klikke i en celle. Lagres live for alle.</p>
-        <div id="kompLegend" class="komp-legend"></div>
-        <div id="kompStatus" class="eco-status">Laster kompetansematrise …</div>
-        <div class="matrix-wrap"><table id="kompTable" class="matrix"></table></div>
       </div>
     </main>
   </section>
@@ -245,6 +225,11 @@
           <div id="pmSuggestions"></div>
         </div>
       </div>
+      <div class="card">
+        <h2>Ressursfordeling — timer per prosjekt (siste 4 uker)</h2>
+        <p class="subnote">Prosjektene med flest timer øverst, og hvem som jobber på dem.</p>
+        <div class="table-wrap tall"><table id="pmResource"></table></div>
+      </div>
     </main>
   </section>
 
@@ -263,6 +248,15 @@
         <p class="subnote">Eksterne kontaktpersoner: utleier, IT-support, samarbeidspartnere m.m.</p>
         <div class="scaffold-grid" id="konGrid"></div>
       </div>
+      <div class="card">
+        <div class="proj-head">
+          <h2>Kontakter fra Tripletex (kunder)</h2>
+          <input id="ttSearch" class="search" type="search" placeholder="Søk kunde …" />
+        </div>
+        <p class="subnote">Alle kunder fra Tripletex, alfabetisk.</p>
+        <div id="ttStatus" class="eco-status">Laster …</div>
+        <div class="table-wrap tall"><table id="ttContacts"></table></div>
+      </div>
     </main>
   </section>
 
@@ -271,9 +265,29 @@
     <main class="container">
       <div class="subtabs" id="hrSubtabs">
         <button class="subtab active" data-sub="plassering">Kontorplassering</button>
+        <button class="subtab" data-sub="ansatte">Ansatte / kompetanse</button>
         <button class="subtab" data-sub="rekruttering">Rekruttering</button>
         <button class="subtab" data-sub="onboarding">Onboarding</button>
         <button class="subtab" data-sub="cv">CV-er</button>
+      </div>
+
+      <div class="hr-sub" id="hrsub-ansatte">
+        <div class="card">
+          <div class="proj-head">
+            <h2>Kompetansematrise</h2>
+            <div class="org-actions">
+              <input id="kompSearch" class="search" type="search" placeholder="Søk ansatt eller ferdighet …" />
+              <button id="kompEdit" class="btn-ghost">🔓 Lås opp arket</button>
+              <button id="kompAddSkill" class="btn-ghost" hidden>+ Ferdighet</button>
+              <button id="kompAddPerson" class="btn-ghost" hidden>+ Person</button>
+              <button id="kompSave" class="btn-primary" hidden>Lagre</button>
+            </div>
+          </div>
+          <p class="subnote" id="kompHint">Nivå 0–4 per ferdighet. Klikk «Lås opp arket», så øker du nivået ved å klikke i en celle. Lagres live for alle.</p>
+          <div id="kompLegend" class="komp-legend"></div>
+          <div id="kompStatus" class="eco-status">Laster kompetansematrise …</div>
+          <div class="matrix-wrap"><table id="kompTable" class="matrix"></table></div>
+        </div>
       </div>
 
       <div class="hr-sub active" id="hrsub-plassering">

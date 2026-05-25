@@ -135,6 +135,7 @@
   }
 
   window.addEventListener("beforeunload", (e) => { if (editing && dirty) { e.preventDefault(); e.returnValue = ""; } });
-  const tabBtn = document.querySelector('.tab[data-tab="ansatte"]');
-  if (tabBtn) tabBtn.addEventListener("click", () => loadCompetence());
+  // Lastes når HR-underfanen «Ansatte / kompetanse» åpnes
+  const subBtn = document.querySelector('#hrSubtabs .subtab[data-sub="ansatte"]');
+  if (subBtn) subBtn.addEventListener("click", () => loadCompetence());
 })();

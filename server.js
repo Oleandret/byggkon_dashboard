@@ -2,11 +2,15 @@ import "dotenv/config"; // leser en lokal .env-fil hvis den finnes (ignoreres p�
 import express from "express";
 import cookieSession from "cookie-session";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { buildOverview } from "./src/metrics.js";
 import { buildEconomy } from "./src/economy.js";
-import { clearCache, resetClient, getInvoices, ymd } from "./src/tripletex.js";
-import { getConfig, saveConfig, getConfigForAdmin } from "./src/settings.js";
+import { clearCache, resetClient, getInvoices, getCustomers, ymd } from "./src/tripletex.js";
+import { getConfig, saveConfig, getConfigForAdmin, SETTINGS_PATH } from "./src/settings.js";
+
+// Mappe for opplastede filer (ved siden av innstillingsfila – legg på Volume på Railway).
+const UPLOAD_DIR = path.join(path.dirname(SETTINGS_PATH), "uploads");
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -18,7 +22,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin-bytt-meg";
 const SESSION_SECRET = process.env.SESSION_SECRET || "bytt-meg-til-en-lang-tilfeldig-streng";
 
 app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
+app.use(express.json({ limit: "15mb" })); // rom for opplastede bilder (base64)
 app.use(
   cookieSession({
     name: "bk_session",
@@ -28,6 +32,9 @@ app.use(
     sameSite: "lax",
   })
 );
+
+// Opplastede filer (krever innlogging – samme cookie som dashbordet)
+app.use("/uploads", (req, res, next) => requireAuth(req, res, next), express.static(UPLOAD_DIR));
 
 function requireAuth(req, res, next) {
   if (req.session && req.session.loggedIn) return next();
@@ -70,6 +77,30 @@ app.get("/admin", requireAdmin, (req, res) =>
 
 // ---- Admin-API ----
 app.get("/api/admin/settings", requireAdmin, (req, res) => res.json(getConfigForAdmin()));
+
+// Opplasting av plantegning (base64 data-URL). Lagres i UPLOAD_DIR.
+app.post("/api/admin/upload-floorplan", requireAdmin, (req, res) => {
+  try {
+    const dataUrl = req.body?.dataUrl || "";
+    const m = /^data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);base64,(.+)$/i.exec(dataUrl);
+    if (!m) return res.status(400).json({ error: "Ugyldig bilde. Last opp PNG, JPG, WEBP, GIF eller SVG." });
+    let ext = m[1].toLowerCase().replace("jpeg", "jpg").replace("svg+xml", "svg");
+    const buf = Buffer.from(m[2], "base64");
+    if (buf.length > 12 * 1024 * 1024) return res.status(400).json({ error: "Bildet er for stort (maks 12 MB)." });
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    // Fjern eventuelle gamle plantegninger
+    for (const e of ["png", "jpg", "webp", "gif", "svg"]) {
+      try { fs.unlinkSync(path.join(UPLOAD_DIR, "floorplan." + e)); } catch {}
+    }
+    const fname = "floorplan." + ext;
+    fs.writeFileSync(path.join(UPLOAD_DIR, fname), buf);
+    const url = "/uploads/" + fname + "?v=" + Date.now();
+    saveConfig({ floorPlanUrl: url });
+    res.json({ ok: true, floorPlanUrl: url });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
 app.post("/api/admin/settings", requireAdmin, (req, res) => {
   try {
     const allowed = [
@@ -139,16 +170,20 @@ app.get("/api/customers", requireAuth, async (req, res) => {
     const today = new Date();
     const to = ymd(today);
     const from = ymd(new Date(today.getFullYear() - 1, today.getMonth(), today.getDate()));
-    const invoices = await getInvoices(from, to);
+    const [invoices, custList] = await Promise.all([getInvoices(from, to), getCustomers().catch(() => [])]);
+    const custById = new Map(custList.map((c) => [c.id, c]));
     const byCust = new Map();
     for (const i of invoices) {
-      const name = i.customer?.name || "Ukjent";
-      const cur = byCust.get(name) || { name, revenue: 0, invoices: 0 };
+      const id = i.customer?.id ?? i.customer?.name ?? "ukjent";
+      const cur = byCust.get(id) || { id, name: i.customer?.name || "Ukjent", revenue: 0, invoices: 0 };
       cur.revenue += i.amount || 0;
       cur.invoices += 1;
-      byCust.set(name, cur);
+      byCust.set(id, cur);
     }
-    const customers = [...byCust.values()].sort((a, b) => b.revenue - a.revenue);
+    const customers = [...byCust.values()].map((c) => {
+      const info = custById.get(c.id) || {};
+      return { name: c.name, revenue: c.revenue, invoices: c.invoices, email: info.email || info.invoiceEmail || "", phone: info.phoneNumber || "" };
+    }).sort((a, b) => b.revenue - a.revenue);
     res.json({ updatedAt: new Date().toISOString(), customers });
   } catch (err) {
     console.error("Feil i /api/customers:", err.message);
@@ -274,6 +309,21 @@ app.post("/api/licenses", requireAuth, (req, res) => {
     saveConfig({ licenses: clean });
     res.json({ ok: true });
   } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Kontakter fra Tripletex (kunder), alfabetisk ----
+app.get("/api/tripletex-contacts", requireAuth, async (req, res) => {
+  try {
+    const list = await getCustomers();
+    const contacts = list
+      .map((c) => ({ name: c.name || "", email: c.email || c.invoiceEmail || "", phone: c.phoneNumber || "" }))
+      .filter((c) => c.name)
+      .sort((a, b) => a.name.localeCompare(b.name, "nb"));
+    res.json({ contacts });
+  } catch (err) {
+    console.error("Feil i /api/tripletex-contacts:", err.message);
+    res.status(502).json({ error: err.message });
+  }
 });
 
 // ---- Kontaktpersoner ----

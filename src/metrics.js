@@ -69,6 +69,7 @@ export async function buildOverview() {
   const outstanding = invoices
     .filter((i) => (i.amountOutstanding || 0) > 0)
     .map((i) => ({
+      id: i.id,
       invoiceNumber: i.invoiceNumber,
       customer: i.customer?.name || "",
       dueDate: i.invoiceDueDate,
@@ -126,7 +127,7 @@ export async function buildOverview() {
   // ---- Prosjekter ----
   // «Aktive prosjekter» = de det faktisk er ført timer på (Tripletex' isClosed-flagg
   // brukes lite hos Bygg-Kon, så vi går på reell aktivitet i stedet).
-  const activeCutoff = ymd(daysAgo(56, today)); // siste 8 uker = "jobber på nå"
+  const activeCutoff = ymd(daysAgo(90, today)); // siste 3 måneder = "jobber på nå"
   const projectsById = new Map(projects.map((p) => [p.id, p]));
 
   const projAgg = new Map(); // id -> aggregat

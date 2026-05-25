@@ -39,7 +39,7 @@ function defaults() {
     companyOrgNr: process.env.COMPANY_ORGNR || "943 885 397 MVA",
     companyAddress: process.env.COMPANY_ADDRESS || "Travbaneveien 3, 4031 Stavanger",
     companyEmail: process.env.COMPANY_EMAIL || "",
-    companyPhone: process.env.COMPANY_PHONE || "",
+    companyPhone: process.env.COMPANY_PHONE || "51 97 44 00",
     companyWebsite: process.env.COMPANY_WEBSITE || "www.byggkon.no",
     values: defaultValues(),
     departments: ["Intern administrasjon", "Prosjektadministrasjon / BYGG", "RIB", "ARK", "RIBr", "Andre rådgivende fag"],
