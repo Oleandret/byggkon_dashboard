@@ -19,6 +19,7 @@
     <nav class="tabs">
       <button class="tab active" data-tab="oversikt">Oversikt</button>
       <button class="tab" data-tab="prosjekter">Prosjekter</button>
+      <button class="tab" data-tab="okonomi">Økonomi</button>
       <button class="tab" data-tab="organisasjon">Organisasjon</button>
     </nav>
     <div class="topbar-right">
@@ -99,6 +100,36 @@
           <input id="projSearch" class="search" type="search" placeholder="Søk prosjekt, kunde eller leder …" />
         </div>
         <div class="table-wrap tall"><table id="projectsTable"></table></div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============ FANE: ØKONOMI ============ -->
+  <section class="tab-panel" id="panel-okonomi">
+    <main class="container">
+      <div id="ecoStatus" class="eco-status">Laster økonomi …</div>
+      <div id="ecoContent" hidden>
+        <p class="subnote" style="margin:0 0 14px">Live tall hentet rett fra hovedboken i Tripletex. Kan avvike noe fra økonomiansvarliges manuelt justerte rapport (f.eks. skatt, periodiseringer og prognoser).</p>
+        <div class="grid-2">
+          <div class="card"><h2>Resultat hittil i år (<span id="ecoYear"></span>)</h2><div id="ecoResYTD" class="pl"></div></div>
+          <div class="card"><h2>Resultat siste 12 måneder (LTM)</h2><div id="ecoResLTM" class="pl"></div></div>
+        </div>
+        <div class="card">
+          <h2>Resultattrend — sum inntekter og EBT (siste 12 mnd)</h2>
+          <canvas id="ecoTrend" height="200"></canvas>
+        </div>
+        <div class="grid-2">
+          <div class="card"><h2>Balanse (pr. i dag)</h2><div id="ecoBalance" class="pl"></div></div>
+          <div class="card">
+            <h2>Likviditet <span class="subnote">øyeblikksbilde</span></h2>
+            <div id="ecoLiq" class="pl"></div>
+            <p class="subnote">Live øyeblikksbilde: bank + kundefordringer − leverandørgjeld. Dette er ikke en prognose slik som i den manuelle rapporten.</p>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Timeregnskap & utilization per ansatt (hittil i år)</h2>
+          <div class="table-wrap tall"><table id="ecoUtil"></table></div>
+        </div>
       </div>
     </main>
   </section>

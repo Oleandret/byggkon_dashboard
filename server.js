@@ -4,6 +4,7 @@ import cookieSession from "cookie-session";
 import path from "path";
 import { fileURLToPath } from "url";
 import { buildOverview } from "./src/metrics.js";
+import { buildEconomy } from "./src/economy.js";
 import { clearCache, resetClient } from "./src/tripletex.js";
 import { getConfig, saveConfig, getConfigForAdmin } from "./src/settings.js";
 
@@ -107,6 +108,15 @@ app.get("/api/overview", requireAuth, async (req, res) => {
     res.status(502).json({ error: err.message });
   }
 });
+app.get("/api/economy", requireAuth, async (req, res) => {
+  try {
+    res.json(await buildEconomy());
+  } catch (err) {
+    console.error("Feil i /api/economy:", err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
 app.post("/api/refresh", requireAuth, (req, res) => {
   clearCache();
   res.json({ ok: true });

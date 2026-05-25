@@ -156,6 +156,20 @@ tbody tr:hover td { background: var(--mint); }
   color: #fff; padding: 12px 18px; border-radius: 10px; font-size: 13px; box-shadow: 0 10px 30px rgba(3,2,19,.18);
   max-width: 90%; z-index: 100; }
 
+/* ---- Økonomi ---- */
+.eco-status { color: var(--muted); padding: 30px 4px; font-size: 14px; }
+.pl { display: flex; flex-direction: column; }
+.pl-row { display: flex; justify-content: space-between; align-items: baseline;
+  padding: 9px 2px; border-bottom: 1px solid var(--border); font-size: 14px; }
+.pl-row:last-child { border-bottom: none; }
+.pl-row .lbl { color: var(--muted); }
+.pl-row .val { font-weight: 600; font-variant-numeric: tabular-nums; }
+.pl-row.total { border-top: 2px solid var(--mint-2); border-bottom: none; margin-top: 4px; padding-top: 12px; }
+.pl-row.total .lbl, .pl-row.total .val { font-weight: 800; font-size: 15px; color: var(--ink); }
+.pl-row .val.pos { color: var(--good); }
+.pl-row .val.neg { color: var(--bad); }
+.pl-row.sub .lbl { padding-left: 14px; font-size: 13px; }
+
 /* ---- Organisasjonskart ---- */
 .org-actions { display: flex; gap: 8px; align-items: center; }
 .org-scroll { overflow: auto; padding: 16px 4px 8px; }

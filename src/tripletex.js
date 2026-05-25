@@ -94,4 +94,20 @@ export async function getTimeEntries(fromDate, toDate) {
   });
 }
 
+// Kontoplan (id -> number/name), brukes til å gruppere balanse/resultat.
+export async function getAccounts() {
+  return fetchAll("search_accounts", { fields: "id,number,name" });
+}
+
+// Saldobalanse for en periode. balanceChange = bevegelse i perioden,
+// balanceOut = utgående saldo (brukes til balanseregnskapet).
+export async function getBalanceSheet(fromDate, toDate, numberFrom = 1000, numberTo = 8299) {
+  return fetchAll("get_balance_sheet", {
+    dateFrom: fromDate,
+    dateTo: toDate,
+    accountNumberFrom: numberFrom,
+    accountNumberTo: numberTo,
+  });
+}
+
 export { ymd };

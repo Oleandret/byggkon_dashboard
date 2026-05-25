@@ -36,6 +36,7 @@ document.querySelectorAll(".tab").forEach((t) => {
     document.querySelectorAll(".tab-panel").forEach((x) => x.classList.remove("active"));
     t.classList.add("active");
     document.getElementById("panel-" + t.dataset.tab).classList.add("active");
+    if (t.dataset.tab === "okonomi") loadEconomy();
   });
 });
 
@@ -76,7 +77,8 @@ function renderProjectsMarquee(projects) {
   // Dobles for sømløs løkke
   const track = document.getElementById("projTrack");
   track.innerHTML = html + html;
-  // Stopp animasjon hvis få prosjekter
+  // Rull sakte: ca. 3,5 sek per prosjekt, minst 60 sek for hele runden
+  track.style.animationDuration = Math.max(60, projects.length * 3.5) + "s";
   track.style.animationPlayState = projects.length > 6 ? "running" : "paused";
 }
 
@@ -194,8 +196,89 @@ async function load() {
 document.getElementById("refreshBtn").addEventListener("click", async () => {
   document.getElementById("updated").textContent = "Henter ferske tall …";
   await fetch("/api/refresh", { method: "POST" });
+  economyLoaded = false;
   load();
+  if (document.getElementById("panel-okonomi").classList.contains("active")) loadEconomy(true);
 });
+
+/* ---- Økonomi-fane (lazy-lastet ved første åpning) ---- */
+let economyLoaded = false, ecoTrendChart;
+const cls = (n) => (n < 0 ? "neg" : "pos");
+function plRow(label, value, { total = false, sub = false, color = false } = {}) {
+  const c = `pl-row ${total ? "total" : ""} ${sub ? "sub" : ""}`;
+  const vc = color ? cls(value) : "";
+  return `<div class="${c}"><span class="lbl">${label}</span><span class="val ${vc}">${nok(value)}</span></div>`;
+}
+
+function renderEconomy(d) {
+  document.getElementById("ecoYear").textContent = d.period.yearLabel;
+  const pl = (r) =>
+    plRow("Driftsinntekter", r.revenue) +
+    plRow("Driftskostnader", r.opex) +
+    plRow("Driftsresultat", r.operatingResult, { total: true, color: true }) +
+    plRow("Finansposter", r.finance) +
+    plRow("Resultat før skatt (EBT)", r.ebt, { total: true, color: true });
+  document.getElementById("ecoResYTD").innerHTML = pl(d.resultYTD);
+  document.getElementById("ecoResLTM").innerHTML = pl(d.resultLTM);
+
+  const b = d.balance;
+  document.getElementById("ecoBalance").innerHTML =
+    plRow("Sum eiendeler", b.assets, { total: false }) +
+    plRow("herav bankinnskudd", b.bank, { sub: true, color: true }) +
+    plRow("herav kundefordringer", b.receivables, { sub: true }) +
+    plRow("Egenkapital", b.equity) +
+    plRow("Gjeld", b.liabilities) +
+    plRow("herav leverandørgjeld", b.supplierDebt, { sub: true });
+
+  const q = d.liquidity;
+  document.getElementById("ecoLiq").innerHTML =
+    plRow("Bankinnskudd", q.bank, { color: true }) +
+    plRow("+ Kundefordringer", q.receivables) +
+    plRow("− Leverandørgjeld", q.supplierDebt) +
+    plRow("= Netto likviditet", q.net, { total: true, color: true });
+
+  // Trend: inntekter (søyler) + EBT (linje)
+  const ctx = document.getElementById("ecoTrend");
+  const data = {
+    labels: d.trend.map((t) => t.label),
+    datasets: [
+      { type: "bar", label: "Sum inntekter", data: d.trend.map((t) => t.revenue), backgroundColor: css("--accent"), borderRadius: 5, order: 2 },
+      { type: "line", label: "EBT", data: d.trend.map((t) => t.ebt), borderColor: css("--ink"), backgroundColor: css("--ink"), tension: 0.3, order: 1 },
+    ],
+  };
+  const opts = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: css("--muted") } }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${nok(c.raw)}` } } },
+    scales: { x: { ticks: { color: css("--muted") }, grid: { display: false } },
+      y: { ticks: { color: css("--muted"), callback: (v) => nokShort(v) }, grid: { color: css("--grid") } } },
+  };
+  if (ecoTrendChart) { ecoTrendChart.data = data; ecoTrendChart.update(); }
+  else ecoTrendChart = new Chart(ctx, { type: "bar", data, options: opts });
+
+  fillTable("ecoUtil",
+    [{ label: "Ansatt" }, { label: "Timer", num: true }, { label: "Fakturerbart", num: true }, { label: "Faktureringsgrad", num: true }, { label: "Utilization", num: true }],
+    d.utilization.map((u) => [esc(u.name), num(u.hours), num(u.billable), pct(u.billingRate), pct(u.utilization)]),
+    "Ingen timer ført i år.");
+}
+
+async function loadEconomy(force = false) {
+  if (economyLoaded && !force) return;
+  const status = document.getElementById("ecoStatus");
+  const content = document.getElementById("ecoContent");
+  status.hidden = false; status.textContent = "Laster økonomi … (henter regnskapstall, kan ta noen sekunder)";
+  content.hidden = true;
+  try {
+    const res = await fetch("/api/economy");
+    if (res.status === 401) { location.href = "/login"; return; }
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Feil ${res.status}`); }
+    const d = await res.json();
+    renderEconomy(d);
+    economyLoaded = true;
+    status.hidden = true; content.hidden = false;
+  } catch (err) {
+    status.hidden = false; status.textContent = "Kunne ikke hente økonomi: " + err.message;
+  }
+}
 
 tickClock();
 setInterval(tickClock, 1000);
