@@ -115,6 +115,9 @@ body { margin: 0; background: var(--bg); color: var(--text); font-size: 15px; -w
 .card h2 { margin: 0 0 16px; font-size: 14px; font-weight: 700; color: var(--text); letter-spacing: .2px;
   display: flex; align-items: center; gap: 8px; }
 .subnote { font-weight: 400; color: var(--muted); font-size: 12px; }
+.card-chart { align-self: start; }
+.chart-box { position: relative; height: 300px; }
+.chart-box canvas { position: absolute; inset: 0; }
 .count-chip { background: var(--mint); color: var(--accent-dark); font-size: 12px; font-weight: 700;
   padding: 2px 9px; border-radius: 999px; }
 
