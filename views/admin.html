@@ -49,6 +49,16 @@
           <input id="heroImageUrl" name="heroImageUrl" placeholder="https://…" />
           <div class="hint">Bildet som vises som banner. Standard er bygg-bildet fra byggkon.no.</div>
         </div>
+        <div class="field">
+          <label>Firmalogo (vises i toppen)</label>
+          <div id="logoPreviewWrap" class="logo-preview" hidden><img id="logoPreview" alt="Logo" /></div>
+          <div class="org-actions" style="flex-wrap:wrap">
+            <input id="logoFile" type="file" accept="image/*" />
+            <button type="button" id="logoUpload" class="btn-ghost">Last opp logo</button>
+            <span id="logoMsg" class="hint"></span>
+          </div>
+          <div class="hint">PNG/SVG med gjennomsiktig bakgrunn fungerer best. Maks 4 MB. Når en logo er lastet opp, vises den i stedet for «BYGG-KON»-teksten i toppen.</div>
+        </div>
 
         <div class="section-title">Firmaopplysninger</div>
         <div class="field"><label for="companyOrgNr">Organisasjonsnummer</label><input id="companyOrgNr" name="companyOrgNr" /></div>

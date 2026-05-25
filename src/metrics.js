@@ -261,6 +261,7 @@ export async function buildOverview() {
     display: {
       birthdays: { today: bdayToday, inWeek: bdayInWeek },
       companyName: cfg.companyName,
+      logoUrl: cfg.logoUrl || "",
       heroImageUrl: cfg.heroImageUrl,
       refreshSeconds: cfg.refreshSeconds,
       weeklyCapacityHours: cfg.weeklyCapacityHours,

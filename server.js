@@ -384,6 +384,23 @@ app.post("/api/refresh", requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ---- Firmalogo (admin laster opp, vises i toppen) ----
+app.post("/api/admin/upload-logo", requireAdmin, (req, res) => {
+  try {
+    const m = /^data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);base64,(.+)$/i.exec(req.body?.dataUrl || "");
+    if (!m) return res.status(400).json({ error: "Ugyldig bilde. Last opp PNG, JPG, WEBP, GIF eller SVG." });
+    const ext = m[1].toLowerCase().replace("jpeg", "jpg").replace("svg+xml", "svg");
+    const buf = Buffer.from(m[2], "base64");
+    if (buf.length > 4 * 1024 * 1024) return res.status(400).json({ error: "Logoen er for stor (maks 4 MB)." });
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    for (const e of ["png", "jpg", "webp", "gif", "svg"]) { try { fs.unlinkSync(path.join(UPLOAD_DIR, `logo.${e}`)); } catch {} }
+    fs.writeFileSync(path.join(UPLOAD_DIR, `logo.${ext}`), buf);
+    const logoUrl = "/uploads/logo." + ext + "?v=" + Date.now();
+    saveConfig({ logoUrl });
+    res.json({ ok: true, logoUrl });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
 // ---- HR / plantegninger (flere kontorer) med ansatt-pins ----
 app.get("/api/hr", requireAuth, (req, res) => {
   res.json({ floorplans: getConfig().floorplans || [] });

@@ -29,6 +29,25 @@
     track.style.animationPlayState = projects.length > 6 ? "running" : "paused";
   }
 
+  function renderFocus(focus) {
+    const track = document.getElementById("dsFocusTrack");
+    if (!track) return;
+    focus = focus || [];
+    if (!focus.length) { track.innerHTML = `<div class="empty" style="padding:14px">Ingen timer ført siste 2 uker.</div>`; track.style.animation = "none"; return; }
+    const item = (e) => {
+      const projs = (e.projects || []).map((p, i) => `<div class="focus-proj${i === 0 ? " top" : ""}"><span class="fp-name">${esc(p.name)}${p.customer ? ` · <span class="fp-cust">${esc(p.customer)}</span>` : ""}</span><span class="fp-hours">${num(p.hours)} t</span></div>`).join("");
+      return `<div class="focus-item"><div class="focus-head"><span class="focus-name">${esc(e.name)}</span><span class="focus-tot">${num(e.totalHours)} t</span></div><div class="focus-projs">${projs}</div></div>`;
+    };
+    const html = focus.map(item).join("");
+    track.innerHTML = html + html;
+    track.style.animation = "";
+    track.style.animationDuration = Math.max(60, focus.length * 5) + "s";
+    track.style.animationPlayState = focus.length > 4 ? "running" : "paused";
+  }
+  async function refreshFocus() {
+    try { const d = await (await fetch("/api/overview")).json(); renderFocus(d.employeeFocus); } catch {}
+  }
+
   function renderPins(projects) {
     if (!map || !markers) return;
     markers.clearLayers();
@@ -76,7 +95,7 @@
       loaded = true;
       initMap();
       // Leaflet trenger synlig container for riktig størrelse
-      setTimeout(() => { if (map) map.invalidateSize(); refresh(); }, 120);
+      setTimeout(() => { if (map) map.invalidateSize(); refresh(); refreshFocus(); }, 120);
       setInterval(clock, 1000); clock();
     } else if (map) {
       setTimeout(() => map.invalidateSize(), 120);

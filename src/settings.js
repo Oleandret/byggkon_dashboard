@@ -27,6 +27,7 @@ function defaultCompetence() {
 function defaults() {
   return {
     companyName: process.env.COMPANY_NAME || "BYGG-KON",
+    logoUrl: process.env.LOGO_URL || "",
     heroImageUrl:
       process.env.HERO_IMAGE_URL ||
       "https://cdn.prod.website-files.com/6971dca24ade29a12176f9bf/69bd3f133cccc0a691865253_Travbaneveien3-8.jpg",
@@ -340,6 +341,7 @@ export function getConfigForAdmin() {
     companyWebsite: c.companyWebsite,
     values: c.values || [],
     departments: c.departments || [],
+    logoUrl: c.logoUrl || "",
     hasMcpUrl: Boolean(c.regnskapsagentMcpUrl),
     hasDashboardPassword: Boolean(c.dashboardPassword),
     weeklyCapacityHours: c.weeklyCapacityHours,

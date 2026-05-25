@@ -513,6 +513,11 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 
 #updated.stale { color: var(--bad); font-weight: 600; }
 
+/* ---- Firmalogo i toppen ---- */
+.brand-logo { height: 34px; width: auto; max-width: 220px; object-fit: contain; display: block; }
+.logo-preview { margin-bottom: 8px; }
+.logo-preview img { max-height: 60px; max-width: 240px; object-fit: contain; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
+
 /* ---- Sidemeny: grupper ---- */
 .nav-group { margin-bottom: 4px; }
 .nav-group-head { width: 100%; text-align: left; background: transparent; border: 0; cursor: pointer;
@@ -573,10 +578,12 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .ds-sub { margin: 4px 0 0; color: var(--muted); }
 .ds-clock { font-size: 16px; font-weight: 700; color: var(--accent-dark); text-transform: capitalize; }
 .ds-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items: stretch; }
-@media (max-width: 900px) { .ds-grid { grid-template-columns: 1fr; } }
+.ds-grid-3 { grid-template-columns: 1fr 2fr 1fr; }
+@media (max-width: 1100px) { .ds-grid-3 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 900px) { .ds-grid, .ds-grid-3 { grid-template-columns: 1fr; } }
 .ds-map { height: 560px; border-radius: 10px; overflow: hidden; z-index: 0; }
 .ds-map-card { display: flex; flex-direction: column; }
-.ds-scroll-card .marquee.marquee-tall { height: 560px; }
+.ds-scroll-card .marquee.marquee-tall, .ds-side .marquee.marquee-tall { height: 560px; }
 .leaflet-container { font: inherit; }
 
 /* ---- Onboarding: lenker + personalhåndbok ---- */

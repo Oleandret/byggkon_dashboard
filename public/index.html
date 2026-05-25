@@ -17,6 +17,7 @@
     <button id="menuToggle" class="btn-ghost menu-btn" title="Meny">☰</button>
     <div class="brand-area">
       <div class="brand">
+        <img id="brandLogo" class="brand-logo" alt="" hidden />
         <span class="brand-mark" id="brandName">BYGG-KON</span>
         <span class="brand-sub">Sanntidsoversikt</span>
         <button id="driftLink" class="brand-link" title="Til driftssentralen">Driftssentral sanntid ↗</button>
@@ -247,13 +248,19 @@
         </div>
         <div class="ds-clock" id="dsClock"></div>
       </div>
-      <div class="ds-grid">
+      <div class="ds-grid ds-grid-3">
+        <div class="card scroll-card ds-side">
+          <h2>Hva jobber hver ansatt med? <span class="subnote">siste 2 uker</span></h2>
+          <div class="marquee marquee-tall" id="dsFocusMarquee">
+            <div class="marquee-track" id="dsFocusTrack"></div>
+          </div>
+        </div>
         <div class="card ds-map-card">
           <h2>Prosjektkart <span class="subnote">siste 8 uker</span></h2>
           <div id="dsMap" class="ds-map"></div>
           <p class="subnote" id="dsMapNote">Pins plasseres ut fra prosjektnavn/sted. Noen prosjekter uten gjenkjennbart sted vises kun i lista.</p>
         </div>
-        <div class="card scroll-card ds-scroll-card">
+        <div class="card scroll-card ds-side">
           <h2>Aktive prosjekter <span class="count-chip" id="dsProjCount"></span></h2>
           <div class="marquee marquee-tall" id="dsMarquee">
             <div class="marquee-track" id="dsTrack"></div>

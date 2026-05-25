@@ -27,8 +27,32 @@ async function loadSettings() {
   const dt = document.getElementById("departmentsText");
   if (dt) dt.value = (s.departments || []).join("\n");
   renderMcp(s.mcpServers || []);
+  const lp = document.getElementById("logoPreview"), lpw = document.getElementById("logoPreviewWrap");
+  if (lp && s.logoUrl) { lp.src = s.logoUrl; lpw.hidden = false; } else if (lpw) { lpw.hidden = true; }
   document.getElementById("settingsPath").textContent = "Lagringssti: " + (s.settingsPath || "");
 }
+
+// ---- Logo-opplasting ----
+const logoBtn = document.getElementById("logoUpload");
+if (logoBtn) logoBtn.addEventListener("click", () => {
+  const f = document.getElementById("logoFile").files[0];
+  const msg = document.getElementById("logoMsg");
+  if (!f) { msg.textContent = "Velg en bildefil først."; return; }
+  if (f.size > 4 * 1024 * 1024) { msg.textContent = "Logoen er for stor (maks 4 MB)."; return; }
+  msg.textContent = "Laster opp …";
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const res = await fetch("/api/admin/upload-logo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataUrl: reader.result }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Opplasting feilet");
+      const lp = document.getElementById("logoPreview"), lpw = document.getElementById("logoPreviewWrap");
+      lp.src = d.logoUrl; lpw.hidden = false;
+      msg.textContent = "✓ Lastet opp og lagret. Vises i toppen på dashbordet.";
+    } catch (e) { msg.textContent = "Feil: " + e.message; }
+  };
+  reader.readAsDataURL(f);
+});
 
 // ---- MCP-servere ----
 const esc = (x) => String(x ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));

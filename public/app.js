@@ -303,6 +303,21 @@ function renderHero(d) {
     document.getElementById("heroTitle").textContent = d.display.companyName;
     document.getElementById("brandName").textContent = d.display.companyName;
   }
+  // Firmalogo i toppen (erstatter tekst-merket hvis lastet opp)
+  const logo = document.getElementById("brandLogo");
+  if (logo) {
+    if (d.display?.logoUrl) {
+      logo.src = d.display.logoUrl;
+      logo.alt = d.display.companyName || "Logo";
+      logo.hidden = false;
+      const bn = document.getElementById("brandName");
+      if (bn) bn.hidden = true;
+    } else {
+      logo.hidden = true;
+      const bn = document.getElementById("brandName");
+      if (bn) bn.hidden = false;
+    }
+  }
   const chips = [
     { label: "Omsetning i år", value: nok(k.revenueYTD) },
     { label: "Utestående", value: nok(k.outstandingTotal), cls: k.overdueTotal > 0 ? "warn" : "" },
