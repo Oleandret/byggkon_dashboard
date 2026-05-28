@@ -75,6 +75,7 @@ function defaults() {
     hrRequests: [],
     hrDocs: [],
     ledelseFiles: { likviditet: {}, rapport: {}, resultat: {}, budsjett: {} },
+    ledelseAdjustments: { likviditet: [], resultat: [], budsjett: [] }, // { slot: [{month, label, amount, note}] }
     mcpServers: [],
     itSystems: defaultItSystems(),
     departmentMembers: {},

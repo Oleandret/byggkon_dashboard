@@ -1089,3 +1089,55 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .sm-agr-del:hover { background: var(--bad-bg); color: var(--bad); }
 .sm-agr-upload { padding: 4px 10px; font-size: 13px; }
 .sm-agr-upload:hover { background: var(--accent); color: #fff; }
+
+/* ============ VERKTØY (BIM/CAD/GIS) ============ */
+.bim-sub { display: block; }
+.bim-sub[hidden] { display: none; }
+.bim-viewer-card { padding-bottom: 12px; }
+.bim-stage { display: grid; grid-template-columns: 280px 1fr; gap: 12px; height: 580px; }
+.bim-tree { background: #faf8f4; border: 1px solid var(--border); border-radius: 8px; padding: 10px; overflow: auto; font-size: 12.5px; }
+.bim-canvas-wrap { position: relative; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: linear-gradient(180deg, #f0f3f7, #d8dde4); }
+.bim-canvas-wrap canvas { width: 100%; height: 100%; display: block; }
+.bim-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.75); }
+.bim-empty { text-align: center; color: var(--muted); }
+.bim-empty p { margin-top: 8px; font-size: 14px; }
+.bim-info { position: absolute; top: 10px; right: 10px; max-width: 280px; background: rgba(255,255,255,.96); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+.bim-info:empty { display: none; }
+.bim-info-title { font-weight: 700; margin-bottom: 6px; font-size: 13px; }
+.bim-info-row { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+.bim-info-row span { color: var(--muted); }
+.bim-tips { margin: 6px 0 8px; padding-left: 20px; font-size: 13px; line-height: 1.6; }
+@media (max-width: 900px) { .bim-stage { grid-template-columns: 1fr; height: auto; } .bim-canvas-wrap { height: 420px; } }
+
+.prog-head { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+.prog-ico { width: 56px; height: 56px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,.1); }
+.prog-list { margin: 6px 0 12px; padding-left: 20px; line-height: 1.6; }
+.prog-list li { margin: 2px 0; }
+.prog-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.prog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 12px; }
+.prog-card { background: #faf8f4; border: 1px solid var(--border); border-radius: 10px; padding: 14px; text-align: center; }
+.prog-card .prog-ico { margin: 0 auto 8px; width: 48px; height: 48px; font-size: 15px; }
+.prog-card h3 { margin: 4px 0 6px; font-size: 14px; }
+.prog-card .subnote { margin-bottom: 10px; min-height: 32px; }
+.prog-card .btn-ghost { font-size: 12px; padding: 5px 12px; }
+
+/* ============ KODE-SNIPPET ============ */
+.code-snip { background: #1e1f22; color: #d6d6d6; font-family: ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Code", monospace; font-size: 12.5px; padding: 12px 16px; border-radius: 8px; overflow-x: auto; line-height: 1.5; margin: 10px 0; white-space: pre; }
+
+/* ============ LEDELSE: AUTO-DATA TABELLER ============ */
+.led-auto-table { font-size: 13px; }
+.auto-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 14px; }
+.auto-tbl th, .auto-tbl td { padding: 7px 10px; border-bottom: 1px solid var(--border); }
+.auto-tbl th { font-weight: 700; background: #faf8f4; font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; text-align: left; }
+.auto-tbl td.num, .auto-tbl th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.auto-tbl .num.neg { color: var(--bad); }
+.auto-tbl tbody tr:hover { background: #fafafa; }
+.adj-box { background: #faf8f4; border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-top: 6px; }
+.adj-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.adj-head h3 { flex: 1; }
+.adj-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.adj-tbl th { font-weight: 700; font-size: 11px; color: var(--muted); padding: 5px 7px; text-transform: uppercase; letter-spacing: .03em; text-align: left; background: #fff; }
+.adj-tbl td { padding: 5px 7px; border-bottom: 1px solid var(--border); background: #fff; }
+.adj-tbl td.num { text-align: right; }
+.adj-tbl .kon-f { width: 100%; padding: 4px 7px; font-size: 12px; border: 1px solid var(--border); border-radius: 5px; }
+.adj-tbl .kon-f.num { text-align: right; }

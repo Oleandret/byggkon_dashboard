@@ -54,6 +54,7 @@
           <button class="tab" data-tab="prosjektmoter">Prosjektmøter</button>
           <button class="tab" data-tab="fagmoter">Fagmøter</button>
           <button class="tab" data-tab="avdelinger">Avdelinger</button>
+          <button class="tab" data-tab="bim">Verktøy</button>
         </div>
       </div>
       <div class="nav-group">
@@ -1064,6 +1065,271 @@
     </main>
   </section>
 
+  <!-- ============ FANE: VERKTØY (BIM/CAD/GIS) ============ -->
+  <section class="tab-panel" id="panel-bim">
+    <main class="container">
+      <div class="page-intro"><span class="pi-ico">🧰</span><span class="pi-txt"><b>Hva siden gjør:</b> Samler BIM-, CAD- og GIS-verktøyene vi bruker og anbefaler. <b>Hensikt:</b> Rask tilgang til viewer, programlenker og open-source-alternativer som funker for konstruksjon, arkitektur og kart.</span></div>
+
+      <div class="subtabs" id="bimSubtabs">
+        <button class="subtab active" data-bsub="viewer">🏗️ BIM-viewer</button>
+        <button class="subtab" data-bsub="freecad">📐 FreeCAD</button>
+        <button class="subtab" data-bsub="qgis">🗺️ QGIS</button>
+        <button class="subtab" data-bsub="blender">🎨 Blender / BonsaiBIM</button>
+        <button class="subtab" data-bsub="ifcjs">🌐 IFC.js / That Open</button>
+        <button class="subtab" data-bsub="openfoam">💨 OpenFOAM</button>
+        <button class="subtab" data-bsub="proprietar">🏢 Proprietære</button>
+      </div>
+
+      <!-- BIM-viewer (xeokit) -->
+      <div class="bim-sub active" id="bsub-viewer">
+        <div class="card">
+          <div class="proj-head">
+            <h2>BIM-modeller (in-browser)</h2>
+            <div class="org-actions">
+              <input type="file" id="bimFile" accept=".ifc,.xkt,.gltf,.glb" hidden />
+              <button id="bimUpload" class="btn-ghost">⬆ Last opp IFC / glTF</button>
+              <select id="bimSelect" class="search" style="max-width:280px"></select>
+              <button id="bimReload" class="btn-ghost" title="Oppdater liste">↻</button>
+              <button id="bimDelete" class="btn-ghost" title="Slett valgt modell">🗑</button>
+            </div>
+          </div>
+          <p class="subnote">Støtter <b>IFC</b> (web-ifc), <b>glTF/GLB</b> og <b>xkt</b>. For store IFC-er (&gt; 50 MB) konverter til xkt først.</p>
+          <div id="bimStatus" class="subnote" style="margin-top:6px"></div>
+        </div>
+
+        <div class="card bim-viewer-card">
+          <div class="proj-head">
+            <h3 id="bimTitle" style="margin:0">Ingen modell lastet</h3>
+            <div class="org-actions">
+              <button id="bimFit" class="btn-ghost" title="Tilpass kamera">⤢ Fit</button>
+              <button id="bimWire" class="btn-ghost" title="Wireframe på/av">▦ Wireframe</button>
+              <button id="bimReset" class="btn-ghost" title="Tilbakestill">↺ Reset</button>
+            </div>
+          </div>
+          <div class="bim-stage">
+            <div id="bimTree" class="bim-tree">
+              <div class="subnote">Trestruktur kommer her etter at en modell er lastet.</div>
+            </div>
+            <div id="bimCanvasWrap" class="bim-canvas-wrap">
+              <canvas id="bimCanvas"></canvas>
+              <div id="bimOverlay" class="bim-overlay">
+                <div class="bim-empty">
+                  <div style="font-size:48px">🏗️</div>
+                  <p>Last opp en IFC- eller glTF-modell for å starte.</p>
+                </div>
+              </div>
+              <div id="bimInfo" class="bim-info"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin-top:0">Hurtigtaster</h3>
+          <ul class="bim-tips">
+            <li><b>Venstre mus:</b> roter</li>
+            <li><b>Høyre/midt-klikk:</b> pan</li>
+            <li><b>Scroll:</b> zoom</li>
+            <li><b>Klikk:</b> vis IFC-info</li>
+          </ul>
+          <p class="subnote">Drevet av xeokit-sdk. Alt kjører lokalt i nettleseren.</p>
+        </div>
+      </div>
+
+      <!-- FreeCAD -->
+      <div class="bim-sub" id="bsub-freecad" hidden>
+        <div class="card">
+          <div class="prog-head">
+            <div class="prog-ico" style="background:#cb0d0c;color:#fff">FC</div>
+            <div>
+              <h2 style="margin:0">FreeCAD <span class="subnote">— open source parametrisk CAD/BIM</span></h2>
+              <p class="subnote" style="margin:4px 0 0">LGPL-lisens · Windows, macOS, Linux · IFC-import/eksport via Arch- og BIM-workbenchene.</p>
+            </div>
+          </div>
+          <p>FreeCAD er gratis og bra for parametrisk modellering, mekaniske detaljer, betongarmering og generell 3D-konstruksjon. Med <b>BIM-workbench</b> (innebygd fra v1.0) kan du modellere bygg på linje med Revit, og eksportere til IFC for samspill med ARK/RIB.</p>
+          <h3>Bra til</h3>
+          <ul class="prog-list">
+            <li>Detaljerte konstruksjonselementer og forskaling</li>
+            <li>Armeringstegninger (ArchRebar / NativeIFC)</li>
+            <li>Parametriske komponenter som kan gjenbrukes</li>
+            <li>Konvertering mellom IFC, STEP, DXF, glTF</li>
+          </ul>
+          <div class="prog-actions">
+            <a class="btn-primary" href="https://www.freecad.org/downloads.php" target="_blank" rel="noopener">⬇ Last ned FreeCAD</a>
+            <a class="btn-ghost" href="https://wiki.freecad.org/BIM_Workbench" target="_blank" rel="noopener">BIM-workbench dokumentasjon</a>
+            <a class="btn-ghost" href="https://forum.freecad.org" target="_blank" rel="noopener">Forum / support</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- QGIS -->
+      <div class="bim-sub" id="bsub-qgis" hidden>
+        <div class="card">
+          <div class="prog-head">
+            <div class="prog-ico" style="background:#589632;color:#fff">QG</div>
+            <div>
+              <h2 style="margin:0">QGIS <span class="subnote">— gratis geoinformasjonssystem</span></h2>
+              <p class="subnote" style="margin:4px 0 0">GPLv2 · Windows, macOS, Linux · Norske kartdata fra Kartverket, Geonorge, kommune-WMS.</p>
+            </div>
+          </div>
+          <p>QGIS er førstevalget for å jobbe med kart, eiendomsgrenser, høydedata og soneplaner. Bra alternativ (og ofte bedre) enn proprietære ArcGIS-løsninger. Kan koble seg direkte mot WMS/WFS fra Kartverket, Geonorge og kommuner.</p>
+          <h3>Bra til</h3>
+          <ul class="prog-list">
+            <li>Tomte- og eiendomsanalyse (Matrikkel via Kartverket)</li>
+            <li>Reguleringsplaner og kommuneplaner</li>
+            <li>Høydedata, DTM/DOM (laser fra Geonorge)</li>
+            <li>Egne kartfremstillinger og rapporter</li>
+            <li>Eksport til DXF/DWG for videre arbeid i CAD</li>
+          </ul>
+          <div class="prog-actions">
+            <a class="btn-primary" href="https://qgis.org/en/site/forusers/download.html" target="_blank" rel="noopener">⬇ Last ned QGIS</a>
+            <a class="btn-ghost" href="https://kartkatalog.geonorge.no" target="_blank" rel="noopener">Geonorge kartkatalog</a>
+            <a class="btn-ghost" href="https://www.geonorge.no/aktuelt/om-geonorge/etablere-tjenester/qgis-og-wms-tjenester/" target="_blank" rel="noopener">QGIS + WMS-guide (Geonorge)</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Blender / BonsaiBIM -->
+      <div class="bim-sub" id="bsub-blender" hidden>
+        <div class="card">
+          <div class="prog-head">
+            <div class="prog-ico" style="background:#f5792a;color:#fff">BL</div>
+            <div>
+              <h2 style="margin:0">Blender + BonsaiBIM <span class="subnote">— open source modellering med native IFC</span></h2>
+              <p class="subnote" style="margin:4px 0 0">GPL · Windows, macOS, Linux · Native IFC via BonsaiBIM-addon (tidligere BlenderBIM).</p>
+            </div>
+          </div>
+          <p>Blender + <b>BonsaiBIM</b> gir åpen og kraftig BIM-modellering med native IFC-støtte — alt du modellerer er IFC, ikke et eget format. Bra alternativ til Revit hvis du vil unngå abonnement, eller for visualisering og animasjon av prosjekter.</p>
+          <h3>Bra til</h3>
+          <ul class="prog-list">
+            <li>Native IFC-modellering uten konvertering</li>
+            <li>Visualisering, rendering og animasjon</li>
+            <li>Punktskybehandling (laserskanning)</li>
+            <li>Modellsjekk og clash-deteksjon</li>
+          </ul>
+          <div class="prog-actions">
+            <a class="btn-primary" href="https://www.blender.org/download/" target="_blank" rel="noopener">⬇ Last ned Blender</a>
+            <a class="btn-ghost" href="https://bonsaibim.org" target="_blank" rel="noopener">BonsaiBIM-addon</a>
+            <a class="btn-ghost" href="https://docs.bonsaibim.org" target="_blank" rel="noopener">Dokumentasjon</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- IFC.js / That Open -->
+      <div class="bim-sub" id="bsub-ifcjs" hidden>
+        <div class="card">
+          <div class="prog-head">
+            <div class="prog-ico" style="background:#2b6eb8;color:#fff">TO</div>
+            <div>
+              <h2 style="margin:0">That Open Engine <span class="subnote">— rammeverk for å bygge BIM-apper i nettleseren</span></h2>
+              <p class="subnote" style="margin:4px 0 0">MIT · JavaScript/TypeScript · Brukt av Speckle, BonsaiBIM m.fl.</p>
+            </div>
+          </div>
+          <p>Tidligere kjent som <b>IFC.js</b>. Moderne, modulært rammeverk basert på three.js og web-ifc. Bra hvis du vil bygge egne web-apper rundt IFC-data, f.eks. koble Bygg-Kon-prosjekter mot Tripletex eller KS-systemet.</p>
+          <h3>Bra til</h3>
+          <ul class="prog-list">
+            <li>Custom BIM-dashboards på web</li>
+            <li>Integrasjon mot interne systemer</li>
+            <li>Property-uthenting og attributtanalyse</li>
+            <li>Lett å embed i eksisterende nettsider</li>
+          </ul>
+          <div class="prog-actions">
+            <a class="btn-primary" href="https://thatopen.com" target="_blank" rel="noopener">↗ thatopen.com</a>
+            <a class="btn-ghost" href="https://github.com/ThatOpen/engine_components" target="_blank" rel="noopener">GitHub: engine_components</a>
+            <a class="btn-ghost" href="https://docs.thatopen.com" target="_blank" rel="noopener">Dokumentasjon</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- OpenFOAM -->
+      <div class="bim-sub" id="bsub-openfoam" hidden>
+        <div class="card">
+          <div class="prog-head">
+            <div class="prog-ico" style="background:#1a5d8a;color:#fff">OF</div>
+            <div>
+              <h2 style="margin:0">OpenFOAM <span class="subnote">— open source CFD (numerisk strømningsmekanikk)</span></h2>
+              <p class="subnote" style="margin:4px 0 0">GPLv3 · Linux/macOS/Windows (WSL) · Foundation-versjonen (openfoam.org) og ESI-versjonen (openfoam.com).</p>
+            </div>
+          </div>
+          <p>OpenFOAM løser strømnings-, varme- og partikkelproblemer numerisk. For et rådgivende konstruksjonsfirma er det relevant for vindanalyse på fasader, komfort rundt bygg, røyk-/brannspredning i RIBr-prosjekter, og termisk simulering. Krever Linux-kompetanse, men ParaView (også åpen kildekode) brukes for visualisering.</p>
+          <h3>Bra til</h3>
+          <ul class="prog-list">
+            <li>Vindlast og fasadekrefter (NS-EN 1991-1-4 verifikasjon)</li>
+            <li>Vindkomfort i bymiljø (Davenport, Lawson-kriterier)</li>
+            <li>Røyk- og brannspredning (FireFOAM / fireFoam)</li>
+            <li>Termisk innemiljø, naturlig ventilasjon</li>
+            <li>HVAC- og rørstrømsoppgaver</li>
+          </ul>
+          <div class="prog-actions">
+            <a class="btn-primary" href="https://openfoam.org/download/" target="_blank" rel="noopener">⬇ Last ned OpenFOAM</a>
+            <a class="btn-ghost" href="https://github.com/OpenFOAM/OpenFOAM-12" target="_blank" rel="noopener">GitHub: OpenFOAM-12</a>
+            <a class="btn-ghost" href="https://cfd.direct/openfoam/user-guide/" target="_blank" rel="noopener">User Guide</a>
+            <a class="btn-ghost" href="https://www.paraview.org" target="_blank" rel="noopener">ParaView (visualisering)</a>
+          </div>
+          <h3 style="margin-top:14px">Kom i gang (Mac/Linux)</h3>
+          <pre class="code-snip"># macOS via Homebrew (Foundation-versjonen):
+brew install openfoam
+
+# Ubuntu/Debian (Foundation-versjonen):
+sudo sh -c "wget -O - https://dl.openfoam.org/gpg.key &gt; /etc/apt/trusted.gpg.d/openfoam.asc"
+sudo add-apt-repository http://dl.openfoam.org/ubuntu
+sudo apt update &amp;&amp; sudo apt install openfoam12
+
+# Kjør et test-case
+source /usr/lib/openfoam/openfoam12/etc/bashrc
+cp -r $FOAM_TUTORIALS/incompressible/simpleFoam/pitzDaily ~/
+cd ~/pitzDaily &amp;&amp; blockMesh &amp;&amp; simpleFoam &amp;&amp; paraFoam</pre>
+          <p class="subnote">Foundation-versjonen (openfoam.org) er den vi anbefaler — utviklet av OpenFOAM Foundation. ESI-versjonen (openfoam.com) er en parallell distribusjon fra ESI Group. Begge er open source, og caser er stort sett kompatible mellom dem.</p>
+        </div>
+      </div>
+
+      <!-- Proprietære -->
+      <div class="bim-sub" id="bsub-proprietar" hidden>
+        <div class="card">
+          <h2>Proprietære verktøy vi bruker</h2>
+          <p class="subnote">Hovedverktøyene i den daglige driften — Autodesk-stacken og spesialprogram for konstruksjon.</p>
+          <div class="prog-grid">
+            <div class="prog-card">
+              <div class="prog-ico" style="background:#0696d7;color:#fff">RV</div>
+              <h3>Revit (Autodesk)</h3>
+              <p class="subnote">Hovedverktøy for ARK og RIB. IFC-eksport for samspill.</p>
+              <a class="btn-ghost" href="https://www.autodesk.no/products/revit/overview" target="_blank" rel="noopener">Autodesk Revit ↗</a>
+            </div>
+            <div class="prog-card">
+              <div class="prog-ico" style="background:#e51e25;color:#fff">AC</div>
+              <h3>AutoCAD (Autodesk)</h3>
+              <p class="subnote">2D-tegning, DWG-arbeid, detaljer.</p>
+              <a class="btn-ghost" href="https://www.autodesk.no/products/autocad/overview" target="_blank" rel="noopener">AutoCAD ↗</a>
+            </div>
+            <div class="prog-card">
+              <div class="prog-ico" style="background:#1f6efb;color:#fff">FC</div>
+              <h3>Focus Konstruksjon</h3>
+              <p class="subnote">Bjelker, søyler, NS-EN 1992/1993-dimensjonering.</p>
+              <a class="btn-ghost" href="https://www.focus.no" target="_blank" rel="noopener">focus.no ↗</a>
+            </div>
+            <div class="prog-card">
+              <div class="prog-ico" style="background:#666;color:#fff">SC</div>
+              <h3>StatCon</h3>
+              <p class="subnote">Konstruksjonsstatikk og rammeanalyse.</p>
+              <a class="btn-ghost" href="https://www.statcon.no" target="_blank" rel="noopener">statcon.no ↗</a>
+            </div>
+            <div class="prog-card">
+              <div class="prog-ico" style="background:#003f7e;color:#fff">SO</div>
+              <h3>Sletten</h3>
+              <p class="subnote">Boligprosjektering, plan/snitt-tegninger.</p>
+              <a class="btn-ghost" href="https://www.sletten-ramme.no" target="_blank" rel="noopener">sletten ↗</a>
+            </div>
+            <div class="prog-card">
+              <div class="prog-ico" style="background:#222;color:#fff">RH</div>
+              <h3>Rhino / Grasshopper</h3>
+              <p class="subnote">Parametrisk modellering, fasader, taktekking.</p>
+              <a class="btn-ghost" href="https://www.rhino3d.com" target="_blank" rel="noopener">rhino3d.com ↗</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </section>
+
   <!-- ============ FANE: KI-AGENTER ============ -->
   <section class="tab-panel" id="panel-kiagenter">
     <main class="container">
@@ -1242,9 +1508,16 @@
         </div>
 
         <div class="led-sub" id="ledsub-likviditet">
+          <div class="card">
+            <div class="proj-head">
+              <h2>Likviditetsprognose — auto fra Tripletex</h2>
+              <button class="btn-ghost led-auto-reload" data-slot="likviditet">↻ Oppdater</button>
+            </div>
+            <p class="subnote">12 mnd framover: utestående fakturaer (inn) og leverandørgjeld (ut) gruppert per måned. Framtidige kostmåneder bruker snitt av siste 6 måneder. Bruk justeringer til høyre for å legge inn engangstilskudd, lønnsendringer, lån eller annet som påvirker likviditeten.</p>
+            <div id="ledAutoLikv" class="led-auto-table">Laster …</div>
+          </div>
           <div class="card" data-slot="likviditet">
-            <h2>Likviditetsprognose</h2>
-            <p class="subnote">Last opp siste versjon av prognosen (Excel/PDF). Lagres på server med revisjonsdato.</p>
+            <h3 style="margin-top:0">Last opp prognose-dokument <span class="subnote">(valgfritt referansedokument)</span></h3>
             <div class="led-file-view"></div>
             <div class="led-file-upload">
               <input type="date" class="kon-f led-rev" />
@@ -1272,9 +1545,11 @@
         <div class="led-sub" id="ledsub-faktgrad">
           <div class="card">
             <h2>Faktureringsgrad — ansatte</h2>
-            <p class="subnote">Utvikling siste 12 måneder per ansatt, siste 3 måneder per ansatt, og totalt siste 2 uker + siste uke.</p>
+            <p class="subnote">Utvikling siste 12 måneder per ansatt, totalt siste 6 måneder, siste 3 måneder per ansatt, og totalt siste 2 uker + siste uke.</p>
             <div id="ledBillKpi" class="kpi-grid"></div>
-            <div class="grid-2">
+            <div style="margin-top:14px"><h3 style="font-size:13px;color:var(--muted)">Siste 6 måneder — totalt for hele firmaet</h3>
+              <div class="chart-box" style="height:280px"><canvas id="ledBill6m"></canvas></div></div>
+            <div class="grid-2" style="margin-top:14px">
               <div><h3 style="font-size:13px;color:var(--muted)">Siste 12 måneder — utvikling per ansatt</h3>
                 <div class="chart-box" style="height:380px"><canvas id="ledBillTrend"></canvas></div></div>
               <div><h3 style="font-size:13px;color:var(--muted)">Siste 3 måneder — per ansatt</h3>
@@ -1285,9 +1560,16 @@
         </div>
 
         <div class="led-sub" id="ledsub-resultat">
+          <div class="card">
+            <div class="proj-head">
+              <h2>Resultatrapport — auto fra Tripletex</h2>
+              <button class="btn-ghost led-auto-reload" data-slot="resultat">↻ Oppdater</button>
+            </div>
+            <p class="subnote">Inntekter (3xxx) og driftskostnader (4000–7999) per måned siste 12 måneder, hentet fra hovedboken. Justeringer kan brukes for å bokføre engangsposter eller forventede endringer som ikke er i regnskapet ennå.</p>
+            <div id="ledAutoRes" class="led-auto-table">Laster …</div>
+          </div>
           <div class="card" data-slot="resultat">
-            <h2>Resultatrapport</h2>
-            <p class="subnote">Last opp siste resultatrapport (Excel/PDF).</p>
+            <h3 style="margin-top:0">Last opp resultatrapport <span class="subnote">(valgfritt vedlegg)</span></h3>
             <div class="led-file-view"></div>
             <div class="led-file-upload">
               <input type="date" class="kon-f led-rev" />
@@ -1299,9 +1581,16 @@
         </div>
 
         <div class="led-sub" id="ledsub-budsjett">
+          <div class="card">
+            <div class="proj-head">
+              <h2>Budsjett 12 mnd — basisestimat fra Tripletex</h2>
+              <button class="btn-ghost led-auto-reload" data-slot="budsjett">↻ Oppdater</button>
+            </div>
+            <p class="subnote">Framskriving av snitt siste 6 måneder som basis. Bruk justeringer for å legge inn planlagte prisøkninger, nye ansatte, rammeavtaler eller andre faktorer som endrer budsjettet.</p>
+            <div id="ledAutoBud" class="led-auto-table">Laster …</div>
+          </div>
           <div class="card" data-slot="budsjett">
-            <h2>Budsjett 12 måneder</h2>
-            <p class="subnote">Last opp gjeldende budsjett (Excel/PDF).</p>
+            <h3 style="margin-top:0">Last opp budsjett-dokument <span class="subnote">(valgfritt)</span></h3>
             <div class="led-file-view"></div>
             <div class="led-file-upload">
               <input type="date" class="kon-f led-rev" />
@@ -1422,5 +1711,6 @@
   <script src="/mktcontacts.js"></script>
   <script src="/social.js"></script>
   <script src="/rib.js"></script>
+  <script type="module" src="/bim.js"></script>
 </body>
 </html>

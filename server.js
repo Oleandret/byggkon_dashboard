@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 import { buildOverview } from "./src/metrics.js";
 import { buildEconomy } from "./src/economy.js";
 import { getNewsFeed } from "./src/newsfeed.js";
-import { clearCache, resetClient, getInvoices, getCustomers, getSupplierInvoices, getSupplierInvoiceDetails, getSuppliers, getForwardableInvoices, getProjects, getProjectAddresses, getTimeEntries, getEmployees, getProjectsEconomyDetails, ymd } from "./src/tripletex.js";
+import { clearCache, resetClient, getInvoices, getCustomers, getSupplierInvoices, getSupplierInvoiceDetails, getSuppliers, getForwardableInvoices, getProjects, getProjectAddresses, getTimeEntries, getEmployees, getProjectsEconomyDetails, getAccounts, getBalanceSheet, ymd } from "./src/tripletex.js";
 import { geocodeOne, sleep } from "./src/geocode.js";
 import { serveWithSnapshot, expireSnapshots } from "./src/snapshot.js";
 const snapTtl = () => getConfig().cacheTtlMs || 300000;
@@ -703,6 +703,58 @@ app.post("/api/suppliermeta", requireAuth, (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
+// ---- BIM-modeller (in-browser viewer) ----
+const BIM_DIR = path.join(UPLOAD_DIR, "bim");
+function bimSize(bytes) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + " kB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+app.get("/api/bim/models", requireAuth, (req, res) => {
+  try {
+    fs.mkdirSync(BIM_DIR, { recursive: true });
+    const files = fs.readdirSync(BIM_DIR).filter((f) => /\.(ifc|xkt|gltf|glb)$/i.test(f));
+    const models = files.map((f) => {
+      const st = fs.statSync(path.join(BIM_DIR, f));
+      return {
+        name: f.replace(/^\d+-/, ""),
+        url: "/uploads/bim/" + f,
+        size: st.size,
+        sizeText: bimSize(st.size),
+        uploadedAt: st.mtime.toISOString(),
+      };
+    }).sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
+    res.json({ models });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.post("/api/bim/upload", requireAuth, (req, res) => {
+  try {
+    const filename = String(req.body?.filename || "modell").slice(0, 200);
+    if (!/\.(ifc|xkt|gltf|glb)$/i.test(filename)) {
+      return res.status(400).json({ error: "Kun .ifc, .xkt, .gltf, .glb støttes." });
+    }
+    const m = /^data:([^;]+);base64,(.+)$/i.exec(req.body?.dataUrl || "");
+    if (!m) return res.status(400).json({ error: "Ugyldig fil." });
+    const buf = Buffer.from(m[2], "base64");
+    if (buf.length > 250 * 1024 * 1024) return res.status(400).json({ error: "Filen er for stor (maks 250 MB)." });
+    fs.mkdirSync(BIM_DIR, { recursive: true });
+    const safe = filename.replace(/[^A-Za-z0-9._-]+/g, "_");
+    const target = Date.now() + "-" + safe;
+    fs.writeFileSync(path.join(BIM_DIR, target), buf);
+    res.json({ ok: true, url: "/uploads/bim/" + target, name: filename });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post("/api/bim/delete", requireAuth, (req, res) => {
+  try {
+    const url = String(req.body?.url || "");
+    if (!/^\/uploads\/bim\/[A-Za-z0-9._-]+$/.test(url)) return res.status(400).json({ error: "Ugyldig URL" });
+    const fname = url.replace("/uploads/bim/", "");
+    const fp = path.join(BIM_DIR, fname);
+    if (fs.existsSync(fp)) fs.unlinkSync(fp);
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
 // ---- Last opp avtale/rammeavtale for en leverandør ----
 app.post("/api/supplier-agreement/upload", requireAuth, (req, res) => {
   try {
@@ -1122,8 +1174,20 @@ app.get("/api/ledelse/billing", requireAdmin, async (req, res) => {
         last3Billable: Math.round(r.last3.b),
       }))
       .sort((a, b) => a.name.localeCompare(b.name, "nb"));
+    // 6-måneders totaltrend (sum av alle aktive ansatte per måned)
+    const trend6 = months.slice(-6).map((_, j) => {
+      const i = months.length - 6 + j;
+      let mh = 0, mb = 0;
+      for (const r of empMap.values()) {
+        if (!activeIds.has(r.id)) continue;
+        mh += r.byMonth[i].h; mb += r.byMonth[i].b;
+      }
+      return { label: months[i].label, rate: mh > 0 ? mb / mh : 0, hours: Math.round(mh), billable: Math.round(mb) };
+    });
     res.json({
       months: months.map((m) => m.label),
+      months6: trend6.map((t) => t.label),
+      trend6,
       employees: employeesOut,
       total: {
         last14: { rate: total14h > 0 ? total14b / total14h : 0, hours: Math.round(total14h), billable: Math.round(total14b) },
@@ -1131,6 +1195,147 @@ app.get("/api/ledelse/billing", requireAdmin, async (req, res) => {
       },
     });
   } catch (err) { res.status(502).json({ error: err.message }); }
+});
+
+// ---- Ledelse: auto-data fra Tripletex til Likviditet/Resultat/Budsjett + justeringer ----
+app.get("/api/ledelse/auto", requireAdmin, async (req, res) => {
+  try {
+    res.json(await serveWithSnapshot("ledelse-auto", async () => {
+      const today = new Date();
+      const todayStr = ymd(today);
+      const yearStart = new Date(today.getFullYear(), 0, 1);
+
+      // Bygg 12 mnd bakover + 12 mnd fremover (totalt 24 etiketter)
+      const monthsPast = [];
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+        monthsPast.push({
+          key: ymd(d).slice(0, 7),
+          label: d.toLocaleDateString("nb-NO", { month: "short", year: "2-digit" }),
+          from: ymd(d),
+          to: ymd(end > today ? today : end),
+        });
+      }
+      const monthsFuture = [];
+      for (let i = 1; i <= 12; i++) {
+        const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+        monthsFuture.push({
+          key: ymd(d).slice(0, 7),
+          label: d.toLocaleDateString("nb-NO", { month: "short", year: "2-digit" }),
+        });
+      }
+
+      // Hent regnskapsdata for siste 12 mnd
+      const [accounts, invoices, supplierInvs, monthSums] = await Promise.all([
+        getAccounts(),
+        getInvoices(ymd(yearStart), todayStr),
+        getSupplierInvoices(monthsPast[0].from, todayStr),
+        Promise.all(monthsPast.map((m) => getBalanceSheet(m.from, m.to, 3000, 8299))),
+      ]);
+      const accById = new Map(accounts.map((a) => [a.id, a]));
+      const summarize = (rows) => {
+        let revenue = 0, opex = 0;
+        for (const r of rows) {
+          const a = accById.get(r.account?.id); if (!a) continue;
+          const n = Number(a.number);
+          const ch = r.balanceChange || 0;
+          if (n >= 3000 && n < 4000) revenue += -ch;
+          else if (n >= 4000 && n < 8000) opex += ch;
+        }
+        return { revenue: Math.round(revenue), opex: Math.round(opex), result: Math.round(revenue - opex) };
+      };
+
+      // RESULTAT 12 mnd historisk
+      const resultat = monthsPast.map((m, i) => ({ ...m, ...summarize(monthSums[i]) }));
+      // Snitt siste 6 mnd brukes som basis for budsjett
+      const avg6Rev = resultat.slice(-6).reduce((s, r) => s + r.revenue, 0) / 6;
+      const avg6Opex = resultat.slice(-6).reduce((s, r) => s + r.opex, 0) / 6;
+
+      // BUDSJETT: framskriving av snitt for 12 mnd fram
+      const budsjett = monthsFuture.map((m) => ({
+        ...m,
+        revenuePlan: Math.round(avg6Rev),
+        opexPlan: Math.round(avg6Opex),
+        resultPlan: Math.round(avg6Rev - avg6Opex),
+      }));
+
+      // LIKVIDITET: utestående fakturaer (innkommende) og leverandørfakturaer (utgående)
+      // gruppert per måned framover (basert på forfallsdato), pluss snitt-kost framover
+      const liqIn = new Map();  // key=YYYY-MM
+      const liqOut = new Map();
+      for (const inv of invoices) {
+        const due = inv.invoiceDueDate || inv.invoiceDate || "";
+        const out = Number(inv.amountOutstanding || 0);
+        if (!due || out <= 0) continue;
+        const key = due.slice(0, 7);
+        liqIn.set(key, (liqIn.get(key) || 0) + out);
+      }
+      for (const si of supplierInvs) {
+        const due = si.invoiceDueDate || si.invoiceDate || "";
+        const amt = Math.abs(Number(si.amount || 0));
+        if (!due || amt <= 0) continue;
+        const key = due.slice(0, 7);
+        liqOut.set(key, (liqOut.get(key) || 0) + amt);
+      }
+      // Likviditet-listing: vis nåværende måned + 11 framover
+      const liqMonths = [];
+      for (let i = 0; i < 12; i++) {
+        const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+        const key = ymd(d).slice(0, 7);
+        liqMonths.push({
+          key, label: d.toLocaleDateString("nb-NO", { month: "short", year: "2-digit" }),
+          cashIn: Math.round(liqIn.get(key) || 0),
+          cashOut: Math.round(liqOut.get(key) || (i > 0 ? avg6Opex : 0)), // framtidige måneder bruker snitt-kost
+        });
+      }
+      // Akkumulert netto kontantstrøm (uten startbalanse — admin kan legge inn via justering)
+      let acc = 0;
+      const likviditet = liqMonths.map((m) => {
+        acc += (m.cashIn - m.cashOut);
+        return { ...m, net: m.cashIn - m.cashOut, accumulated: acc };
+      });
+
+      const adj = getConfig().ledelseAdjustments || {};
+      return {
+        updatedAt: new Date().toISOString(),
+        resultat, budsjett, likviditet,
+        adjustments: {
+          resultat: adj.resultat || [],
+          budsjett: adj.budsjett || [],
+          likviditet: adj.likviditet || [],
+        },
+        notes: {
+          basis: "Basisestimat = gjennomsnitt siste 6 måneder. Justeringer legges til/trekkes fra i kolonnen til høyre.",
+        },
+      };
+    }, 10 * 60 * 1000));
+  } catch (err) {
+    console.error("Feil i /api/ledelse/auto:", err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// ---- Ledelse: justeringer (admin) ----
+app.get("/api/ledelse/adjustments", requireAdmin, (req, res) => res.json({ adjustments: getConfig().ledelseAdjustments || {} }));
+app.post("/api/ledelse/adjustments", requireAdmin, (req, res) => {
+  try {
+    const slot = String(req.body?.slot || "").toLowerCase();
+    if (!["likviditet", "resultat", "budsjett"].includes(slot)) return res.status(400).json({ error: "Ukjent slot" });
+    const list = Array.isArray(req.body?.items) ? req.body.items : null;
+    if (!list) return res.status(400).json({ error: "Mangler items" });
+    const all = { ...(getConfig().ledelseAdjustments || {}) };
+    all[slot] = list.slice(0, 200).map((x) => ({
+      id: String(x.id || ("a_" + Math.random().toString(36).slice(2, 9))),
+      month: String(x.month || "").slice(0, 7),
+      label: String(x.label || "").slice(0, 200),
+      amount: Math.round(Number(x.amount) || 0),
+      type: x.type === "out" ? "out" : "in", // in = legges til, out = trekkes fra
+      note: String(x.note || "").slice(0, 300),
+    }));
+    saveConfig({ ledelseAdjustments: all });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
 // ---- Ledelse (kun leder/admin) ----
