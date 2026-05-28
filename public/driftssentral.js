@@ -83,6 +83,53 @@
       renderCapacity(d.billingWeek);
     } catch {}
   }
+  function nokShort(n) { n = n || 0; if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(1) + " mill"; if (Math.abs(n) >= 1e3) return Math.round(n / 1000) + " k"; return String(Math.round(n)); }
+  function fillMarquee(trackId, items, makeItem) {
+    const track = document.getElementById(trackId);
+    if (!track) return;
+    if (!items.length) { track.innerHTML = `<div class="empty" style="padding:14px">Ingen data.</div>`; track.style.animation = "none"; return; }
+    const html = items.map(makeItem).join("");
+    track.innerHTML = html + html;
+    track.style.animation = "";
+    track.style.animationDuration = Math.max(60, items.length * 3.5) + "s";
+    track.style.animationPlayState = items.length > 8 ? "running" : "paused";
+  }
+  async function refreshSuppliers() {
+    try {
+      const res = await fetch("/api/costs");
+      if (!res.ok) return;
+      const d = await res.json();
+      const sup = (d.suppliers || []).slice(0, 30);
+      fillMarquee("dsSupTrack", sup, (s) => `<div class="proj-item"><div class="nm">${esc(s.name)}</div><div class="meta"><span>${num(s.count)} fakturaer</span><span>${nokShort(s.cost)} kr</span></div></div>`);
+    } catch {}
+  }
+  async function refreshCustomers() {
+    try {
+      const res = await fetch("/api/customers");
+      if (!res.ok) return;
+      const d = await res.json();
+      const top = (d.customers || []).slice(0, 20);
+      fillMarquee("dsCustTrack", top, (c, i) => `<div class="proj-item"><div class="nm">${i + 1}. ${esc(c.name)}</div><div class="meta"><span>${esc(c.topProjectManager || "—")}</span><span>${nokShort(c.revenue)} kr</span></div></div>`);
+    } catch {}
+  }
+  async function refreshContacts() {
+    try {
+      const res = await fetch("/api/org");
+      if (!res.ok) return;
+      const d = await res.json();
+      const wrap = document.getElementById("dsContacts");
+      if (!wrap) return;
+      const people = (d.nodes || []).filter((p) => p.name && (p.email || p.phone))
+        .sort((a, b) => a.name.localeCompare(b.name, "nb"));
+      if (!people.length) { wrap.innerHTML = `<div class="empty">Ingen kontaktinfo registrert.</div>`; return; }
+      wrap.innerHTML = people.map((p) => `<div class="ds-contact">
+        <div class="dsc-name">${esc(p.name)}</div>
+        ${p.title ? `<div class="dsc-title">${esc(p.title)}</div>` : ""}
+        ${p.phone ? `<div class="dsc-line">📞 <a href="tel:${esc(p.phone.replace(/\s/g, ""))}">${esc(p.phone)}</a></div>` : ""}
+        ${p.email ? `<div class="dsc-line">✉️ <a href="mailto:${esc(p.email)}">${esc(p.email)}</a></div>` : ""}
+      </div>`).join("");
+    } catch {}
+  }
 
   function renderPins(projects) {
     if (!map || !markers) return;
@@ -135,7 +182,7 @@
       loaded = true;
       initMap();
       // Leaflet trenger synlig container for riktig størrelse
-      setTimeout(() => { if (map) map.invalidateSize(); refresh(); refreshFocus(); }, 120);
+      setTimeout(() => { if (map) map.invalidateSize(); refresh(); refreshFocus(); refreshSuppliers(); refreshCustomers(); refreshContacts(); }, 120);
       setInterval(clock, 1000); clock();
     } else if (map) {
       setTimeout(() => map.invalidateSize(), 120);

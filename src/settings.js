@@ -43,7 +43,7 @@ function defaults() {
     companyPhone: process.env.COMPANY_PHONE || "51 97 44 00",
     companyWebsite: process.env.COMPANY_WEBSITE || "www.byggkon.no",
     values: defaultValues(),
-    departments: ["Intern administrasjon", "Prosjektadministrasjon / BYGG", "RIB", "ARK", "RIBr", "Andre rådgivende fag"],
+    departments: ["Ledelse", "Intern administrasjon", "Prosjektadministrasjon / BYGG", "RIB", "ARK", "RIBr", "Andre rådgivende fag"],
     floorplans: [
       { id: "stavanger", name: "Travbaneveien (Stavanger)", url: process.env.FLOORPLAN_URL || "/floorplan.png", pins: [] },
       { id: "haugesund", name: "Haugesund (RIBr)", url: "", pins: [] },
@@ -67,6 +67,7 @@ function defaults() {
     nextOfKin: [],
     hrRequests: [],
     hrDocs: [],
+    ledelseFiles: { likviditet: {}, rapport: {}, resultat: {}, budsjett: {} },
     mcpServers: [],
     parking: { url: "", pins: [] },
     kiSuggestions: [],

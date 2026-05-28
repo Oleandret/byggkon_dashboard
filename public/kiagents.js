@@ -61,8 +61,23 @@
   const IMP = ["Høy", "Middels", "Lav"], PROD = ["Idé", "Under utvikling", "Klar", "I produksjon"], SELL = ["Ja", "Kanskje", "Nei"];
   const impRank = { "Høy": 0, "Middels": 1, "Lav": 2 };
   const opts = (arr, v) => arr.map((o) => `<option${o === v ? " selected" : ""}>${o}</option>`).join("");
-  function sortedSug() { return suggestions.slice().sort((a, b) => (impRank[a.importance] ?? 1) - (impRank[b.importance] ?? 1) || (b.ts || 0) - (a.ts || 0)); }
+  function sortedSug() {
+    return suggestions.slice().sort((a, b) =>
+      ((b.voteAvg || 0) - (a.voteAvg || 0)) ||
+      ((b.voteCount || 0) - (a.voteCount || 0)) ||
+      ((impRank[a.importance] ?? 1) - (impRank[b.importance] ?? 1)) ||
+      ((b.ts || 0) - (a.ts || 0))
+    );
+  }
   function impCls(i) { return i === "Høy" ? "imp-high" : i === "Lav" ? "imp-low" : "imp-mid"; }
+  const DIE = (n) => ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"][n] || "🎲";
+  function dieRow(s) {
+    return `<div class="dice-row">
+      <span class="dice-label">🎲 Karakter:</span>
+      ${[1, 2, 3, 4, 5, 6].map((v) => `<button class="dice-btn" data-id="${esc(s.id)}" data-value="${v}" title="Gi ${v}">${DIE(v)}</button>`).join("")}
+      <span class="dice-avg">${(s.voteAvg || 0).toFixed(1)} <span class="subnote">(${s.voteCount || 0} stemmer)</span></span>
+    </div>`;
+  }
   function renderSug() {
     const list = sortedSug();
     if (!list.length) { sugEl.innerHTML = `<div class="empty">Ingen forslag ennå.</div>`; return; }
@@ -78,9 +93,11 @@
                <input class="kon-f" data-f="by" value="${esc(s.by)}" placeholder="Navn" style="max-width:120px" />
                <button class="btn-ghost sug-del" data-id="${esc(s.id)}">🗑</button>
              </div>
+             ${dieRow(s)}
            </div>`
         : `<div class="ki-sug">
              <div class="ki-sug-top"><span class="imp-badge ${impCls(s.importance)}">${esc(s.importance || "Middels")}</span><span class="ki-sug-text">${esc(s.text)}</span></div>
+             ${dieRow(s)}
              <div class="ki-sug-meta">
                <span class="ki-tag">⚙ ${esc(s.production || "Idé")}</span>
                <span class="ki-tag${s.sellable === "Ja" ? " sell-yes" : ""}">💰 Selges: ${esc(s.sellable || "Nei")}</span>
@@ -89,6 +106,20 @@
            </div>`;
     }).join("");
   }
+  // Klikk på terning – bruker navnet fra "Foreslå"-feltet for å unngå dobbeltstemming.
+  sugEl.addEventListener("click", async (e) => {
+    const b = e.target.closest(".dice-btn");
+    if (!b) return;
+    e.preventDefault();
+    const id = b.dataset.id, value = Number(b.dataset.value);
+    const by = (document.getElementById("kiSuggestBy").value || "").trim() || prompt("Ditt navn (for å registrere stemmen):", "") || "Anonym";
+    document.getElementById("kiSuggestBy").value = by === "Anonym" ? "" : by;
+    try {
+      const res = await fetch("/api/kisuggestions/vote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, by, value }) });
+      if (!res.ok) throw new Error("Stemme feilet");
+      await loadSug(true);
+    } catch (e2) { err("Kunne ikke registrere terningkast: " + e2.message); }
+  });
   sugEl.addEventListener("input", (e) => { const c = e.target.closest(".ki-sug"); if (c && e.target.dataset.f) suggestions[Number(c.dataset.i)][e.target.dataset.f] = e.target.value; });
   sugEl.addEventListener("change", (e) => { const c = e.target.closest(".ki-sug"); if (c && e.target.dataset.f) { suggestions[Number(c.dataset.i)][e.target.dataset.f] = e.target.value; } });
   sugEl.addEventListener("click", async (e) => {

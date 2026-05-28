@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 import { buildOverview } from "./src/metrics.js";
 import { buildEconomy } from "./src/economy.js";
 import { getNewsFeed } from "./src/newsfeed.js";
-import { clearCache, resetClient, getInvoices, getCustomers, getSupplierInvoices, getProjects, getProjectAddresses, getTimeEntries, ymd } from "./src/tripletex.js";
+import { clearCache, resetClient, getInvoices, getCustomers, getSupplierInvoices, getSupplierInvoiceDetails, getProjects, getProjectAddresses, getTimeEntries, getEmployees, ymd } from "./src/tripletex.js";
 import { geocodeOne, sleep } from "./src/geocode.js";
 import { serveWithSnapshot, expireSnapshots } from "./src/snapshot.js";
 const snapTtl = () => getConfig().cacheTtlMs || 300000;
@@ -146,6 +146,8 @@ app.get("/api/overview", requireAuth, async (req, res) => {
   }
 });
 // ---- Kostnader per leverandør (siste 12 mnd, fra Tripletex) ----
+// Ekskluder lønn-/skatte-relaterte oppføringer (ikke faktiske leverandørkostnader).
+const SALARY_RE = /\b(skatteetaten|skattekontoret|skatt\s|skattetrekk|arbeidsgiveravgift|lønn|lonn|payroll|nav|otp|pensjon\s?innskudd|trygdeavgift)\b/i;
 app.get("/api/costs", requireAuth, async (req, res) => {
   try {
     res.json(await serveWithSnapshot("costs", async () => {
@@ -157,16 +159,62 @@ app.get("/api/costs", requireAuth, async (req, res) => {
       let total = 0;
       for (const s of sis) {
         const name = s.supplier?.name || "Ukjent";
+        if (SALARY_RE.test(name)) continue; // ingen lønnskostnader skal med
+        const id = s.supplier?.id;
         const cost = Math.abs(s.amount || 0);
-        const cur = bySup.get(name) || { name, cost: 0, count: 0 };
+        const cur = bySup.get(name) || { name, id, cost: 0, count: 0 };
         cur.cost += cost; cur.count += 1; total += cost;
+        if (id && !cur.id) cur.id = id;
         bySup.set(name, cur);
       }
-      const suppliers = [...bySup.values()].sort((a, b) => b.cost - a.cost);
-      return { suppliers, total };
+      const meta = getConfig().supplierMeta || {};
+      // Filtrer bort de som er merket "avsluttet" – men ta dem med i en egen liste
+      const all = [...bySup.values()].sort((a, b) => b.cost - a.cost);
+      const suppliers = all.filter((s) => !(meta[s.name] && meta[s.name].terminated));
+      const terminated = all.filter((s) => meta[s.name] && meta[s.name].terminated);
+      return { suppliers, terminated, total };
     }, snapTtl()));
   } catch (err) {
     console.error("Feil i /api/costs:", err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// Detalj for én leverandør: alle fakturaer siste 12 mnd med tilgjengelige felt.
+app.get("/api/supplier-detail", requireAuth, async (req, res) => {
+  try {
+    const name = String(req.query.name || "").trim();
+    if (!name) return res.status(400).json({ error: "Mangler navn" });
+    const today = new Date();
+    const to = ymd(today);
+    const from = ymd(new Date(today.getFullYear() - 1, today.getMonth(), today.getDate()));
+    const allSi = await getSupplierInvoices(from, to);
+    const matches = allSi.filter((s) => (s.supplier?.name || "") === name);
+    if (!matches.length) return res.json({ name, invoices: [] });
+    const supplierId = matches.find((m) => m.supplier?.id)?.supplier?.id;
+    let rows = matches.map((r) => ({ id: r.id, invoiceDate: r.invoiceDate || "", amount: Math.abs(r.amount || 0) }));
+    if (supplierId) {
+      // Full info når mulig
+      const details = await getSupplierInvoiceDetails(supplierId, from, to);
+      if (details.length) {
+        rows = details.map((r) => ({
+          id: r.id,
+          invoiceNumber: r.invoiceNumber || r.kid || "",
+          invoiceDate: r.invoiceDate || "",
+          dueDate: r.invoiceDueDate || r.dueDate || "",
+          amount: Math.abs(r.amount || r.amountCurrency || 0),
+          currency: r.currency || "NOK",
+          comment: r.comment || r.description || r.title || "",
+          voucherNumber: r.voucher?.number || "",
+          status: r.status || "",
+        }));
+      }
+    }
+    rows.sort((a, b) => (b.invoiceDate || "").localeCompare(a.invoiceDate || ""));
+    const total = rows.reduce((s, r) => s + (r.amount || 0), 0);
+    res.json({ name, supplierId, invoices: rows, total });
+  } catch (err) {
+    console.error("Feil i /api/supplier-detail:", err.message);
     res.status(502).json({ error: err.message });
   }
 });
@@ -601,6 +649,7 @@ app.post("/api/suppliermeta", requireAuth, (req, res) => {
       rammeavtale: !!req.body?.rammeavtale,
       ansvarlig: String(req.body?.ansvarlig || "").slice(0, 80),
       status: String(req.body?.status || "").slice(0, 120),
+      terminated: !!req.body?.terminated,
     };
     saveConfig({ supplierMeta: meta });
     res.json({ ok: true });
@@ -749,14 +798,40 @@ app.post("/api/vision", requireAuth, (req, res) => {
 });
 
 // ---- KI: forslag fra ansatte ----
-app.get("/api/kisuggestions", requireAuth, (req, res) => res.json({ suggestions: (getConfig().kiSuggestions || []).slice(-100) }));
+function enrichSug(s) {
+  const votes = s.votes || {};
+  const vals = Object.values(votes).filter((v) => v >= 1 && v <= 6);
+  const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  return { ...s, votes, voteAvg: avg, voteCount: vals.length };
+}
+app.get("/api/kisuggestions", requireAuth, (req, res) => {
+  const list = (getConfig().kiSuggestions || []).slice(-100).map(enrichSug);
+  res.json({ suggestions: list });
+});
 app.post("/api/kisuggestions", requireAuth, (req, res) => {
   try {
     const text = String(req.body?.text || "").trim().slice(0, 600);
     if (!text) return res.status(400).json({ error: "Tomt forslag" });
     const by = String(req.body?.by || "").trim().slice(0, 60);
     const list = (getConfig().kiSuggestions || []).slice(-99);
-    list.push({ id: "k" + Date.now().toString(36), text, by, ts: Date.now(), importance: "Middels", production: "Idé", sellable: "Nei" });
+    list.push({ id: "k" + Date.now().toString(36), text, by, ts: Date.now(), importance: "Middels", production: "Idé", sellable: "Nei", votes: {} });
+    saveConfig({ kiSuggestions: list });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+// Terningkast – én stemme per navn (overskrives ved ny stemme).
+app.post("/api/kisuggestions/vote", requireAuth, (req, res) => {
+  try {
+    const id = String(req.body?.id || "");
+    const by = String(req.body?.by || "").trim().slice(0, 60) || "Anonym";
+    const value = Math.max(1, Math.min(6, Number(req.body?.value) || 0));
+    if (!id || !value) return res.status(400).json({ error: "Mangler id eller verdi 1–6" });
+    const list = (getConfig().kiSuggestions || []).map((s) => {
+      if (s.id !== id) return s;
+      const votes = { ...(s.votes || {}) };
+      votes[by] = value;
+      return { ...s, votes };
+    });
     saveConfig({ kiSuggestions: list });
     res.json({ ok: true });
   } catch (err) { res.status(400).json({ error: err.message }); }
@@ -777,6 +852,7 @@ app.post("/api/kisuggestions/save", requireAuth, (req, res) => {
       importance: imp.includes(s.importance) ? s.importance : "Middels",
       production: prod.includes(s.production) ? s.production : "Idé",
       sellable: sell.includes(s.sellable) ? s.sellable : "Nei",
+      votes: (s.votes && typeof s.votes === "object") ? s.votes : {},
     }));
     saveConfig({ kiSuggestions: clean });
     res.json({ ok: true });
@@ -873,6 +949,101 @@ app.post("/api/devgoals", requireAuth, (req, res) => {
     saveConfig({ devGoals: clean });
     res.json({ ok: true });
   } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Ledelse: filer (Likviditetsprognose, Økonomirapport, Resultat, Budsjett) ----
+const LED_SLOTS = { likviditet: 1, rapport: 1, resultat: 1, budsjett: 1 };
+app.get("/api/ledelse/files", requireAdmin, (req, res) => res.json({ files: getConfig().ledelseFiles || {} }));
+app.post("/api/ledelse/file", requireAdmin, (req, res) => {
+  try {
+    const slot = String(req.body?.slot || "");
+    if (!LED_SLOTS[slot]) return res.status(400).json({ error: "Ukjent slot" });
+    const revision = String(req.body?.revision || "").slice(0, 10);
+    const filename = String(req.body?.filename || "Dokument").slice(0, 160);
+    const m = /^data:([^;]+);base64,(.+)$/i.exec(req.body?.dataUrl || "");
+    if (!m) return res.status(400).json({ error: "Ugyldig fil." });
+    const mime = m[1].toLowerCase();
+    const ext = mime.includes("pdf") ? "pdf"
+      : mime.includes("spreadsheet") ? "xlsx"
+      : mime.includes("presentation") ? "pptx"
+      : mime.includes("msword") ? "doc"
+      : (filename.split(".").pop() || "bin").toLowerCase().slice(0, 5);
+    const buf = Buffer.from(m[2], "base64");
+    if (buf.length > 16 * 1024 * 1024) return res.status(400).json({ error: "Filen er for stor (maks 16 MB)." });
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    for (const e of ["pdf", "xlsx", "xls", "pptx", "ppt", "doc", "docx", "csv"]) { try { fs.unlinkSync(path.join(UPLOAD_DIR, `ledelse-${slot}.${e}`)); } catch {} }
+    fs.writeFileSync(path.join(UPLOAD_DIR, `ledelse-${slot}.${ext}`), buf);
+    const url = "/uploads/ledelse-" + slot + "." + ext + "?v=" + Date.now();
+    const files = { ...(getConfig().ledelseFiles || {}) };
+    files[slot] = { url, filename, revision, uploadedAt: new Date().toISOString().slice(0, 10) };
+    saveConfig({ ledelseFiles: files });
+    res.json({ ok: true, file: files[slot] });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Ledelse: faktureringsgrad ansatte (utvikling 12 mnd, 3 mnd, 2 uker, 1 uke) ----
+app.get("/api/ledelse/billing", requireAdmin, async (req, res) => {
+  try {
+    const today = new Date();
+    const from = new Date(today.getFullYear(), today.getMonth() - 11, 1);
+    const fromStr = ymd(from); const toStr = ymd(today);
+    const [employees, time] = await Promise.all([
+      getEmployees().catch(() => []),
+      getTimeEntries(fromStr, toStr).catch(() => []),
+    ]);
+    const empName = new Map(employees.map((e) => [e.id, `${e.firstName || ""} ${e.lastName || ""}`.trim()]));
+    // Bygg månedsetiketter (12 mnd)
+    const months = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+      months.push({
+        label: d.toLocaleDateString("nb-NO", { month: "short", year: "2-digit" }),
+        from: ymd(d), to: ymd(end > today ? today : end),
+      });
+    }
+    // per ansatt: { name, byMonth:[12]{h,b}, last3:{h,b}, last14:{h,b}, last7:{h,b} }
+    const empMap = new Map();
+    const d14 = new Date(today); d14.setDate(today.getDate() - 14);
+    const d7 = new Date(today); d7.setDate(today.getDate() - 7);
+    const d90 = new Date(today); d90.setDate(today.getDate() - 90);
+    const s14 = ymd(d14), s7 = ymd(d7), s90 = ymd(d90);
+    let total14h = 0, total14b = 0, total7h = 0, total7b = 0;
+    for (const e of time) {
+      const id = e.employee?.id; if (id == null) continue;
+      const name = empName.get(id); if (!name) continue;
+      let row = empMap.get(id);
+      if (!row) { row = { id, name, byMonth: months.map(() => ({ h: 0, b: 0 })), last3: { h: 0, b: 0 }, last14: { h: 0, b: 0 }, last7: { h: 0, b: 0 } }; empMap.set(id, row); }
+      const h = e.hours || 0, b = e.chargeableHours || 0;
+      const mi = months.findIndex((m) => e.date >= m.from && e.date <= m.to);
+      if (mi >= 0) { row.byMonth[mi].h += h; row.byMonth[mi].b += b; }
+      if (e.date >= s90) { row.last3.h += h; row.last3.b += b; }
+      if (e.date >= s14) { row.last14.h += h; row.last14.b += b; total14h += h; total14b += b; }
+      if (e.date >= s7) { row.last7.h += h; row.last7.b += b; total7h += h; total7b += b; }
+    }
+    // kun ansatte med aktivitet siste 28 dager (=nåværende)
+    const s28 = ymd(new Date(today.getTime() - 28 * 86400000));
+    const activeIds = new Set();
+    for (const e of time) { if (e.date >= s28 && e.employee?.id != null) activeIds.add(e.employee.id); }
+    const employeesOut = [...empMap.values()]
+      .filter((r) => activeIds.has(r.id))
+      .map((r) => ({
+        name: r.name,
+        trend12: r.byMonth.map((m) => (m.h > 0 ? m.b / m.h : null)),
+        last3Rate: r.last3.h > 0 ? r.last3.b / r.last3.h : 0,
+        last3Hours: Math.round(r.last3.h),
+        last3Billable: Math.round(r.last3.b),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, "nb"));
+    res.json({
+      months: months.map((m) => m.label),
+      employees: employeesOut,
+      total: {
+        last14: { rate: total14h > 0 ? total14b / total14h : 0, hours: Math.round(total14h), billable: Math.round(total14b) },
+        last7: { rate: total7h > 0 ? total7b / total7h : 0, hours: Math.round(total7h), billable: Math.round(total7b) },
+      },
+    });
+  } catch (err) { res.status(502).json({ error: err.message }); }
 });
 
 // ---- Ledelse (kun leder/admin) ----

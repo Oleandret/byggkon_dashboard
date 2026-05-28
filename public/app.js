@@ -216,20 +216,28 @@ async function loadCosts(force = false) {
     const rows = sup.map((c, i) => {
       const m = supplierMeta[c.name] || {};
       return [
-        String(i + 1), esc(c.name), `<span class="cost-cat">${esc(costCategory(c.name))}</span>`, num(c.count), nok(c.cost),
+        String(i + 1),
+        `<a href="#" class="sup-link" data-name="${esc(c.name)}" title="Klikk for fakturaer">${esc(c.name)}</a>`,
+        `<span class="cost-cat">${esc(costCategory(c.name))}</span>`,
+        num(c.count), nok(c.cost),
         `<label class="ramme-toggle"><input type="checkbox" class="sm-ramme" data-name="${esc(c.name)}" ${m.rammeavtale ? "checked" : ""}/> <span></span></label>`,
         `<input class="sm-input sm-ansvarlig" data-name="${esc(c.name)}" value="${esc(m.ansvarlig || "")}" placeholder="Hvem forhandler?" />`,
         `<input class="sm-input sm-status" data-name="${esc(c.name)}" value="${esc(m.status || "")}" placeholder="Status / notat" />`,
+        `<label class="ramme-toggle"><input type="checkbox" class="sm-term" data-name="${esc(c.name)}" ${m.terminated ? "checked" : ""}/> <span></span></label>`,
       ];
     });
-    rows.push(["", "<b>Total</b>", "", "", `<b>${nok(d.total || 0)}</b>`, "", "", ""]);
+    rows.push(["", "<b>Total</b>", "", "", `<b>${nok(d.total || 0)}</b>`, "", "", "", ""]);
     fillTable("kostTable",
       [{ label: "#" }, { label: "Leverandør" }, { label: "Hva er kostnaden? (antatt)" }, { label: "Antall", num: true }, { label: "Kostnad 12 mnd", num: true },
-       { label: "Rammeavtale" }, { label: "Forhandlingsansvarlig" }, { label: "Status / aksjon" }],
+       { label: "Rammeavtale" }, { label: "Forhandlingsansvarlig" }, { label: "Status / aksjon" }, { label: "Avslutt" }],
       rows, "Ingen kostnader funnet.");
     const withRamme = sup.filter((c) => (supplierMeta[c.name] || {}).rammeavtale).length;
+    const termCount = (d.terminated || []).length;
     const sumEl = document.getElementById("kostRammeSummary");
-    if (sumEl) sumEl.innerHTML = `<b>${withRamme}</b> av <b>${sup.length}</b> leverandører har rammeavtale. <span class="subnote">Huk av når avtale er på plass, og noter hvem som forhandler.</span>`;
+    if (sumEl) sumEl.innerHTML =
+      `Viser <b>${sup.length}</b> aktive leverandører (lønn/skatt ekskludert). <b>${withRamme}</b> har rammeavtale.` +
+      (termCount ? ` <b>${termCount}</b> avsluttede leverandører er skjult.` : "") +
+      ` <span class="subnote">Klikk på et leverandørnavn for å se fakturaene.</span>`;
   } catch (err) {
     status.hidden = false; status.textContent = "Kunne ikke hente kostnader: " + err.message;
   }
@@ -237,16 +245,64 @@ async function loadCosts(force = false) {
 let supplierMeta = {};
 async function saveSupplierMeta(name) {
   const row = (sel) => document.querySelector(`${sel}[data-name="${CSS.escape(name)}"]`);
-  const ramme = row("input.sm-ramme"); const ansv = row(".sm-ansvarlig"); const st = row(".sm-status");
-  const payload = { name, rammeavtale: ramme ? ramme.checked : false, ansvarlig: ansv ? ansv.value.trim() : "", status: st ? st.value.trim() : "" };
-  supplierMeta[name] = { rammeavtale: payload.rammeavtale, ansvarlig: payload.ansvarlig, status: payload.status };
-  try { await fetch("/api/suppliermeta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); }
-  catch (e) { showError("Kunne ikke lagre leverandørinfo: " + e.message); }
+  const ramme = row("input.sm-ramme"); const ansv = row(".sm-ansvarlig"); const st = row(".sm-status"); const term = row("input.sm-term");
+  const payload = {
+    name,
+    rammeavtale: ramme ? ramme.checked : false,
+    ansvarlig: ansv ? ansv.value.trim() : "",
+    status: st ? st.value.trim() : "",
+    terminated: term ? term.checked : false,
+  };
+  supplierMeta[name] = { rammeavtale: payload.rammeavtale, ansvarlig: payload.ansvarlig, status: payload.status, terminated: payload.terminated };
+  try {
+    await fetch("/api/suppliermeta", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    if (payload.terminated) { costsLoaded = false; loadCosts(true); } // skjul rad
+  } catch (e) { showError("Kunne ikke lagre leverandørinfo: " + e.message); }
+}
+async function showSupplierDetail(name) {
+  const modal = document.getElementById("supModal");
+  const body = document.getElementById("supModalBody");
+  document.getElementById("supModalTitle").textContent = name;
+  body.innerHTML = `<div class="subnote">Laster fakturaer …</div>`;
+  modal.hidden = false;
+  try {
+    const res = await fetch("/api/supplier-detail?name=" + encodeURIComponent(name));
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Feil");
+    const d = await res.json();
+    if (!d.invoices.length) { body.innerHTML = `<div class="empty">Ingen fakturaer funnet siste 12 måneder.</div>`; return; }
+    const rows = d.invoices.map((inv) => `<tr>
+      <td>${esc(inv.invoiceDate || "—")}</td>
+      <td>${esc(inv.invoiceNumber || "—")}</td>
+      <td>${esc(inv.comment || "—")}</td>
+      <td>${esc(inv.voucherNumber || "")}</td>
+      <td class="num">${nok(inv.amount)}</td>
+    </tr>`).join("");
+    body.innerHTML = `
+      <p class="subnote">${d.invoices.length} fakturaer · Sum 12 mnd: <b>${nok(d.total || 0)}</b></p>
+      <div class="table-wrap"><table class="sup-detail-tbl">
+        <thead><tr><th>Dato</th><th>Fakturanr.</th><th>Beskrivelse</th><th>Bilag</th><th class="num">Beløp</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+  } catch (e) { body.innerHTML = `<div class="empty">Kunne ikke hente: ${esc(e.message)}</div>`; }
 }
 (function () {
   const tbl = document.getElementById("kostTable");
   if (!tbl) return;
-  tbl.addEventListener("change", (e) => { const t = e.target; if (t.classList.contains("sm-ramme") || t.classList.contains("sm-input")) saveSupplierMeta(t.dataset.name); });
+  tbl.addEventListener("change", (e) => {
+    const t = e.target;
+    if (t.classList.contains("sm-ramme") || t.classList.contains("sm-input") || t.classList.contains("sm-term")) saveSupplierMeta(t.dataset.name);
+  });
+  tbl.addEventListener("click", (e) => {
+    const a = e.target.closest("a.sup-link");
+    if (!a) return;
+    e.preventDefault(); showSupplierDetail(a.dataset.name);
+  });
+  // Lukke modal
+  document.addEventListener("click", (e) => {
+    if (e.target.id === "supModalClose" || e.target.id === "supModal") {
+      const m = document.getElementById("supModal"); if (m) m.hidden = true;
+    }
+  });
 })();
 
 /* ---- Kunder-fane (lazy) ---- */
@@ -353,13 +409,11 @@ function renderHero(d) {
       ).join("");
   }
 
-  // Avdelinger (kort)
+  // Avdelinger (kompakte chips øverst)
   const avd = document.getElementById("avdGrid");
   if (avd && Array.isArray(d.display?.departments)) {
     avd.innerHTML = d.display.departments.length
-      ? d.display.departments.map((name) =>
-          `<div class="scaffold-card"><div class="sc-title">${esc(name)}</div><div class="sc-note">Eget dashboard kommer</div></div>`
-        ).join("")
+      ? d.display.departments.map((name) => `<span class="avd-chip">${esc(name)}</span>`).join("")
       : `<div class="sc-note">Ingen avdelinger satt opp ennå.</div>`;
   }
 

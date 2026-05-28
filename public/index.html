@@ -44,7 +44,7 @@
         <button type="button" class="nav-group-head">Oversikt</button>
         <div class="nav-group-items">
           <button class="tab active" data-tab="oversikt">Oversikt</button>
-          <button class="tab" data-tab="driftssentral">📺 Driftssentral</button>
+          <button class="tab" data-tab="driftssentral">Driftssentral</button>
         </div>
       </div>
       <div class="nav-group">
@@ -275,6 +275,26 @@
             <div class="marquee-track" id="dsTrack"></div>
           </div>
         </div>
+      </div>
+
+      <div class="ds-grid ds-grid-2" style="margin-top:16px">
+        <div class="card scroll-card ds-side">
+          <h2>Hvem jobber vi med? <span class="subnote">— leverandører</span></h2>
+          <div class="marquee marquee-tall" id="dsSupMarquee">
+            <div class="marquee-track" id="dsSupTrack"></div>
+          </div>
+        </div>
+        <div class="card scroll-card ds-side">
+          <h2>Våre kunder <span class="subnote">— topp 20</span></h2>
+          <div class="marquee marquee-tall" id="dsCustMarquee">
+            <div class="marquee-track" id="dsCustTrack"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h2>Kontaktinformasjon ansatte</h2>
+        <div id="dsContacts" class="ds-contacts"></div>
       </div>
     </main>
   </section>
@@ -849,6 +869,44 @@
         <div id="mktMap" class="front-map"></div>
       </div>
       <div class="card intro-card">
+        <h2>🌐 byggkon.no admin</h2>
+        <p>Rediger hovedsiden vår direkte i Webflow-admin. Du åpner det vanlige redigeringsgrensesnittet i en ny fane og logger inn med din byggkon-konto.</p>
+        <div class="social-actions">
+          <a class="btn-primary" href="https://www.byggkon.no/admin" target="_blank" rel="noopener">Åpne byggkon.no admin ↗</a>
+          <a class="sc-link" href="https://www.byggkon.no/" target="_blank" rel="noopener">Se nettsiden ↗</a>
+          <a class="sc-link" href="https://webflow.com/dashboard/sites/bygg-kon/general" target="_blank" rel="noopener">Webflow-dashboard ↗</a>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card social-card">
+          <div class="proj-head">
+            <h2><span class="social-ico social-fb">f</span> Facebook</h2>
+            <a class="sc-link" href="https://www.facebook.com/byggkon" target="_blank" rel="noopener">Vår side ↗</a>
+          </div>
+          <p class="subnote">Skriv innlegget her, kopier teksten, og åpne Facebook for å lime inn og publisere.</p>
+          <textarea id="fbText" class="kon-f" rows="6" placeholder="Hva vil du dele på Facebook? …"></textarea>
+          <div class="social-actions">
+            <button class="btn-ghost" data-social-copy="fbText">📋 Kopier tekst</button>
+            <a class="btn-primary" id="fbPost" href="https://www.facebook.com/byggkon" target="_blank" rel="noopener">Åpne Facebook for å poste ↗</a>
+            <span class="social-msg subnote" id="fbMsg"></span>
+          </div>
+        </div>
+        <div class="card social-card">
+          <div class="proj-head">
+            <h2><span class="social-ico social-li">in</span> LinkedIn</h2>
+            <a class="sc-link" href="https://www.linkedin.com/company/bygg-kon/" target="_blank" rel="noopener">Vår side ↗</a>
+          </div>
+          <p class="subnote">Skriv innlegget her, kopier teksten, og åpne LinkedIn for å lime inn og publisere.</p>
+          <textarea id="liText" class="kon-f" rows="6" placeholder="Hva vil du dele på LinkedIn? …"></textarea>
+          <div class="social-actions">
+            <button class="btn-ghost" data-social-copy="liText">📋 Kopier tekst</button>
+            <a class="btn-primary" id="liPost" href="https://www.linkedin.com/company/bygg-kon/admin/page-posts/published/" target="_blank" rel="noopener">Åpne LinkedIn for å poste ↗</a>
+            <span class="social-msg subnote" id="liMsg"></span>
+          </div>
+        </div>
+      </div>
+      <div class="card intro-card">
         <h2>💼 Knytt kontakter på LinkedIn</h2>
         <p>Alle oppfordres til å være aktive på <b>LinkedIn</b> – koble dere til kunder, samarbeidspartnere og bransjefolk, og del og lik Bygg-Kon sitt innhold. Jo flere av oss som er synlige, jo større rekkevidde får vi i markedet. Det er en av de enkleste måtene hver enkelt kan bidra til mer synlighet og nye oppdrag.</p>
         <a class="sc-link" href="https://www.linkedin.com/company/bygg-kon/" target="_blank" rel="noopener">Følg Bygg-Kon på LinkedIn ↗</a>
@@ -880,10 +938,30 @@
   <section class="tab-panel" id="panel-avdelinger">
     <main class="container">
       <div class="page-intro"><span class="pi-ico">🏢</span><span class="pi-txt"><b>Hva siden gjør:</b> Viser avdelingene våre og hvordan vi er organisert. <b>Hensikt:</b> Gi en rask oversikt over fagområdene og hvem som hører hjemme hvor.</span></div>
-      <div class="card">
+      <div class="card avd-card">
         <h2>Avdelinger</h2>
-        <p class="subnote">Hver avdeling får etter hvert sitt eget dashboard. Klikk «⚙ Innstillinger» for å endre avdelingslista.</p>
-        <div class="scaffold-grid" id="avdGrid"></div>
+        <p class="subnote">Klikk «⚙ Innstillinger» for å endre lista. Hver avdeling får etter hvert sitt eget dashboard.</p>
+        <div class="avd-strip" id="avdGrid"></div>
+      </div>
+
+      <div class="card">
+        <div class="proj-head">
+          <h2>RIB-dashboard <span class="subnote">— løpende prosjekter for RIB-ansatte</span></h2>
+          <button class="btn-ghost dept-reload" data-dept="rib">↻</button>
+        </div>
+        <p class="subnote">Timer hentet fra Tripletex siste 4 uker per RIB-ansatt. Bygges fra organisasjonskart-titler (RIB).</p>
+        <div class="dept-status subnote" data-dept="rib">Laster …</div>
+        <div class="dept-grid rib-grid" data-dept="rib"></div>
+      </div>
+
+      <div class="card">
+        <div class="proj-head">
+          <h2>Ledelse-dashboard <span class="subnote">— løpende prosjekter for ledere</span></h2>
+          <button class="btn-ghost dept-reload" data-dept="led">↻</button>
+        </div>
+        <p class="subnote">Daglig leder, faglige ledere og avdelingsledere — timer siste 4 uker fra Tripletex.</p>
+        <div class="dept-status subnote" data-dept="led">Laster …</div>
+        <div class="dept-grid rib-grid" data-dept="led"></div>
       </div>
     </main>
   </section>
@@ -1033,13 +1111,95 @@
         <a href="/admin/login" class="btn-primary" style="display:inline-block;text-decoration:none">Logg inn som leder</a>
       </div>
       <div id="ledContent" hidden>
-        <div class="card">
-          <div class="proj-head">
-            <h2>Ledermøte-referater</h2>
-            <button id="ledAdd" class="btn-ghost">+ Nytt referat</button>
+        <div class="subtabs" id="ledSubtabs">
+          <button class="subtab active" data-sub="okonomi">Økonomi</button>
+          <button class="subtab" data-sub="likviditet">Likviditetsprognose</button>
+          <button class="subtab" data-sub="rapport">Økonomirapport</button>
+          <button class="subtab" data-sub="faktgrad">Faktureringsgrad ansatte</button>
+          <button class="subtab" data-sub="resultat">Resultatrapport</button>
+          <button class="subtab" data-sub="budsjett">Budsjett 12 mnd</button>
+        </div>
+
+        <div class="led-sub active" id="ledsub-okonomi">
+          <div class="card">
+            <div class="proj-head">
+              <h2>Ledermøte-referater &amp; økonomi</h2>
+              <button id="ledAdd" class="btn-ghost">+ Nytt referat</button>
+            </div>
+            <p class="subnote">Månedlige ledermøter. Kun synlig for ledelsen.</p>
+            <div id="ledMeetings"></div>
           </div>
-          <p class="subnote">Månedlige ledermøter. Kun synlig for ledelsen.</p>
-          <div id="ledMeetings"></div>
+        </div>
+
+        <div class="led-sub" id="ledsub-likviditet">
+          <div class="card" data-slot="likviditet">
+            <h2>Likviditetsprognose</h2>
+            <p class="subnote">Last opp siste versjon av prognosen (Excel/PDF). Lagres på server med revisjonsdato.</p>
+            <div class="led-file-view"></div>
+            <div class="led-file-upload">
+              <input type="date" class="kon-f led-rev" />
+              <input type="file" class="kon-f led-file" accept=".xlsx,.xls,.pdf,.csv" />
+              <button class="btn-primary led-up">Last opp ny versjon</button>
+              <span class="led-msg subnote"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="led-sub" id="ledsub-rapport">
+          <div class="card" data-slot="rapport">
+            <h2>Økonomirapport</h2>
+            <p class="subnote">Last opp siste økonomirapport (PowerPoint/PDF).</p>
+            <div class="led-file-view"></div>
+            <div class="led-file-upload">
+              <input type="date" class="kon-f led-rev" />
+              <input type="file" class="kon-f led-file" accept=".pptx,.ppt,.pdf,.xlsx" />
+              <button class="btn-primary led-up">Last opp ny versjon</button>
+              <span class="led-msg subnote"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="led-sub" id="ledsub-faktgrad">
+          <div class="card">
+            <h2>Faktureringsgrad — ansatte</h2>
+            <p class="subnote">Utvikling siste 12 måneder per ansatt, siste 3 måneder per ansatt, og totalt siste 2 uker + siste uke.</p>
+            <div id="ledBillKpi" class="kpi-grid"></div>
+            <div class="grid-2">
+              <div><h3 style="font-size:13px;color:var(--muted)">Siste 12 måneder — utvikling per ansatt</h3>
+                <div class="chart-box" style="height:380px"><canvas id="ledBillTrend"></canvas></div></div>
+              <div><h3 style="font-size:13px;color:var(--muted)">Siste 3 måneder — per ansatt</h3>
+                <div class="chart-box" style="height:380px"><canvas id="ledBill3m"></canvas></div></div>
+            </div>
+            <div id="ledBillStatus" class="subnote" style="margin-top:8px">Laster …</div>
+          </div>
+        </div>
+
+        <div class="led-sub" id="ledsub-resultat">
+          <div class="card" data-slot="resultat">
+            <h2>Resultatrapport</h2>
+            <p class="subnote">Last opp siste resultatrapport (Excel/PDF).</p>
+            <div class="led-file-view"></div>
+            <div class="led-file-upload">
+              <input type="date" class="kon-f led-rev" />
+              <input type="file" class="kon-f led-file" accept=".xlsx,.xls,.pdf,.csv" />
+              <button class="btn-primary led-up">Last opp ny versjon</button>
+              <span class="led-msg subnote"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="led-sub" id="ledsub-budsjett">
+          <div class="card" data-slot="budsjett">
+            <h2>Budsjett 12 måneder</h2>
+            <p class="subnote">Last opp gjeldende budsjett (Excel/PDF).</p>
+            <div class="led-file-view"></div>
+            <div class="led-file-upload">
+              <input type="date" class="kon-f led-rev" />
+              <input type="file" class="kon-f led-file" accept=".xlsx,.xls,.pdf,.csv" />
+              <button class="btn-primary led-up">Last opp ny versjon</button>
+              <span class="led-msg subnote"></span>
+            </div>
+          </div>
         </div>
       </div>
     </main>
@@ -1075,6 +1235,17 @@
     </main>
   </section>
 
+  <!-- Modal for leverandørdetaljer -->
+  <div id="supModal" class="modal" hidden>
+    <div class="modal-card sup-modal-card">
+      <div class="proj-head">
+        <h3 id="supModalTitle">Leverandør</h3>
+        <button id="supModalClose" class="btn-ghost">✕</button>
+      </div>
+      <div id="supModalBody"></div>
+    </div>
+  </div>
+
   <!-- Modal for å redigere/legge til person -->
   <div id="orgModal" class="modal" hidden>
     <div class="modal-card">
@@ -1107,6 +1278,7 @@
   <script src="/contacts.js"></script>
   <script src="/licenses.js"></script>
   <script src="/ledelse.js"></script>
+  <script src="/ledelse-extra.js"></script>
   <script src="/news.js"></script>
   <script src="/calendar.js"></script>
   <script src="/devgoals.js"></script>
@@ -1117,5 +1289,7 @@
   <script src="/hub.js"></script>
   <script src="/marketing.js"></script>
   <script src="/mktcontacts.js"></script>
+  <script src="/social.js"></script>
+  <script src="/rib.js"></script>
 </body>
 </html>

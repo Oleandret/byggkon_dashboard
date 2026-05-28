@@ -567,6 +567,52 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .nav-group-items { display: flex; flex-direction: column; gap: 2px; }
 .nav-group-items .tab { padding-left: 18px; }
 
+/* ---- KI-forslag: terningkast (1–6) ---- */
+.dice-row { display: flex; align-items: center; gap: 5px; margin-top: 8px; flex-wrap: wrap; }
+.dice-label { font-size: 11.5px; color: var(--muted); margin-right: 4px; }
+.dice-btn { width: 30px; height: 30px; padding: 0; border: 1px solid var(--border); background: #fff; border-radius: 8px;
+  cursor: pointer; font-size: 20px; line-height: 1; transition: transform .08s, background .12s; }
+.dice-btn:hover { background: var(--mint); transform: translateY(-1px); }
+.dice-avg { margin-left: 8px; font-weight: 800; color: var(--accent-dark); }
+
+/* ---- Leverandør-detalj-modal ---- */
+.sup-modal-card { max-width: 900px; width: 96vw; max-height: 90vh; overflow-y: auto; padding: 18px 22px; }
+.sup-detail-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.sup-detail-tbl th, .sup-detail-tbl td { padding: 6px 9px; border-bottom: 1px solid var(--grid); text-align: left; }
+.sup-detail-tbl td.num, .sup-detail-tbl th.num { text-align: right; white-space: nowrap; }
+.sup-link { color: var(--accent-dark); text-decoration: none; font-weight: 700; border-bottom: 1px dotted var(--accent-soft); }
+.sup-link:hover { color: var(--accent); border-bottom-style: solid; }
+
+/* ---- Avdelinger: kompakte chips øverst + RIB-dashboard ---- */
+.avd-card { padding: 12px 14px; }
+.avd-strip { display: flex; flex-wrap: wrap; gap: 7px; }
+.avd-chip { background: var(--mint); border: 1px solid var(--mint-2); color: var(--accent-dark); border-radius: 999px; padding: 4px 12px; font-size: 12.5px; font-weight: 700; }
+.rib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.rib-card { border: 1px solid var(--border); border-top: 3px solid var(--accent); border-radius: 10px; padding: 10px 12px; background: #fff; }
+.rib-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+.rib-name { font-weight: 700; font-size: 14px; }
+.rib-tot { font-size: 12px; font-weight: 700; color: var(--accent-dark); }
+.rib-tbl { width: 100%; border-collapse: collapse; }
+.rib-tbl td { padding: 5px 6px; border-top: 1px solid var(--grid); font-size: 12.5px; vertical-align: top; }
+.rib-tbl tr:first-child td { border-top: 0; }
+.rib-tbl td.num { text-align: right; white-space: nowrap; font-weight: 700; }
+.rib-cust { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+/* ---- Sosiale medier (markedsføring) ---- */
+.social-card textarea.kon-f { width: 100%; resize: vertical; }
+.social-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 9px; }
+.social-msg { margin-left: 4px; }
+.social-ico { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;
+  border-radius: 6px; font-weight: 800; font-size: 14px; color: #fff; margin-right: 6px; }
+.social-fb { background: #1877f2; font-family: Georgia, serif; }
+.social-li { background: #0a66c2; font-size: 11px; letter-spacing: -.5px; }
+
+/* ---- Ledelse underfaner ---- */
+.led-sub { display: none; }
+.led-sub.active { display: block; }
+.led-file-upload { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+.led-file-upload .kon-f { flex: 0 0 auto; }
+
 /* ---- Innstillinger: faner ---- */
 .set-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
 .set-tab { border: 0; background: transparent; padding: 9px 14px; font: inherit; font-weight: 600; font-size: 13.5px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
@@ -640,6 +686,14 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .ds-cap-chip b { color: var(--accent-dark); }
 .ds-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items: stretch; }
 .ds-grid-3 { grid-template-columns: 1fr 2fr 1fr; }
+.ds-grid-2 { grid-template-columns: 1fr 1fr; }
+@media (max-width: 900px) { .ds-grid-2 { grid-template-columns: 1fr; } }
+.ds-contacts { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.ds-contact { background: #fff; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 9px; padding: 9px 12px; font-size: 12.5px; }
+.dsc-name { font-weight: 700; font-size: 13.5px; }
+.dsc-title { font-size: 11.5px; color: var(--accent-dark); font-weight: 600; margin-bottom: 4px; }
+.dsc-line { font-size: 12px; line-height: 1.45; }
+.dsc-line a { color: var(--ink); }
 @media (max-width: 1100px) { .ds-grid-3 { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 900px) { .ds-grid, .ds-grid-3 { grid-template-columns: 1fr; } }
 .ds-map { height: 560px; border-radius: 10px; overflow: hidden; z-index: 0; }

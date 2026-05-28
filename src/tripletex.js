@@ -125,6 +125,18 @@ export async function getSupplierInvoices(fromDate, toDate) {
   });
 }
 
+// Detaljer for én leverandørs fakturaer (best effort med fields=*).
+export async function getSupplierInvoiceDetails(supplierId, fromDate, toDate) {
+  try {
+    const data = await callTool("search_supplier_invoices", {
+      supplierId, invoiceDateFrom: fromDate, invoiceDateTo: toDate,
+      from: 0, count: 1000, fields: "*",
+    });
+    assertOk("search_supplier_invoices", data);
+    return data?.values || [];
+  } catch { return []; }
+}
+
 // Kunder (id -> navn, e-post, telefon) – til kunde-oversikten.
 export async function getCustomers() {
   return fetchAll("search_customers", { fields: "id,name,email,phoneNumber,invoiceEmail" });
