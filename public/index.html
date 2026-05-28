@@ -1529,9 +1529,68 @@ cd ~/pitzDaily &amp;&amp; blockMesh &amp;&amp; simpleFoam &amp;&amp; paraFoam</p
         </div>
 
         <div class="led-sub" id="ledsub-rapport">
+          <div class="rapport-deck" id="rapportDeck">
+            <!-- Slide 1: Tittel -->
+            <div class="rapport-slide rapport-title">
+              <div class="rapport-brand">BYGG-KON AS</div>
+              <h1 id="rapportTitle">Status Bygg-Kon AS</h1>
+              <div class="rapport-meta" id="rapportPeriod">—</div>
+            </div>
+
+            <!-- Slide 2: Resultat 2026 og LTM -->
+            <div class="rapport-slide">
+              <div class="rapport-h">
+                <h2>Resultat 2026 og LTM</h2>
+                <div class="org-actions">
+                  <button class="btn-ghost" id="rapportReload">↻ Oppdater</button>
+                </div>
+              </div>
+              <div class="rapport-kpis" id="rapportResultKpis"></div>
+              <div class="chart-box" style="height:380px"><canvas id="rapportResultChart"></canvas></div>
+              <p class="subnote" id="rapportResultNote"></p>
+            </div>
+
+            <!-- Slide 3: Balanse -->
+            <div class="rapport-slide">
+              <div class="rapport-h"><h2>Balanse — Bygg-Kon AS</h2></div>
+              <p class="subnote">* EK og andel ikke justert for skattekostnad.</p>
+              <div class="rapport-kpis" id="rapportBalanceKpis"></div>
+              <div id="rapportBalanceTable"></div>
+            </div>
+
+            <!-- Slide 4: Likviditet -->
+            <div class="rapport-slide">
+              <div class="rapport-h"><h2>Likviditet</h2></div>
+              <div class="chart-box" style="height:340px"><canvas id="rapportLikvChart"></canvas></div>
+              <ul class="rapport-bullets" id="rapportLikvNotes">
+                <li>En likviditetsprognose som denne er alltid usikker.</li>
+                <li>Den tar utgangspunkt i status p.t., fakturerte inntekter og mottatte fakturaer.</li>
+                <li>Videre knyttes inn budsjett og forventninger derfra.</li>
+                <li>Den viser om det blir behov for ytterligere likviditetstilskudd utover i året.</li>
+              </ul>
+            </div>
+
+            <!-- Slide 5: Kontantstrøm -->
+            <div class="rapport-slide">
+              <div class="rapport-h"><h2>Kontantstrømanalyse</h2></div>
+              <div class="chart-box" style="height:340px"><canvas id="rapportCashChart"></canvas></div>
+              <ul class="rapport-bullets">
+                <li>Analysen viser hvordan finansiering av selskapet gjøres.</li>
+                <li>Endring i bank + akkumulert netto kontantstrøm per måned.</li>
+              </ul>
+            </div>
+
+            <!-- Slide 6: Timeregnskap -->
+            <div class="rapport-slide">
+              <div class="rapport-h"><h2>Timeregnskap — totalt og utilization per ansatt</h2></div>
+              <div class="rapport-kpis" id="rapportHoursKpis"></div>
+              <div class="chart-box" style="height:420px"><canvas id="rapportUtilChart"></canvas></div>
+              <p class="subnote">Faktureringsgrad = fakturerbare timer / totalt førte timer, siste 3 måneder.</p>
+            </div>
+          </div>
+
           <div class="card" data-slot="rapport">
-            <h2>Økonomirapport</h2>
-            <p class="subnote">Last opp siste økonomirapport (PowerPoint/PDF).</p>
+            <h3 style="margin-top:0">Last opp eksternt rapportdokument <span class="subnote">(valgfritt vedlegg)</span></h3>
             <div class="led-file-view"></div>
             <div class="led-file-upload">
               <input type="date" class="kon-f led-rev" />

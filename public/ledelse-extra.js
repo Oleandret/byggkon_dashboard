@@ -348,6 +348,173 @@
     });
   }
 
+  /* ============ ØKONOMIRAPPORT (PowerPoint-stil) ============ */
+  let rapportCharts = {};
+  let rapportLoaded = false;
+  async function loadRapport() {
+    if (rapportLoaded) return; rapportLoaded = true;
+    try {
+      const [econRes, likvRes] = await Promise.all([fetch("/api/economy"), fetch("/api/ledelse/likviditet")]);
+      const econ = await econRes.json();
+      const likv = likvRes.ok ? await likvRes.json() : null;
+      renderRapport(econ, likv);
+    } catch (e) {
+      console.warn("Rapport-feil:", e);
+      rapportLoaded = false;
+    }
+  }
+  function destroyCharts() {
+    Object.values(rapportCharts).forEach((c) => { try { c.destroy(); } catch {} });
+    rapportCharts = {};
+  }
+  function renderRapport(econ, likv) {
+    destroyCharts();
+    const fmtNok = (n) => Math.round(n || 0).toLocaleString("nb-NO");
+    const pctNum = (x) => Math.round((x || 0) * 100) + " %";
+    // Tittel
+    const now = new Date();
+    document.getElementById("rapportPeriod").textContent = `Status per ${now.toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" })}`;
+
+    /* ---- Slide 2: Resultat 2026 og LTM ---- */
+    const trend = econ.trend || [];
+    document.getElementById("rapportResultKpis").innerHTML = `
+      <div class="rapport-kpi"><div class="rk-lbl">Omsetning hittil i år</div><div class="rk-val">${fmtNok(econ.resultYTD?.revenue)} kr</div></div>
+      <div class="rapport-kpi"><div class="rk-lbl">Driftsresultat hittil</div><div class="rk-val">${fmtNok(econ.resultYTD?.operatingResult)} kr</div></div>
+      <div class="rapport-kpi"><div class="rk-lbl">Omsetning LTM</div><div class="rk-val">${fmtNok(econ.resultLTM?.revenue)} kr</div></div>
+      <div class="rapport-kpi"><div class="rk-lbl">EBT LTM</div><div class="rk-val ${econ.resultLTM?.ebt >= 0 ? "" : "neg"}">${fmtNok(econ.resultLTM?.ebt)} kr</div></div>
+    `;
+    rapportCharts.result = new Chart(document.getElementById("rapportResultChart"), {
+      type: "bar",
+      data: {
+        labels: trend.map((t) => t.label),
+        datasets: [
+          { label: "Sum Inntekter", data: trend.map((t) => t.revenue), backgroundColor: "#2b6eb8", borderRadius: 4, order: 2 },
+          { label: "EBT", data: trend.map((t) => t.ebt), backgroundColor: trend.map((t) => t.ebt >= 0 ? "#1d6a3b" : "#b42318"), borderRadius: 4, order: 1, type: "bar" },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: css("--muted"), font: { size: 11 } } },
+          tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmtNok(c.raw)} kr` } },
+        },
+        scales: {
+          x: { ticks: { color: css("--muted") }, grid: { display: false } },
+          y: { ticks: { color: css("--muted"), callback: (v) => Math.round(v / 1000) + "k" }, grid: { color: css("--grid") } },
+        },
+      },
+    });
+    const lastTrend = trend[trend.length - 1];
+    if (lastTrend) {
+      document.getElementById("rapportResultNote").textContent =
+        `Siste måned (${lastTrend.label}): Inntekter ${fmtNok(lastTrend.revenue)} kr, EBT ${fmtNok(lastTrend.ebt)} kr.`;
+    }
+
+    /* ---- Slide 3: Balanse ---- */
+    const b = econ.balance || {};
+    document.getElementById("rapportBalanceKpis").innerHTML = `
+      <div class="rapport-kpi"><div class="rk-lbl">Bank</div><div class="rk-val ${b.bank >= 0 ? "" : "neg"}">${fmtNok(b.bank)} kr</div></div>
+      <div class="rapport-kpi"><div class="rk-lbl">Kundefordringer</div><div class="rk-val">${fmtNok(b.receivables)} kr</div></div>
+      <div class="rapport-kpi"><div class="rk-lbl">Leverandørgjeld</div><div class="rk-val">${fmtNok(b.supplierDebt)} kr</div></div>
+      <div class="rapport-kpi"><div class="rk-lbl">Egenkapital*</div><div class="rk-val">${fmtNok(b.equity)} kr</div></div>
+    `;
+    const totLiab = (b.liabilities || 0);
+    const totAssets = (b.assets || 0);
+    const ekRatio = totAssets > 0 ? (b.equity / totAssets) : 0;
+    document.getElementById("rapportBalanceTable").innerHTML = `
+      <table class="rapport-tbl">
+        <thead><tr><th>Post</th><th class="num">Beløp (kr)</th></tr></thead>
+        <tbody>
+          <tr class="grp"><td>Eiendeler</td><td class="num"><b>${fmtNok(b.assets)}</b></td></tr>
+          <tr><td>— hvorav bank</td><td class="num">${fmtNok(b.bank)}</td></tr>
+          <tr><td>— hvorav kundefordringer</td><td class="num">${fmtNok(b.receivables)}</td></tr>
+          <tr class="grp"><td>Gjeld og egenkapital</td><td class="num"><b>${fmtNok(totLiab + (b.equity || 0))}</b></td></tr>
+          <tr><td>— Egenkapital*</td><td class="num">${fmtNok(b.equity)} (${pctNum(ekRatio)})</td></tr>
+          <tr><td>— Leverandørgjeld</td><td class="num">${fmtNok(b.supplierDebt)}</td></tr>
+          <tr><td>— Annen gjeld</td><td class="num">${fmtNok(totLiab - (b.supplierDebt || 0))}</td></tr>
+        </tbody>
+      </table>`;
+
+    /* ---- Slide 4: Likviditet ---- */
+    if (likv && likv.months) {
+      const months = likv.months;
+      // Beregn netto per måned fra auto + justeringer
+      const sumPerSection = { innbetalinger: months.map(() => 0), utbetalinger: months.map(() => 0), fasteKostnader: months.map(() => 0) };
+      likv.sections.forEach((sec) => {
+        sec.rows.forEach((row) => {
+          months.forEach((m, i) => {
+            const adj = Number(likv.adjustments?.[row.key]?.[m.key] || 0);
+            sumPerSection[sec.key][i] += (row.auto[i] || 0) + adj;
+          });
+        });
+      });
+      const netto = months.map((_, i) => sumPerSection.innbetalinger[i] - sumPerSection.utbetalinger[i] - sumPerSection.fasteKostnader[i]);
+      const ubArr = []; let acc = likv.startBalance || 0;
+      netto.forEach((n) => { acc += n; ubArr.push(acc); });
+      rapportCharts.likv = new Chart(document.getElementById("rapportLikvChart"), {
+        type: "line",
+        data: {
+          labels: months.map((m) => m.label),
+          datasets: [
+            { label: "UB bank (inkl. KK)", data: ubArr, borderColor: "#2b6eb8", backgroundColor: "rgba(43,110,184,.12)", fill: true, tension: 0.25 },
+            { label: "Netto kontantstrøm/mnd", data: netto, type: "bar", backgroundColor: netto.map((n) => n >= 0 ? "#1d6a3b" : "#b42318"), borderRadius: 4 },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: css("--muted"), font: { size: 11 } } }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmtNok(c.raw)} kr` } } },
+          scales: { x: { ticks: { color: css("--muted") }, grid: { display: false } }, y: { ticks: { color: css("--muted"), callback: (v) => Math.round(v / 1000) + "k" }, grid: { color: css("--grid") } } },
+        },
+      });
+    }
+
+    /* ---- Slide 5: Kontantstrøm ---- */
+    // Bruk månedsrevenue og månedsresultat fra trend som proxy for cashflow
+    const cashflow = trend.map((t) => t.ebt);
+    let cumCash = 0; const cumCashArr = cashflow.map((v) => { cumCash += v; return cumCash; });
+    rapportCharts.cash = new Chart(document.getElementById("rapportCashChart"), {
+      type: "bar",
+      data: {
+        labels: trend.map((t) => t.label),
+        datasets: [
+          { label: "EBT per måned", data: cashflow, backgroundColor: cashflow.map((n) => n >= 0 ? "#1d6a3b" : "#b42318"), borderRadius: 4, order: 2 },
+          { label: "Akkumulert", data: cumCashArr, type: "line", borderColor: "#2b6eb8", backgroundColor: "rgba(43,110,184,.10)", fill: false, tension: 0.25, order: 1 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: css("--muted"), font: { size: 11 } } }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmtNok(c.raw)} kr` } } },
+        scales: { x: { ticks: { color: css("--muted") }, grid: { display: false } }, y: { ticks: { color: css("--muted"), callback: (v) => Math.round(v / 1000) + "k" }, grid: { color: css("--grid") } } },
+      },
+    });
+
+    /* ---- Slide 6: Timeregnskap ---- */
+    const b3 = econ.billing3m || { employees: [], total: {} };
+    document.getElementById("rapportHoursKpis").innerHTML = `
+      <div class="rapport-kpi"><div class="rk-lbl">Faktureringsgrad — siste 3 mnd</div><div class="rk-val">${pctNum(b3.total?.billingRate)}</div></div>
+      <div class="rapport-kpi"><div class="rk-lbl">Totale timer 3 mnd</div><div class="rk-val">${num(b3.total?.hours)} t</div></div>
+      <div class="rapport-kpi"><div class="rk-lbl">Fakturerbare timer 3 mnd</div><div class="rk-val">${num(b3.total?.billable)} t</div></div>
+    `;
+    const emps = (b3.employees || []).slice();
+    rapportCharts.util = new Chart(document.getElementById("rapportUtilChart"), {
+      type: "bar",
+      data: {
+        labels: emps.map((e) => e.name),
+        datasets: [{
+          label: "Faktureringsgrad",
+          data: emps.map((e) => Math.round(e.billingRate * 100)),
+          backgroundColor: emps.map((e) => e.billingRate >= 0.70 ? "#1d6a3b" : e.billingRate >= 0.60 ? "#d18d3c" : "#b42318"),
+          borderRadius: 4,
+        }],
+      },
+      options: {
+        indexAxis: "y", responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${c.raw} % (${num(emps[c.dataIndex].billable)} av ${num(emps[c.dataIndex].hours)} t)` } } },
+        scales: { x: { suggestedMin: 0, suggestedMax: 100, ticks: { color: css("--muted"), callback: (v) => v + " %" }, grid: { color: css("--grid") } }, y: { ticks: { color: css("--muted") }, grid: { display: false } } },
+      },
+    });
+  }
+
   function nokshort(n) {
     n = Math.round(n || 0);
     if (Math.abs(n) >= 1000000) return (n / 1000000).toFixed(2).replace(/\.?0+$/, "") + "M";
@@ -459,5 +626,13 @@
   if (tab) tab.addEventListener("click", () => {
     loadFiles();
     if (!autoLoaded) { autoLoaded = true; loadAuto(); }
+    // Rapporten lastes når undertabben åpnes
+    setTimeout(() => { const rs = document.querySelector('#ledSubtabs .subtab[data-sub="rapport"]'); if (rs && rs.classList.contains("active")) loadRapport(); }, 50);
+  });
+  // Når man bytter undertab i Ledelse
+  document.addEventListener("click", (e) => {
+    const sub = e.target.closest('#ledSubtabs .subtab');
+    if (sub && sub.dataset.sub === "rapport") loadRapport();
+    if (e.target.id === "rapportReload") { rapportLoaded = false; loadRapport(); }
   });
 })();
