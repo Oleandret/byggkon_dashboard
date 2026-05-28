@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 import { buildOverview } from "./src/metrics.js";
 import { buildEconomy } from "./src/economy.js";
 import { getNewsFeed } from "./src/newsfeed.js";
-import { clearCache, resetClient, getInvoices, getCustomers, getSupplierInvoices, getSupplierInvoiceDetails, getProjects, getProjectAddresses, getTimeEntries, getEmployees, ymd } from "./src/tripletex.js";
+import { clearCache, resetClient, getInvoices, getCustomers, getSupplierInvoices, getSupplierInvoiceDetails, getSuppliers, getForwardableInvoices, getProjects, getProjectAddresses, getTimeEntries, getEmployees, ymd } from "./src/tripletex.js";
 import { geocodeOne, sleep } from "./src/geocode.js";
 import { serveWithSnapshot, expireSnapshots } from "./src/snapshot.js";
 const snapTtl = () => getConfig().cacheTtlMs || 300000;
@@ -122,10 +122,14 @@ app.post("/api/admin/settings", requireAdmin, (req, res) => {
     if (Array.isArray(req.body?.departments)) {
       partial.departments = req.body.departments.map((d) => String(d || "").trim()).filter(Boolean);
     }
-    // MCP-servere (navn + url). Url må være http(s).
+    // MCP-servere (navn + url + key). Url må være http(s).
     if (Array.isArray(req.body?.mcpServers)) {
       partial.mcpServers = req.body.mcpServers
-        .map((m) => ({ name: String(m.name || "").slice(0, 60).trim(), url: String(m.url || "").slice(0, 500).trim() }))
+        .map((m) => ({
+          name: String(m.name || "").slice(0, 60).trim(),
+          url: String(m.url || "").slice(0, 500).trim(),
+          key: String(m.key || "").slice(0, 500).trim(),
+        }))
         .filter((m) => m.name && /^https?:\/\//i.test(m.url));
     }
     saveConfig(partial);
@@ -154,7 +158,20 @@ app.get("/api/costs", requireAuth, async (req, res) => {
       const today = new Date();
       const to = ymd(today);
       const from = ymd(new Date(today.getFullYear() - 1, today.getMonth(), today.getDate()));
-      const sis = await getSupplierInvoices(from, to);
+      const [sis, supplierList] = await Promise.all([
+        getSupplierInvoices(from, to),
+        getSuppliers().catch(() => []),
+      ]);
+      // navn -> {email, phone, orgNr}
+      const supContact = new Map();
+      for (const s of supplierList) {
+        if (!s.name) continue;
+        supContact.set(s.name, {
+          email: s.email || s.invoiceEmail || "",
+          phone: s.phoneNumber || s.phone || "",
+          orgNr: s.organizationNumber || "",
+        });
+      }
       const bySup = new Map();
       let total = 0;
       for (const s of sis) {
@@ -162,13 +179,13 @@ app.get("/api/costs", requireAuth, async (req, res) => {
         if (SALARY_RE.test(name)) continue; // ingen lønnskostnader skal med
         const id = s.supplier?.id;
         const cost = Math.abs(s.amount || 0);
-        const cur = bySup.get(name) || { name, id, cost: 0, count: 0 };
+        const c = supContact.get(name) || {};
+        const cur = bySup.get(name) || { name, id, cost: 0, count: 0, email: c.email || "", phone: c.phone || "", orgNr: c.orgNr || "" };
         cur.cost += cost; cur.count += 1; total += cost;
         if (id && !cur.id) cur.id = id;
         bySup.set(name, cur);
       }
       const meta = getConfig().supplierMeta || {};
-      // Filtrer bort de som er merket "avsluttet" – men ta dem med i en egen liste
       const all = [...bySup.values()].sort((a, b) => b.cost - a.cost);
       const suppliers = all.filter((s) => !(meta[s.name] && meta[s.name].terminated));
       const terminated = all.filter((s) => meta[s.name] && meta[s.name].terminated);
@@ -176,6 +193,28 @@ app.get("/api/costs", requireAuth, async (req, res) => {
     }, snapTtl()));
   } catch (err) {
     console.error("Feil i /api/costs:", err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// Til viderefakturering: leverandørfakturaer der kommentaren inneholder "vf"
+// eller "viderefaktur" – siste 12 måneder.
+app.get("/api/forwardable", requireAuth, async (req, res) => {
+  try {
+    const today = new Date();
+    const to = ymd(today);
+    const from = ymd(new Date(today.getFullYear() - 1, today.getMonth(), today.getDate()));
+    const rows = await getForwardableInvoices(from, to);
+    const out = rows.map((r) => ({
+      id: r.id,
+      supplier: r.supplier?.name || "",
+      invoiceDate: r.invoiceDate || "",
+      invoiceNumber: r.invoiceNumber || r.kid || "",
+      comment: r.comment || r.description || r.title || "",
+      amount: Math.abs(r.amount || 0),
+    })).sort((a, b) => (b.invoiceDate || "").localeCompare(a.invoiceDate || ""));
+    res.json({ invoices: out, total: out.reduce((s, r) => s + r.amount, 0) });
+  } catch (err) {
     res.status(502).json({ error: err.message });
   }
 });
@@ -1116,6 +1155,58 @@ app.post("/api/prosjektmoter", requireAuth, (req, res) => {
       text: String(s.text || "").slice(0, 500), by: String(s.by || "").slice(0, 80), date: String(s.date || "").slice(0, 10),
     })) : (getConfig().prosjektmoter?.suggestions || []);
     saveConfig({ prosjektmoter: { meetings, suggestions } });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Avdelingsmedlemmer (hvilke ansatte hører til hvilken avdeling) ----
+app.get("/api/department-members", requireAuth, (req, res) => res.json({ members: getConfig().departmentMembers || {} }));
+app.post("/api/department-members", requireAuth, (req, res) => {
+  try {
+    const m = req.body?.members;
+    if (!m || typeof m !== "object") return res.status(400).json({ error: "Mangler members-objekt" });
+    const clean = {};
+    for (const [dept, list] of Object.entries(m)) {
+      if (!dept || !Array.isArray(list)) continue;
+      clean[String(dept).slice(0, 80)] = list.map((x) => String(x || "").slice(0, 80)).filter(Boolean);
+    }
+    saveConfig({ departmentMembers: clean });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- IT-system og verktøy (alle innloggede kan redigere) ----
+app.get("/api/itsystems", requireAuth, (req, res) => res.json({ systems: getConfig().itSystems || [] }));
+app.post("/api/itsystems", requireAuth, (req, res) => {
+  try {
+    const list = Array.isArray(req.body?.systems) ? req.body.systems : null;
+    if (!list) return res.status(400).json({ error: "Mangler systems-liste" });
+    const clean = list.map((s) => ({
+      title: String(s.title || "").slice(0, 120),
+      url: String(s.url || "").slice(0, 500),
+      note: String(s.note || "").slice(0, 600),
+      status: String(s.status || "").slice(0, 30),
+      statusCls: String(s.statusCls || "").slice(0, 16),
+    }));
+    saveConfig({ itSystems: clean });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Aktive MCP-agenter (navn + url + key) — kun ledelse ----
+app.get("/api/admin/mcpservers", requireAdmin, (req, res) => res.json({ servers: getConfig().mcpServers || [] }));
+app.post("/api/admin/mcpservers", requireAdmin, (req, res) => {
+  try {
+    const list = Array.isArray(req.body?.servers) ? req.body.servers : null;
+    if (!list) return res.status(400).json({ error: "Mangler servers-liste" });
+    const clean = list
+      .map((m) => ({
+        name: String(m.name || "").slice(0, 60).trim(),
+        url: String(m.url || "").slice(0, 500).trim(),
+        key: String(m.key || "").slice(0, 500).trim(),
+      }))
+      .filter((m) => m.name);
+    saveConfig({ mcpServers: clean });
     res.json({ ok: true });
   } catch (err) { res.status(400).json({ error: err.message }); }
 });

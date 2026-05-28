@@ -125,7 +125,7 @@
     <main class="container">
       <div id="birthdayBanner" class="bday-banner" hidden></div>
 
-      <div class="front-grid front-grid-3">
+      <div class="front-grid front-grid-4">
         <div class="card front-box">
           <div class="proj-head">
             <h2>Nyheter internt</h2>
@@ -168,6 +168,14 @@
               <button type="submit" class="btn-primary">Legg til</button>
             </div>
           </form>
+        </div>
+        <div class="card front-box cam-card">
+          <h2>Live cam — Forus <span class="subnote">E39 (Statens Vegvesen)</span></h2>
+          <p class="subnote">Se trafikken på E39 ved Forus i sanntid. Bildet oppdateres automatisk.</p>
+          <a href="https://www.vegvesen.no/trafikkinformasjon/reiseinformasjon/webkamera/#/1129024_2" target="_blank" rel="noopener">
+            <img id="forusCam" class="cam-img" alt="E39 Forus webkamera" src="https://kamera.atlas.vegvesen.no/api/images/1129024_2" />
+          </a>
+          <p class="subnote" id="forusCamTime">Sist oppdatert: nå</p>
         </div>
       </div><!-- /front-grid -->
 
@@ -294,6 +302,7 @@
 
       <div class="card" style="margin-top:16px">
         <h2>Kontaktinformasjon ansatte</h2>
+        <p class="subnote">📧 <b><a href="mailto:post@byggkon.no">post@byggkon.no</a></b> går til alle ansatte.</p>
         <div id="dsContacts" class="ds-contacts"></div>
       </div>
     </main>
@@ -408,25 +417,28 @@
           <div id="pmSuggestions"></div>
         </div>
       </div>
-      <div class="grid-2">
-        <div class="card">
-          <h2>Ressursfordeling — timer per prosjekt (siste 4 uker)</h2>
-          <p class="subnote">Prosjektene med flest timer øverst, og hvem som jobber på dem.</p>
-          <div class="table-wrap tall"><table id="pmResource"></table></div>
-        </div>
-        <div class="card">
-          <div class="proj-head">
-            <h2>Per ansatt — prosjekter (siste 4 uker)</h2>
-            <select id="pmEmpFilter" class="kon-f" style="max-width:200px"></select>
-          </div>
-          <p class="subnote">Hver ansatt og prosjektene de har ført timer på, med flest timer øverst.</p>
-          <div id="pmEmpResource" class="emp-res"></div>
-        </div>
+      <div class="card">
+        <h2>Ressursfordeling — timer per prosjekt <span class="subnote">siste 2 uker</span></h2>
+        <p class="subnote">Prosjektene med flest timer øverst og hvem som jobber på dem.</p>
+        <div id="pmResourceGrid" class="pm-res-grid"></div>
       </div>
       <div class="card">
-        <h2>Kapasitet — hvem kan ta mer? <span class="subnote">siste 4 uker, lavest faktureringsgrad = mest ledig</span></h2>
+        <div class="proj-head">
+          <h2>Per ansatt — prosjekter <span class="subnote">siste 2 uker</span></h2>
+          <select id="pmEmpFilter" class="kon-f" style="max-width:200px"></select>
+        </div>
+        <p class="subnote">Hver ansatt og prosjektene de har ført timer på, med flest timer øverst.</p>
+        <div id="pmEmpResource" class="emp-res"></div>
+      </div>
+      <div class="card">
+        <h2>Kapasitet — hvem kan ta mer? <span class="subnote">siste 4 uker</span></h2>
         <div class="value-note">💚 <b>Vi er ett team.</b> Målet er å fylle ordreboka til hver enkelt — sammen. Har noen ledig kapasitet, er det en mulighet til å hjelpe en kollega, dele kompetanse og ta inn nye oppdrag. Bruk denne oversikten i møtet til å flytte arbeid dit det trengs, og til å løfte hverandre.</div>
         <div class="table-wrap"><table id="pmCapacity"></table></div>
+      </div>
+      <div class="card">
+        <h2>Kapasitet — siste 2 uker <span class="subnote">faktureringsgrad nå</span></h2>
+        <p class="subnote">Lavest øverst – mest ledig kapasitet til neste oppdrag.</p>
+        <div class="table-wrap"><table id="pmCapacity2w"></table></div>
       </div>
     </main>
   </section>
@@ -446,6 +458,11 @@
         </div>
         <p class="subnote">Eksterne kontaktpersoner: utleier, IT-support, samarbeidspartnere m.m.</p>
         <div class="scaffold-grid" id="konGrid"></div>
+      </div>
+      <div class="card">
+        <h2>Ansatte i Bygg-Kon</h2>
+        <p class="subnote">📧 <b><a href="mailto:post@byggkon.no">post@byggkon.no</a></b> går til alle ansatte. Listen hentes fra organisasjonskartet.</p>
+        <div id="konAnsatte" class="ds-contacts"></div>
       </div>
       <div class="card">
         <div class="proj-head">
@@ -785,9 +802,13 @@
         <div class="table-wrap tall"><table id="kostTable"></table></div>
       </div>
       <div class="card">
-        <h2>Til viderefakturering</h2>
-        <p class="subnote">Potensielle kostnader (utlegg) som skal faktureres videre til kunde.</p>
-        <div id="rebillNote" class="value-note">For å hente disse automatisk trenger jeg å vite hvordan dere markerer slike kostnader i Tripletex (f.eks. knyttet til et bestemt prosjekt, en konto, eller en avdeling). Si fra, så kobler jeg det på.</div>
+        <div class="proj-head">
+          <h2>Til viderefakturering <span class="subnote">— fakturaer merket «vf» eller «viderefaktur» i kommentar</span></h2>
+          <button id="rebillReload" class="btn-ghost">↻</button>
+        </div>
+        <p class="subnote">Søker i kommentarfeltet på leverandørfakturaer siste 12 måneder. Klikk en linje for å åpne fakturaen i Tripletex.</p>
+        <div id="rebillStatus" class="subnote">Laster …</div>
+        <div class="table-wrap"><table id="rebillTable"></table></div>
       </div>
     </main>
   </section>
@@ -878,32 +899,26 @@
         </div>
       </div>
 
-      <div class="grid-2">
-        <div class="card social-card">
-          <div class="proj-head">
-            <h2><span class="social-ico social-fb">f</span> Facebook</h2>
-            <a class="sc-link" href="https://www.facebook.com/byggkon" target="_blank" rel="noopener">Vår side ↗</a>
-          </div>
-          <p class="subnote">Skriv innlegget her, kopier teksten, og åpne Facebook for å lime inn og publisere.</p>
-          <textarea id="fbText" class="kon-f" rows="6" placeholder="Hva vil du dele på Facebook? …"></textarea>
-          <div class="social-actions">
-            <button class="btn-ghost" data-social-copy="fbText">📋 Kopier tekst</button>
-            <a class="btn-primary" id="fbPost" href="https://www.facebook.com/byggkon" target="_blank" rel="noopener">Åpne Facebook for å poste ↗</a>
-            <span class="social-msg subnote" id="fbMsg"></span>
+      <div class="card social-card">
+        <div class="proj-head">
+          <h2>Post til sosiale medier <span class="social-ico social-fb">f</span><span class="social-ico social-li">in</span></h2>
+          <div class="org-actions">
+            <a class="sc-link" href="https://www.facebook.com/byggkon" target="_blank" rel="noopener">Facebook ↗</a>
+            <a class="sc-link" href="https://www.linkedin.com/company/bygg-kon/" target="_blank" rel="noopener">LinkedIn ↗</a>
           </div>
         </div>
-        <div class="card social-card">
-          <div class="proj-head">
-            <h2><span class="social-ico social-li">in</span> LinkedIn</h2>
-            <a class="sc-link" href="https://www.linkedin.com/company/bygg-kon/" target="_blank" rel="noopener">Vår side ↗</a>
-          </div>
-          <p class="subnote">Skriv innlegget her, kopier teksten, og åpne LinkedIn for å lime inn og publisere.</p>
-          <textarea id="liText" class="kon-f" rows="6" placeholder="Hva vil du dele på LinkedIn? …"></textarea>
-          <div class="social-actions">
-            <button class="btn-ghost" data-social-copy="liText">📋 Kopier tekst</button>
-            <a class="btn-primary" id="liPost" href="https://www.linkedin.com/company/bygg-kon/admin/page-posts/published/" target="_blank" rel="noopener">Åpne LinkedIn for å poste ↗</a>
-            <span class="social-msg subnote" id="liMsg"></span>
-          </div>
+        <p class="subnote">Skriv innlegget, legg ved bilde, og post med ett klikk. Teksten kopieres automatisk og begge kanaler åpnes klar til innliming. <b>Direkte API-publisering krever OAuth-oppsett</b> hos Meta og LinkedIn – ikke aktivt ennå.</p>
+        <textarea id="socText" class="kon-f" rows="6" placeholder="Hva vil du dele? Skriv innlegget her …"></textarea>
+        <div class="social-image">
+          <input id="socImage" type="file" accept="image/*" />
+          <img id="socImagePreview" alt="" hidden />
+          <button id="socImageDownload" class="btn-ghost" hidden>⬇ Last ned bilde for vedlegg</button>
+        </div>
+        <div class="social-actions">
+          <button id="socPostBoth" class="btn-primary">📋 Kopier &amp; åpne begge kanaler</button>
+          <button id="socPostFb" class="btn-ghost">Bare Facebook</button>
+          <button id="socPostLi" class="btn-ghost">Bare LinkedIn</button>
+          <span class="social-msg subnote" id="socMsg"></span>
         </div>
       </div>
       <div class="card intro-card">
@@ -946,22 +961,16 @@
 
       <div class="card">
         <div class="proj-head">
-          <h2>RIB-dashboard <span class="subnote">— løpende prosjekter for RIB-ansatte</span></h2>
-          <button class="btn-ghost dept-reload" data-dept="rib">↻</button>
+          <h2 id="deptDashTitle">Velg en avdeling øverst</h2>
+          <div class="org-actions">
+            <button id="deptEditMembers" class="btn-ghost" hidden>👥 Rediger medlemmer</button>
+            <button id="deptReload" class="btn-ghost">↻</button>
+          </div>
         </div>
-        <p class="subnote">Timer hentet fra Tripletex siste 4 uker per RIB-ansatt. Bygges fra organisasjonskart-titler (RIB).</p>
-        <div class="dept-status subnote" data-dept="rib">Laster …</div>
-        <div class="dept-grid rib-grid" data-dept="rib"></div>
-      </div>
-
-      <div class="card">
-        <div class="proj-head">
-          <h2>Ledelse-dashboard <span class="subnote">— løpende prosjekter for ledere</span></h2>
-          <button class="btn-ghost dept-reload" data-dept="led">↻</button>
-        </div>
-        <p class="subnote">Daglig leder, faglige ledere og avdelingsledere — timer siste 4 uker fra Tripletex.</p>
-        <div class="dept-status subnote" data-dept="led">Laster …</div>
-        <div class="dept-grid rib-grid" data-dept="led"></div>
+        <p class="subnote" id="deptDashSub">Klikk på en avdelings-chip øverst. Hver avdeling viser sine ansatte med løpende prosjekter (timer siste 4 uker fra Tripletex).</p>
+        <div id="deptMemberEdit" class="dept-member-edit" hidden></div>
+        <div id="deptStatus" class="subnote" hidden></div>
+        <div id="deptGrid" class="rib-grid"></div>
       </div>
     </main>
   </section>
@@ -974,6 +983,18 @@
       <div class="card hub-card">
         <h2>Bygg-Kon AI Hub <span class="subnote">— alle agentene koblet sammen</span></h2>
         <div id="aiHub" class="ai-hub"></div>
+      </div>
+
+      <div class="card" id="mcpKeysCard" hidden>
+        <div class="proj-head">
+          <h2>Aktive AI-agenter — MCP-tilkoblinger 🔒</h2>
+          <div class="org-actions">
+            <button id="mcpKeysAdd" class="btn-ghost">+ Agent</button>
+            <button id="mcpKeysSave" class="btn-primary">Lagre</button>
+          </div>
+        </div>
+        <p class="subnote">Kun ledelsen. Navn, URL og MCP-nøkkel for agentene systemet skal snakke med. Behandles som passord — lagres kun på serveren.</p>
+        <div id="mcpKeysList" class="mcp-keys-list"></div>
       </div>
       <div class="card">
         <h2>Operative AI-agenter <span class="subnote">— i bruk nå</span></h2>
@@ -1209,9 +1230,23 @@
   <section class="tab-panel" id="panel-itsystem">
     <main class="container">
       <div class="page-intro"><span class="pi-ico">💻</span><span class="pi-txt"><b>Hva siden gjør:</b> Alfabetisk oversikt over IT-systemene og lisensene våre, med kort forklaring på hvert. <b>Hensikt:</b> Vite hvilke verktøy vi har og hvem som eier dem. Passord ligger i 1Password — aldri her.</span></div>
+      <div class="card intro-card">
+        <h2>🤖 Slik bruker vi Claude og KI-agentene</h2>
+        <p><b>Claude</b> er motoren bak dette dashbordet og Cowork-arbeidsstasjonen vår. Den leser/skriver til Tripletex via Regnskapsagent-MCP-en, og genererer rapporter, dokumenter og analyser på sekunder.</p>
+        <p><b>Fyxer AI</b> håndterer innboksen vår — sorterer, foreslår svar og lærer av hvordan vi vanligvis svarer. Sammen med Claude reduserer det e-posttiden vesentlig.</p>
+        <p><b>De andre agentene</b> (Loki, Nova, Hilde, Embla/KI Tilbud, Stein, Eira) er spesialiserte: Loki finner svar i alle prosjektdokumentene våre, Nova svarer på fag og regelverk, Hilde slår opp eiendom i Kartverket/Brønnøysund, Embla produserer komplette tilbud etter NS-standarder, Stein gjør kalkyle, og Eira følger opp kunder. Alle er koblet sammen i <b>Bygg-Kon AI Hub</b> (se KI-agenter-fanen), og resultatet er at vi kan hente ut og produsere dokumenter på minutter i stedet for dager.</p>
+        <p class="subnote">Alt sammen kjører på vår byggkon.ai-plattform med felles innlogging (ai@byggkon.no for delt tilgang).</p>
+      </div>
       <div class="card">
-        <h2>IT-system og verktøy</h2>
-        <p class="subnote">Oversikt over systemene vi bruker, hva de er til, og raske lenker. (Brukernavn og passord ligger ikke her – de finnes i 1Password.)</p>
+        <div class="proj-head">
+          <h2>IT-system og verktøy</h2>
+          <div class="org-actions">
+            <button id="itEdit" class="btn-ghost">🔓 Lås opp</button>
+            <button id="itAdd" class="btn-ghost" hidden>+ Nytt system</button>
+            <button id="itSave" class="btn-primary" hidden>Lagre</button>
+          </div>
+        </div>
+        <p class="subnote">Oversikt over systemene vi bruker, hva de er til, og raske lenker. Lås opp for å legge til/redigere. (Passord ligger i 1Password — ikke her.)</p>
         <div class="scaffold-grid" id="itGrid"></div>
       </div>
       <div class="card">

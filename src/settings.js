@@ -69,6 +69,8 @@ function defaults() {
     hrDocs: [],
     ledelseFiles: { likviditet: {}, rapport: {}, resultat: {}, budsjett: {} },
     mcpServers: [],
+    itSystems: defaultItSystems(),
+    departmentMembers: {},
     parking: { url: "", pins: [] },
     kiSuggestions: [],
     kiAgents: [
@@ -111,6 +113,7 @@ function defaults() {
     contacts: [
       { name: "Ole Christoffer Olsen", role: "Manager – Travbaneveien Admin (utleier)", org: "Aider", phone: "975 37 438 / 51 87 09 00", email: "", note: "Kontaktperson for bygget vi leier." },
       { name: "Mathias Furenes", role: "IT-kontaktperson / IT-support", org: "IT Relasjon AS", phone: "", email: "", note: "Kontakt ved IT-problemer." },
+      { name: "Eldin", role: "IT-support", org: "IT Relasjon AS", phone: "", email: "", note: "Alternativ kontakt ved IT-problemer." },
       { name: "Elias Voll", role: "Adgangskontroll – bygg Travbaneveien", org: "", phone: "944 20 426", email: "eliasvoll.tb3@gmail.com", note: "Adgangskort til kontoret." },
       { name: "Anna Maja Oleszczyk", role: "Lønnsmedarbeider", org: "Brainiacs AS (regnskapsbyrå)", phone: "", email: "amo@brainiacs.no", note: "Kjører lønn månedlig. Krever timegodkjenning i Tripletex før lønnskjøring, følger opp manglende timelister direkte med ansatte. Brukes til: lønn, ferie/avspasering, feriedager, fleksisaldo, sykmelding." },
       { name: "Lisa Haga Bø", role: "Regnskapsfører", org: "Brainiacs AS", phone: "", email: "lhb@brainiacs.no", note: "Tilknyttet Haga-gruppen. Brukes til: regnskap, MVA, periodeavslutning." },
@@ -171,6 +174,35 @@ function defaultLedermoter() {
 }
 
 // Startinnhold for markedsføring-fanen (redigerbar strategi).
+function defaultItSystems() {
+  return [
+    { title: "Tripletex", url: "tripletex.no", note: "Timeføring, fakturering og regnskap. Datakilden bak dette dashbordet." },
+    { title: "Office 365", url: "portal.office.com", note: "E-post, Teams, OneNote, Office-pakken. Alle ansatte." },
+    { title: "Fireflies AI", url: "fireflies.ai", note: "Møtereferat automatisk for Teams-møter. Inviter ai@byggkon.no.", status: "Auto", statusCls: "ok" },
+    { title: "Fyxer AI", url: "app.fyxer.com", note: "E-posthåndtering med AI (under testing)." },
+    { title: "Holteportalen (EG Holte)", url: "holteportalen.no", note: "Kalkyle og byggeprosjekt-verktøy." },
+    { title: "Holte KS-system", url: "holteportalen.no", note: "Kvalitetssikringssystem (abonnement)." },
+    { title: "OpenAI / ChatGPT", url: "chatgpt.com", note: "Språkmodell. Bedriftskonto: ai@byggkon.no." },
+    { title: "Claude (Anthropic)", url: "claude.ai", note: "Språkmodell. Driver dette dashbordet og Cowork." },
+    { title: "n8n", url: "n8n.io", note: "Automasjon og arbeidsflyt for KI-agentene." },
+    { title: "Prosjektagenten", url: "prosjektagenten.no", note: "AI for å finne relevante prosjekter/tilbud." },
+    { title: "Mercell", url: "mercell.com", note: "Anbuds- og tilbudsplattform (offentlige konkurranser)." },
+    { title: "Orgbrain", url: "apps.orgbrain.ai/home/organizations/943885397", note: "Styresystem – styremøter, protokoller og dokumenter." },
+    { title: "Faktura / bilag-mottak", url: "mailto:byggkon@ebilag.com", note: "Send kvitteringer/bilag til byggkon@ebilag.com." },
+    { title: "Byggforsk", url: "byggforsk.no", note: "Byggdetaljblader og faglige oppslag." },
+    { title: "Norsk Standard", url: "standard.no", note: "NS-standarder (NS 8401, 8405, TEK m.m.)." },
+    { title: "Norsk Prisbok", url: "norskprisbok.no", note: "Priser og kostnadsoppslag for bygg." },
+    { title: "1Password", url: "1password.com", note: "Passordbehandler. Alle innlogginger ligger her.", status: "Passord", statusCls: "ok" },
+    { title: "LinkedIn", url: "linkedin.com", note: "Nettverk, rekruttering og markedsføring." },
+    { title: "Phonero", url: "phonero.no", note: "Telefonabonnement (mobil)." },
+    { title: "reMarkable", url: "remarkable.com", note: "Digital notatblokk." },
+    { title: "Adobe", url: "adobe.com", note: "PDF / Acrobat og designverktøy." },
+    { title: "Nettside (Webflow)", url: "webflow.com/dashboard/sites/bygg-kon/general", note: "Ny nettside byggkon.no – redigeres i Webflow." },
+    { title: "Møteromsbooking", url: "tb3-booking.itrelasjon.com", note: "Booking av møterom på Travbaneveien." },
+    { title: "RIB-programmer", url: "", note: "Konstruksjonsprogramvare: Focus, Statcon, Revit, AutoCAD, Sletten." },
+  ];
+}
+
 function defaultVision() {
   return `Felles målsetning for Byggkon
 

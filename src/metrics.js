@@ -142,6 +142,24 @@ export async function buildOverview() {
     .map((e) => ({ name: e.name, hours: e.hours, billable: e.billable, billingRate: e.billable / e.hours }))
     .sort((a, b) => a.billingRate - b.billingRate);
 
+  // ---- Faktureringsgrad siste 14 dager (kapasitet på prosjektmøter) ----
+  const twoWeekAgoStr = ymd(daysAgo(14, today));
+  const twoWeekByEmp = new Map();
+  for (const e of timeEntries) {
+    if (e.date < twoWeekAgoStr) continue;
+    const id = e.employee?.id;
+    const name = employeesById.get(id) || fullName(e.employee) || "Ukjent";
+    const key = id ?? name;
+    const cur = twoWeekByEmp.get(key) || { name, hours: 0, billable: 0 };
+    cur.hours += e.hours || 0;
+    cur.billable += e.chargeableHours || 0;
+    twoWeekByEmp.set(key, cur);
+  }
+  const billingTwoWeeks = [...twoWeekByEmp.values()]
+    .filter((e) => e.name && e.name !== "Ukjent" && e.hours > 0)
+    .map((e) => ({ name: e.name, hours: e.hours, billable: e.billable, billingRate: e.billable / e.hours }))
+    .sort((a, b) => a.billingRate - b.billingRate);
+
   // ---- Timeføring denne uka (man–i dag), per nåværende ansatt ----
   // Direkte knyttet til lønnsproblemet: hvem mangler førte timer denne uka?
   const dayShort = ["Søn", "Man", "Tir", "Ons", "Tor", "Fre", "Lør"];
@@ -176,11 +194,12 @@ export async function buildOverview() {
   const activeCutoff = ymd(daysAgo(90, today)); // siste 3 måneder = "jobber på nå"
   const projectsById = new Map(projects.map((p) => [p.id, p]));
 
+  const twoWeeksAgoStr = ymd(daysAgo(14, today));
   const projAgg = new Map(); // id -> aggregat
   for (const e of timeEntries) {
     if (!e.project) continue;
     const id = e.project.id;
-    const cur = projAgg.get(id) || { id, name: e.project.name || "", ytd: 0, ytdBillable: 0, last4w: 0, last8w: 0, lastActivity: "", emp4wById: {} };
+    const cur = projAgg.get(id) || { id, name: e.project.name || "", ytd: 0, ytdBillable: 0, last4w: 0, last2w: 0, last8w: 0, lastActivity: "", emp4wById: {}, emp2wById: {} };
     if (!cur.name && e.project.name) cur.name = e.project.name;
     cur.ytd += e.hours || 0;
     cur.ytdBillable += e.chargeableHours || 0;
@@ -188,6 +207,11 @@ export async function buildOverview() {
       cur.last4w += e.hours || 0;
       const eid = e.employee?.id ?? "?";
       cur.emp4wById[eid] = (cur.emp4wById[eid] || 0) + (e.hours || 0);
+    }
+    if (e.date >= twoWeeksAgoStr) {
+      cur.last2w += e.hours || 0;
+      const eid = e.employee?.id ?? "?";
+      cur.emp2wById[eid] = (cur.emp2wById[eid] || 0) + (e.hours || 0);
     }
     if (e.date >= activeCutoff) cur.last8w += e.hours || 0;
     if (e.date > cur.lastActivity) cur.lastActivity = e.date;
@@ -201,16 +225,23 @@ export async function buildOverview() {
       const nm = employeesById.get(Number(eid)) || "Ukjent";
       byEmp4w[nm] = (byEmp4w[nm] || 0) + h;
     }
+    const byEmp2w = {};
+    for (const [eid, h] of Object.entries(a.emp2wById || {})) {
+      const nm = employeesById.get(Number(eid)) || "Ukjent";
+      byEmp2w[nm] = (byEmp2w[nm] || 0) + h;
+    }
     return {
       number: p?.number || "",
       name: a.name || p?.name || `Prosjekt ${a.id}`,
       customer: p?.customer?.name || "",
       projectManager: fullName(p?.projectManager),
       hours4w: a.last4w,
+      hours2w: a.last2w,
       hoursYTD: a.ytd,
       billableYTD: a.ytdBillable,
       lastActivity: a.lastActivity || null,
       byEmp4w,
+      byEmp2w,
     };
   };
 
@@ -232,7 +263,7 @@ export async function buildOverview() {
   }));
 
   // ---- Hva jobber hver ansatt med? (siste 2 uker) ----
-  const twoWeeksAgoStr = ymd(daysAgo(14, today));
+  // (twoWeeksAgoStr er allerede definert lenger opp)
   const focusMap = new Map(); // eid -> { name, total, proj: Map(pid -> {name, customer, hours}) }
   for (const e of timeEntries) {
     if (e.date < twoWeeksAgoStr || !e.project) continue;
@@ -307,6 +338,7 @@ export async function buildOverview() {
     employeeFocus,
     timesheetWeek,
     billingWeek,
+    billingTwoWeeks,
     projectsDetailed,
     orders: orders
       .map((o) => ({

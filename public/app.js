@@ -154,6 +154,19 @@ function renderReminders() {
   if (locked) sb.classList.add("open");
 })();
 
+/* ---- Live cam (E39 Forus, Statens Vegvesen) — oppfrisk hvert 30. sek ---- */
+(function () {
+  const img = document.getElementById("forusCam");
+  if (!img) return;
+  const base = img.src.split("?")[0];
+  const stamp = document.getElementById("forusCamTime");
+  function refresh() {
+    img.src = base + "?t=" + Date.now();
+    if (stamp) stamp.textContent = "Sist oppdatert: " + new Date().toLocaleTimeString("nb-NO");
+  }
+  setInterval(refresh, 30000);
+})();
+
 /* ---- Klokke ---- */
 function tickClock() {
   const now = new Date();
@@ -215,10 +228,15 @@ async function loadCosts(force = false) {
     const sup = d.suppliers || [];
     const rows = sup.map((c, i) => {
       const m = supplierMeta[c.name] || {};
+      const contact = (c.email || c.phone) ? [
+        c.email ? `<a href="mailto:${esc(c.email)}" title="${esc(c.email)}" onclick="event.stopPropagation()">✉️</a>` : "",
+        c.phone ? `<a href="tel:${esc(c.phone.replace(/\s/g, ''))}" title="${esc(c.phone)}" onclick="event.stopPropagation()">📞</a>` : "",
+      ].join(" ") : `<span class="subnote">—</span>`;
       return [
         String(i + 1),
         `<a href="#" class="sup-link" data-name="${esc(c.name)}" title="Klikk for fakturaer">${esc(c.name)}</a>`,
         `<span class="cost-cat">${esc(costCategory(c.name))}</span>`,
+        contact,
         num(c.count), nok(c.cost),
         `<label class="ramme-toggle"><input type="checkbox" class="sm-ramme" data-name="${esc(c.name)}" ${m.rammeavtale ? "checked" : ""}/> <span></span></label>`,
         `<input class="sm-input sm-ansvarlig" data-name="${esc(c.name)}" value="${esc(m.ansvarlig || "")}" placeholder="Hvem forhandler?" />`,
@@ -226,11 +244,12 @@ async function loadCosts(force = false) {
         `<label class="ramme-toggle"><input type="checkbox" class="sm-term" data-name="${esc(c.name)}" ${m.terminated ? "checked" : ""}/> <span></span></label>`,
       ];
     });
-    rows.push(["", "<b>Total</b>", "", "", `<b>${nok(d.total || 0)}</b>`, "", "", "", ""]);
+    rows.push(["", "<b>Total</b>", "", "", "", `<b>${nok(d.total || 0)}</b>`, "", "", "", ""]);
     fillTable("kostTable",
-      [{ label: "#" }, { label: "Leverandør" }, { label: "Hva er kostnaden? (antatt)" }, { label: "Antall", num: true }, { label: "Kostnad 12 mnd", num: true },
+      [{ label: "#" }, { label: "Leverandør" }, { label: "Hva er kostnaden? (antatt)" }, { label: "Kontakt" }, { label: "Antall", num: true }, { label: "Kostnad 12 mnd", num: true },
        { label: "Rammeavtale" }, { label: "Forhandlingsansvarlig" }, { label: "Status / aksjon" }, { label: "Avslutt" }],
       rows, "Ingen kostnader funnet.");
+    loadForwardable();
     const withRamme = sup.filter((c) => (supplierMeta[c.name] || {}).rammeavtale).length;
     const termCount = (d.terminated || []).length;
     const sumEl = document.getElementById("kostRammeSummary");
@@ -242,6 +261,40 @@ async function loadCosts(force = false) {
     status.hidden = false; status.textContent = "Kunne ikke hente kostnader: " + err.message;
   }
 }
+async function loadForwardable() {
+  const status = document.getElementById("rebillStatus");
+  try {
+    const res = await fetch("/api/forwardable");
+    if (!res.ok) throw new Error("Feil " + res.status);
+    const d = await res.json();
+    if (status) status.hidden = true;
+    if (!d.invoices.length) {
+      fillTable("rebillTable",
+        [{ label: "Dato" }, { label: "Leverandør" }, { label: "Fakturanr." }, { label: "Kommentar" }, { label: "Beløp", num: true }],
+        [], `Ingen fakturaer merket «vf» eller «viderefaktur» siste 12 mnd.`);
+      return;
+    }
+    const rows = d.invoices.map((inv) => {
+      const url = `https://tripletex.no/execute/viewSupplierInvoice?supplierInvoiceId=${encodeURIComponent(inv.id)}`;
+      return [
+        esc(inv.invoiceDate || "—"), esc(inv.supplier || "—"), esc(inv.invoiceNumber || "—"),
+        `<span class="rebill-comment">${esc(inv.comment || "")}</span>`,
+        `<a class="pill purr" href="${esc(url)}" target="_blank" rel="noopener">${nok(inv.amount)} ↗</a>`,
+      ];
+    });
+    rows.push(["", "<b>Total</b>", "", "", `<b>${nok(d.total || 0)}</b>`]);
+    fillTable("rebillTable",
+      [{ label: "Dato" }, { label: "Leverandør" }, { label: "Fakturanr." }, { label: "Kommentar" }, { label: "Beløp", num: true }],
+      rows, `Ingen fakturaer å viderefakturere.`);
+  } catch (e) {
+    if (status) { status.hidden = false; status.textContent = "Kunne ikke hente: " + e.message; }
+  }
+}
+(function () {
+  const b = document.getElementById("rebillReload");
+  if (b) b.addEventListener("click", loadForwardable);
+})();
+
 let supplierMeta = {};
 async function saveSupplierMeta(name) {
   const row = (sel) => document.querySelector(`${sel}[data-name="${CSS.escape(name)}"]`);
@@ -270,19 +323,24 @@ async function showSupplierDetail(name) {
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Feil");
     const d = await res.json();
     if (!d.invoices.length) { body.innerHTML = `<div class="empty">Ingen fakturaer funnet siste 12 måneder.</div>`; return; }
-    const rows = d.invoices.map((inv) => `<tr>
-      <td>${esc(inv.invoiceDate || "—")}</td>
-      <td>${esc(inv.invoiceNumber || "—")}</td>
-      <td>${esc(inv.comment || "—")}</td>
-      <td>${esc(inv.voucherNumber || "")}</td>
-      <td class="num">${nok(inv.amount)}</td>
-    </tr>`).join("");
+    const rows = d.invoices.map((inv) => {
+      const url = `https://tripletex.no/execute/viewSupplierInvoice?supplierInvoiceId=${encodeURIComponent(inv.id)}`;
+      return `<tr class="sup-row" data-url="${esc(url)}" title="Åpne i Tripletex">
+        <td>${esc(inv.invoiceDate || "—")}</td>
+        <td>${esc(inv.invoiceNumber || "—")}</td>
+        <td>${esc(inv.comment || "—")}</td>
+        <td>${esc(inv.voucherNumber || "")}</td>
+        <td class="num">${nok(inv.amount)}</td>
+        <td><a class="pill purr" href="${esc(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Åpne ↗</a></td>
+      </tr>`;
+    }).join("");
     body.innerHTML = `
-      <p class="subnote">${d.invoices.length} fakturaer · Sum 12 mnd: <b>${nok(d.total || 0)}</b></p>
+      <p class="subnote">${d.invoices.length} fakturaer · Sum 12 mnd: <b>${nok(d.total || 0)}</b>. Klikk en linje for å åpne fakturaen i Tripletex.</p>
       <div class="table-wrap"><table class="sup-detail-tbl">
-        <thead><tr><th>Dato</th><th>Fakturanr.</th><th>Beskrivelse</th><th>Bilag</th><th class="num">Beløp</th></tr></thead>
+        <thead><tr><th>Dato</th><th>Fakturanr.</th><th>Beskrivelse</th><th>Bilag</th><th class="num">Beløp</th><th></th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>`;
+    body.querySelectorAll(".sup-row").forEach((tr) => tr.addEventListener("click", () => window.open(tr.dataset.url, "_blank", "noopener")));
   } catch (e) { body.innerHTML = `<div class="empty">Kunne ikke hente: ${esc(e.message)}</div>`; }
 }
 (function () {
@@ -409,11 +467,11 @@ function renderHero(d) {
       ).join("");
   }
 
-  // Avdelinger (kompakte chips øverst)
+  // Avdelinger (klikkbare chips øverst)
   const avd = document.getElementById("avdGrid");
   if (avd && Array.isArray(d.display?.departments)) {
     avd.innerHTML = d.display.departments.length
-      ? d.display.departments.map((name) => `<span class="avd-chip">${esc(name)}</span>`).join("")
+      ? d.display.departments.map((name) => `<button class="avd-chip" data-dept-name="${esc(name)}">${esc(name)}</button>`).join("")
       : `<div class="sc-note">Ingen avdelinger satt opp ennå.</div>`;
   }
 
@@ -603,20 +661,54 @@ async function loadProjectNotes() {
 
 function renderResource() {
   if (!lastData) return;
+  const wrap = document.getElementById("pmResourceGrid");
+  if (!wrap) return;
   const rows = lastData.projectsDetailed
-    .filter((p) => (p.hours4w || 0) > 0)
-    .sort((a, b) => (b.hours4w || 0) - (a.hours4w || 0));
-  fillTable("pmResource",
-    [{ label: "Prosjekt" }, { label: "Kunde" }, { label: "Prosjektleder" }, { label: "Timer 4 uker", num: true }, { label: "Hvem jobber på det (timer)" }],
-    rows.map((p) => {
-      const who = Object.entries(p.byEmp4w || {}).sort((a, b) => b[1] - a[1])
-        .map(([navn, t]) => `${esc(navn)} (${num(t)} t)`).join(", ");
-      return [esc(p.name), esc(p.customer), esc(p.projectManager || "—"), num(p.hours4w), who || "—"];
-    }),
-    "Ingen timer ført siste 4 uker.");
+    .filter((p) => (p.hours2w || 0) > 0)
+    .sort((a, b) => (b.hours2w || 0) - (a.hours2w || 0));
+  if (!rows.length) { wrap.innerHTML = `<div class="empty">Ingen timer ført siste 2 uker.</div>`; }
+  else {
+    wrap.innerHTML = rows.map((p) => {
+      const emps = Object.entries(p.byEmp2w || {}).sort((a, b) => b[1] - a[1]);
+      const maxH = Math.max(...emps.map(([, t]) => t), 1);
+      const chips = emps.map(([n, t]) =>
+        `<div class="pm-emp"><div class="pm-emp-name">${esc(n)}</div><div class="pm-emp-bar"><span style="width:${Math.round((t / maxH) * 100)}%"></span></div><div class="pm-emp-h">${num(t)} t</div></div>`
+      ).join("");
+      return `<div class="pm-res-card">
+        <div class="pm-res-head">
+          <div>
+            <div class="pm-res-name">${p.number ? `<span class="pm-res-num">${esc(p.number)}</span>` : ""}${esc(p.name)}</div>
+            <div class="pm-res-sub">${esc(p.customer || "—")}${p.projectManager ? ` · PL: ${esc(p.projectManager)}` : ""}</div>
+          </div>
+          <div class="pm-res-tot"><b>${num(p.hours2w)} t</b><span class="subnote">siste 2 uker</span></div>
+        </div>
+        <div class="pm-emps">${chips || `<div class="empty">Ingen timer registrert.</div>`}</div>
+      </div>`;
+    }).join("");
+  }
   populatePmEmpFilter();
   renderEmpResource();
   renderCapacity();
+  renderCapacity2w();
+}
+
+function renderCapacity2w() {
+  const billing = (lastData && lastData.billingTwoWeeks) || [];
+  const rows = [...billing].sort((a, b) => (a.billingRate || 0) - (b.billingRate || 0));
+  fillTable("pmCapacity2w",
+    [{ label: "Ansatt" }, { label: "Faktureringsgrad" }, { label: "Timer (2 uker)", num: true }, { label: "Vurdering" }],
+    rows.map((b) => {
+      const bk = bucket(b.billingRate);
+      const w = Math.min(100, Math.round((b.billingRate || 0) * 100));
+      const tag = b.billingRate < 0.6 ? "Ledig kapasitet" : b.billingRate < 0.85 ? "Litt rom" : "Godt booket";
+      return [
+        esc(b.name),
+        `<div class="ratecell"><b>${pct(b.billingRate)}</b><div class="ratebar"><span style="width:${w}%"></span></div></div>`,
+        num(b.hours),
+        `<span class="tag ${bk.cls}">${tag}</span>`,
+      ];
+    }),
+    "Ingen timer ført siste 2 uker.");
 }
 
 // Kapasitet: ansatte sortert etter faktureringsgrad (lavest = mest ledig).
@@ -640,11 +732,11 @@ function renderCapacity() {
 }
 
 // Bygger per-ansatt-oversikt fra prosjektdata: hver ansatt -> prosjektene de
-// har ført timer på siste 4 uker, sortert med flest timer øverst.
+// har ført timer på siste 2 uker, sortert med flest timer øverst.
 function buildEmpProjects() {
   const map = new Map();
   for (const p of (lastData.projectsDetailed || [])) {
-    for (const [navn, t] of Object.entries(p.byEmp4w || {})) {
+    for (const [navn, t] of Object.entries(p.byEmp2w || {})) {
       if (!t) continue;
       const cur = map.get(navn) || { navn, total: 0, projects: [] };
       cur.total += t;
@@ -678,7 +770,7 @@ function renderEmpResource() {
   const filter = sel ? sel.value : "";
   let emps = buildEmpProjects();
   if (filter) emps = emps.filter((e) => e.navn === filter);
-  if (!emps.length) { wrap.innerHTML = `<div class="empty">Ingen timer ført siste 4 uker.</div>`; return; }
+  if (!emps.length) { wrap.innerHTML = `<div class="empty">Ingen timer ført siste 2 uker.</div>`; return; }
   wrap.innerHTML = emps.map((e) => {
     const maxH = Math.max(...e.projects.map((p) => p.hours), 1);
     const initials = e.navn.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();

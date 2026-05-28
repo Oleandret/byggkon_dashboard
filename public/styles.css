@@ -567,6 +567,40 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .nav-group-items { display: flex; flex-direction: column; gap: 2px; }
 .nav-group-items .tab { padding-left: 18px; }
 
+/* ---- IT-system: redigerbare rader ---- */
+.it-list.editing .it-item.edit { display: flex; flex-wrap: wrap; gap: 7px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 9px; margin-bottom: 6px; background: #fff; }
+.it-list.editing .it-item.edit .kon-f { flex: 1 1 140px; min-width: 0; }
+
+/* ---- MCP-keys-editor (KI-agenter, kun ledelse) ---- */
+.mcp-keys-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.mcp-keys-row { display: grid; grid-template-columns: 180px 1.5fr 1fr auto; gap: 8px; align-items: center; }
+@media (max-width: 720px) { .mcp-keys-row { grid-template-columns: 1fr 1fr; } }
+
+/* ---- Avdelinger: klikkbare chips ---- */
+#avdGrid button.avd-chip { cursor: pointer; border: 1px solid var(--mint-2); background: var(--mint); color: var(--accent-dark); font: inherit; }
+#avdGrid button.avd-chip:hover { background: var(--accent-soft); }
+#avdGrid button.avd-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.dept-member-edit { background: var(--mint); border: 1px solid var(--mint-2); border-radius: 10px; padding: 12px 14px; margin: 8px 0; }
+.dept-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 5px; }
+.dept-check { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+
+/* ---- Prosjektmøter: pen ressursfordeling (2 uker) ---- */
+.pm-res-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.pm-res-card { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: #fff; border-top: 3px solid var(--accent); }
+.pm-res-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin-bottom: 8px; }
+.pm-res-num { background: var(--mint); color: var(--accent-dark); border-radius: 6px; padding: 1px 7px; font-size: 11px; font-weight: 700; margin-right: 6px; }
+.pm-res-name { font-weight: 700; font-size: 14px; }
+.pm-res-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.pm-res-tot { text-align: right; }
+.pm-res-tot b { font-size: 15px; color: var(--accent-dark); }
+.pm-res-tot .subnote { display: block; font-size: 10.5px; }
+.pm-emps { display: flex; flex-direction: column; gap: 5px; margin-top: 6px; }
+.pm-emp { display: grid; grid-template-columns: 1fr 80px 56px; gap: 9px; align-items: center; font-size: 12.5px; }
+.pm-emp-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pm-emp-bar { height: 6px; background: var(--grid); border-radius: 999px; overflow: hidden; }
+.pm-emp-bar > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.pm-emp-h { text-align: right; font-weight: 700; }
+
 /* ---- KI-forslag: terningkast (1–6) ---- */
 .dice-row { display: flex; align-items: center; gap: 5px; margin-top: 8px; flex-wrap: wrap; }
 .dice-label { font-size: 11.5px; color: var(--muted); margin-right: 4px; }
@@ -582,6 +616,15 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .sup-detail-tbl td.num, .sup-detail-tbl th.num { text-align: right; white-space: nowrap; }
 .sup-link { color: var(--accent-dark); text-decoration: none; font-weight: 700; border-bottom: 1px dotted var(--accent-soft); }
 .sup-link:hover { color: var(--accent); border-bottom-style: solid; }
+
+/* ---- Klikkbar fakturarad i leverandør-modalen ---- */
+.sup-detail-tbl tr.sup-row { cursor: pointer; }
+.sup-detail-tbl tr.sup-row:hover td { background: var(--mint); }
+
+/* ---- Avdelinger: dept-velger og kompakte chips ---- */
+.dept-picker { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dept-picker .dept-pick { border: 1px solid var(--border); border-radius: 999px; padding: 5px 16px; font-weight: 700; }
+.dept-picker .dept-pick.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
 /* ---- Avdelinger: kompakte chips øverst + RIB-dashboard ---- */
 .avd-card { padding: 12px 14px; }
@@ -602,6 +645,8 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .social-card textarea.kon-f { width: 100%; resize: vertical; }
 .social-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 9px; }
 .social-msg { margin-left: 4px; }
+.social-image { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; margin-top: 9px; }
+.social-image img { max-width: 220px; max-height: 160px; border: 1px solid var(--border); border-radius: 8px; object-fit: cover; }
 .social-ico { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;
   border-radius: 6px; font-weight: 800; font-size: 14px; color: #fff; margin-right: 6px; }
 .social-fb { background: #1877f2; font-family: Georgia, serif; }
@@ -642,6 +687,10 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .front-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; align-items: start; margin-bottom: 16px; }
 .front-grid-3 { grid-template-columns: repeat(3, 1fr); }
 @media (max-width: 980px) { .front-grid-3 { grid-template-columns: 1fr; } }
+.front-grid-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 1280px) { .front-grid-4 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 680px) { .front-grid-4 { grid-template-columns: 1fr; } }
+.cam-card .cam-img { width: 100%; height: auto; max-height: 240px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); display: block; margin-top: 4px; }
 .front-grid > .card { margin: 0; }
 .front-box { display: flex; flex-direction: column; min-height: 430px; }
 .front-box-body { flex: 1 1 auto; overflow-y: auto; min-height: 0; }

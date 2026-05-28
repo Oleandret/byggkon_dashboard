@@ -125,6 +125,30 @@ export async function getSupplierInvoices(fromDate, toDate) {
   });
 }
 
+// Leverandører med kontaktinfo (best effort – feltnavn varierer i MCP-er).
+let _suppliersCache = { ts: 0, list: null };
+export async function getSuppliers() {
+  if (_suppliersCache.list && Date.now() - _suppliersCache.ts < 30 * 60 * 1000) return _suppliersCache.list;
+  let list = [];
+  try { list = await fetchAll("search_suppliers", { fields: "id,name,email,phoneNumber,invoiceEmail,organizationNumber" }); }
+  catch { try { list = await fetchAll("search_suppliers", { fields: "*" }); } catch { list = []; } }
+  _suppliersCache = { ts: Date.now(), list };
+  return list;
+}
+
+// Faktureringskandidater: leverandørfakturaer der kommentaren inneholder
+// "vf" eller "viderefaktur" – brukes til viderefakturerings-oversikten.
+export async function getForwardableInvoices(fromDate, toDate) {
+  try {
+    const data = await callTool("search_supplier_invoices", {
+      invoiceDateFrom: fromDate, invoiceDateTo: toDate, from: 0, count: 1000, fields: "*",
+    });
+    assertOk("search_supplier_invoices", data);
+    const re = /\b(vf|viderefaktur)/i;
+    return (data?.values || []).filter((r) => re.test(String(r.comment || r.description || r.title || "")));
+  } catch { return []; }
+}
+
 // Detaljer for én leverandørs fakturaer (best effort med fields=*).
 export async function getSupplierInvoiceDetails(supplierId, fromDate, toDate) {
   try {

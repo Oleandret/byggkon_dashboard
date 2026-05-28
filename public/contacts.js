@@ -101,6 +101,28 @@
   }
 
   window.addEventListener("beforeunload", (e) => { if (editing && dirty) { e.preventDefault(); e.returnValue = ""; } });
+  // ---- Ansatte fra organisasjonskartet ----
+  let ansatteLoaded = false;
+  async function loadAnsatte() {
+    if (ansatteLoaded) return;
+    const wrap = document.getElementById("konAnsatte");
+    if (!wrap) return;
+    try {
+      const res = await fetch("/api/org");
+      if (!res.ok) return;
+      const d = await res.json();
+      ansatteLoaded = true;
+      const people = (d.nodes || []).filter((p) => p.name).sort((a, b) => a.name.localeCompare(b.name, "nb"));
+      if (!people.length) { wrap.innerHTML = `<div class="empty">Ingen ansatte registrert.</div>`; return; }
+      wrap.innerHTML = people.map((p) => `<div class="ds-contact">
+        <div class="dsc-name">${esc(p.name)}</div>
+        ${p.title ? `<div class="dsc-title">${esc(p.title)}</div>` : ""}
+        ${p.phone ? `<div class="dsc-line">📞 <a href="tel:${esc(p.phone.replace(/\s/g, ""))}">${esc(p.phone)}</a></div>` : ""}
+        ${p.email ? `<div class="dsc-line">✉️ <a href="mailto:${esc(p.email)}">${esc(p.email)}</a></div>` : ""}
+      </div>`).join("");
+    } catch (e2) { /* ignore */ }
+  }
+
   const tab = document.querySelector('.tab[data-tab="kontakter"]');
-  if (tab) tab.addEventListener("click", () => { loadContacts(); loadTt(); });
+  if (tab) tab.addEventListener("click", () => { loadContacts(); loadTt(); loadAnsatte(); });
 })();
