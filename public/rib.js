@@ -80,20 +80,23 @@
       return;
     }
     status.hidden = true;
-    grid.innerHTML = people.map((personName) => {
-      const projs = projects.map((p) => {
-        let hours = 0;
-        for (const [empName, t] of Object.entries(p.byEmp4w || {})) {
-          if (namesMatch(empName, personName)) { hours += t; break; }
-        }
-        return { name: p.name, customer: p.customer, hours };
-      }).filter((p) => p.hours > 0).sort((a, b) => b.hours - a.hours);
-      const total = projs.reduce((s, p) => s + p.hours, 0);
-      const rows = projs.length
-        ? projs.map((p) => `<tr><td><b>${esc(p.name)}</b>${p.customer ? `<span class="rib-cust">${esc(p.customer)}</span>` : ""}</td><td class="num">${num(p.hours)} t</td></tr>`).join("")
-        : `<tr><td class="empty" colspan="2">Ingen timer ført siste 4 uker.</td></tr>`;
-      return `<div class="rib-card"><div class="rib-head"><span class="rib-name">${esc(personName)}</span><span class="rib-tot">${num(total)} t</span></div><table class="rib-tbl"><tbody>${rows}</tbody></table></div>`;
-    }).join("");
+    // Bruk 3-ukers vindu (foretrekk byEmp3w fra serveren; fallback til 4w hvis ikke deployet ennå)
+    const pickEmp = (p) => p.byEmp3w || p.byEmp4w || {};
+    grid.innerHTML = `<div class="period-banner">Viser <b>timer siste 3 uker</b> per ansatt og prosjekt.</div>` +
+      people.map((personName) => {
+        const projs = projects.map((p) => {
+          let hours = 0;
+          for (const [empName, t] of Object.entries(pickEmp(p))) {
+            if (namesMatch(empName, personName)) { hours += t; break; }
+          }
+          return { name: p.name, customer: p.customer, hours };
+        }).filter((p) => p.hours > 0).sort((a, b) => b.hours - a.hours);
+        const total = projs.reduce((s, p) => s + p.hours, 0);
+        const rows = projs.length
+          ? projs.map((p) => `<tr><td><b>${esc(p.name)}</b>${p.customer ? `<span class="rib-cust">${esc(p.customer)}</span>` : ""}</td><td class="num">${num(p.hours)} t</td></tr>`).join("")
+          : `<tr><td class="empty" colspan="2">Ingen timer ført siste 3 uker.</td></tr>`;
+        return `<div class="rib-card"><div class="rib-head"><span class="rib-name">${esc(personName)}</span><span class="rib-tot">${num(total)} t</span></div><table class="rib-tbl"><tbody>${rows}</tbody></table></div>`;
+      }).join("");
   }
 
   /* =================== PROSJEKTOVERSIKT =================== */
@@ -101,26 +104,29 @@
     const box = document.getElementById("deptProjects");
     if (!box) return;
     const people = membersFor(activeDept);
+    const pickEmp = (p) => p.byEmp3w || p.byEmp4w || {};
     const list = projects.map((p) => {
       let deptHours = 0;
       const contribs = [];
-      for (const [empName, t] of Object.entries(p.byEmp4w || {})) {
+      for (const [empName, t] of Object.entries(pickEmp(p))) {
         if (people.some((pn) => namesMatch(empName, pn))) { deptHours += t; contribs.push({ name: empName, hours: t }); }
       }
-      return { ...p, deptHours, contribs: contribs.sort((a, b) => b.hours - a.hours) };
+      const totalH = (typeof p.hours3w === "number") ? p.hours3w : p.hours4w;
+      return { ...p, totalH, deptHours, contribs: contribs.sort((a, b) => b.hours - a.hours) };
     }).filter((p) => p.deptHours > 0).sort((a, b) => b.deptHours - a.deptHours);
 
-    if (!list.length) { box.innerHTML = `<div class="empty">Ingen prosjekter med timer fra denne avdelingen siste 4 uker.</div>`; return; }
+    if (!list.length) { box.innerHTML = `<div class="empty">Ingen prosjekter med timer fra denne avdelingen siste 3 uker.</div>`; return; }
     box.innerHTML = `
+      <div class="period-banner">Viser <b>timer siste 3 uker</b> per prosjekt.</div>
       <table class="dept-proj-tbl">
-        <thead><tr><th>Prosjekt</th><th>Kunde</th><th>Prosjektleder</th><th class="num">Timer (avd.) 4u</th><th class="num">Timer total 4u</th><th>Bidragsytere</th></tr></thead>
+        <thead><tr><th>Prosjekt</th><th>Kunde</th><th>Prosjektleder</th><th class="num">Timer (avd.) 3u</th><th class="num">Timer total 3u</th><th>Bidragsytere</th></tr></thead>
         <tbody>${list.map((p) => `
           <tr>
             <td><b>${esc(p.name)}</b>${p.number ? `<span class="subnote"> · ${esc(p.number)}</span>` : ""}</td>
             <td>${esc(p.customer || "")}</td>
             <td>${esc(p.projectManager || "")}</td>
             <td class="num"><b>${num(p.deptHours)}</b> t</td>
-            <td class="num">${num(p.hours4w)} t</td>
+            <td class="num">${num(p.totalH)} t</td>
             <td>${p.contribs.map((c) => `${esc(c.name.split(" ")[0])} (${num(c.hours)}t)`).join(", ")}</td>
           </tr>`).join("")}</tbody>
       </table>`;
@@ -282,21 +288,51 @@
     const board = document.getElementById("kanbanBoard");
     if (!board || !activeDept) return;
     const data = kanbanFor(activeDept);
+    const people = membersFor(activeDept);
+    // Bygg en options-streng for personliste
+    const optsFor = (selected) =>
+      `<option value="">— ingen —</option>` +
+      people.map((p) => `<option ${p === selected ? "selected" : ""}>${esc(p)}</option>`).join("");
     board.innerHTML = STAGES.map((st) => {
       const cards = data.cards.filter((c) => c.stage === st.id);
       return `<div class="kb-col" data-stage="${st.id}" style="background:${st.color}">
         <div class="kb-col-head"><span class="kb-col-title">${esc(st.label)}</span><span class="kb-col-count">${cards.length}</span></div>
         <div class="kb-cards" data-stage="${st.id}">
-          ${cards.map((c) => `
+          ${cards.map((c) => {
+            const stageOwners = c.stageOwners || {};
+            const curOwner = stageOwners[c.stage] || c.owner || "";
+            return `
             <div class="kb-card" draggable="true" data-id="${esc(c.id)}">
               <div class="kb-card-title"><span class="kb-edit-title" contenteditable="true" data-id="${esc(c.id)}" data-f="title">${esc(c.title)}</span></div>
               <div class="kb-card-meta subnote"><span class="kb-edit-title" contenteditable="true" data-id="${esc(c.id)}" data-f="customer">${esc(c.customer || "Legg til kunde")}</span></div>
-              ${c.owner || c.dueDate ? `<div class="kb-card-foot"><span class="subnote">${esc(c.owner)}</span>${c.dueDate ? `<span class="kb-due">${esc(c.dueDate)}</span>` : ""}</div>` : ""}
+              <div class="kb-owner-row">
+                <label class="kb-owner-lbl">👤 Ansvar (${esc(st.label.replace(/^\d+\s*-\s*/, ""))})</label>
+                <select class="kb-owner-sel" data-id="${esc(c.id)}" data-stage="${esc(c.stage)}">${optsFor(curOwner)}</select>
+              </div>
+              ${c.dueDate ? `<div class="kb-card-foot"><span class="kb-due">${esc(c.dueDate)}</span></div>` : ""}
               <button class="kb-del" data-id="${esc(c.id)}">×</button>
-            </div>`).join("")}
+            </div>`;
+          }).join("")}
         </div>
       </div>`;
     }).join("");
+    // Owner-picker per fase
+    board.querySelectorAll(".kb-owner-sel").forEach((sel) => {
+      sel.addEventListener("change", async () => {
+        const id = sel.dataset.id;
+        const stage = sel.dataset.stage;
+        const card = data.cards.find((c) => c.id === id);
+        if (!card) return;
+        if (!card.stageOwners) card.stageOwners = {};
+        card.stageOwners[stage] = sel.value;
+        // Sett også top-level owner = ansvarlig for nåværende fase
+        if (card.stage === stage) card.owner = sel.value;
+        await saveKanban();
+        renderKanban();
+      });
+      sel.addEventListener("mousedown", (e) => e.stopPropagation()); // unngå drag
+      sel.addEventListener("click", (e) => e.stopPropagation());
+    });
     board.querySelectorAll(".kb-card").forEach((card) => {
       card.addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", card.dataset.id); card.classList.add("dragging"); });
       card.addEventListener("dragend", () => card.classList.remove("dragging"));
@@ -334,7 +370,7 @@
     data.cards.push({
       id: "k_" + Math.random().toString(36).slice(2, 9),
       title: title || "Nytt prosjekt", customer: customer || "", stage: "1",
-      projectNumber: projectNumber || "", owner: "", dueDate: "",
+      projectNumber: projectNumber || "", owner: "", stageOwners: {}, dueDate: "",
     });
   }
 

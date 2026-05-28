@@ -1073,3 +1073,19 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .met-principle { background: #fff7e1; border-left: 3px solid var(--accent); padding: 8px 12px; margin: 8px 0 6px; border-radius: 0 6px 6px 0; }
 .met-ul { margin: 4px 0 10px; padding-left: 22px; }
 .met-ul li { margin: 3px 0; line-height: 1.45; }
+
+/* ============ PERIODE-BANNER + KANBAN OWNER ============ */
+.period-banner { background: #eef4ff; border-left: 3px solid var(--accent); padding: 8px 12px; margin: 4px 0 12px; border-radius: 0 6px 6px 0; font-size: 12.5px; color: var(--ink); }
+.kb-owner-row { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+.kb-owner-lbl { display: block; font-size: 10.5px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 3px; }
+.kb-owner-sel { width: 100%; padding: 4px 6px; font-size: 12px; border: 1px solid var(--border); border-radius: 5px; background: #fff; cursor: pointer; }
+.kb-owner-sel:hover { border-color: var(--accent); }
+
+/* ============ LEVERANDØR-AVTALE OPPLASTING ============ */
+.sup-agreement { display: inline-flex; align-items: center; gap: 4px; }
+.sup-agreement a { font-size: 18px; text-decoration: none; }
+.sup-agreement a:hover { transform: scale(1.15); }
+.sm-agr-del { padding: 2px 6px; font-size: 12px; color: var(--muted); }
+.sm-agr-del:hover { background: var(--bad-bg); color: var(--bad); }
+.sm-agr-upload { padding: 4px 10px; font-size: 13px; }
+.sm-agr-upload:hover { background: var(--accent); color: #fff; }

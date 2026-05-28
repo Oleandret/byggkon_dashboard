@@ -684,14 +684,53 @@ app.post("/api/suppliermeta", requireAuth, (req, res) => {
     const name = String(req.body?.name || "").slice(0, 120);
     if (!name) return res.status(400).json({ error: "Mangler leverandørnavn" });
     const meta = { ...(getConfig().supplierMeta || {}) };
+    const prev = meta[name] || {};
+    // Avtale-felter kan oppdateres delvis: tom streng = fjern, ellers behold/overskriv.
+    const agreementUrl = req.body?.agreementUrl !== undefined
+      ? String(req.body.agreementUrl).slice(0, 500) : (prev.agreementUrl || "");
+    const agreementName = req.body?.agreementName !== undefined
+      ? String(req.body.agreementName).slice(0, 200) : (prev.agreementName || "");
     meta[name] = {
       rammeavtale: !!req.body?.rammeavtale,
       ansvarlig: String(req.body?.ansvarlig || "").slice(0, 80),
       status: String(req.body?.status || "").slice(0, 120),
       terminated: !!req.body?.terminated,
+      agreementUrl,
+      agreementName,
     };
     saveConfig({ supplierMeta: meta });
     res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Last opp avtale/rammeavtale for en leverandør ----
+app.post("/api/supplier-agreement/upload", requireAuth, (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    const filename = String(req.body?.filename || "avtale").slice(0, 160);
+    const m = /^data:([^;]+);base64,(.+)$/i.exec(req.body?.dataUrl || "");
+    if (!name || !m) return res.status(400).json({ error: "Ugyldig fil eller mangler leverandør." });
+    const mime = m[1].toLowerCase();
+    const ext = mime.includes("pdf") ? "pdf"
+      : mime.includes("wordprocessingml") ? "docx"
+      : mime.includes("spreadsheetml") ? "xlsx"
+      : mime.includes("msword") ? "doc"
+      : mime.includes("ms-excel") ? "xls"
+      : (filename.split(".").pop() || "bin").toLowerCase().slice(0, 5);
+    const buf = Buffer.from(m[2], "base64");
+    if (buf.length > 15 * 1024 * 1024) return res.status(400).json({ error: "Filen er for stor (maks 15 MB)." });
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    const safeName = name.replace(/[^A-Za-z0-9_-]+/g, "_").slice(0, 40);
+    const safeFile = filename.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 60);
+    const target = `agreement-${safeName}-${Date.now()}-${safeFile}`;
+    fs.writeFileSync(path.join(UPLOAD_DIR, target), buf);
+    const url = "/uploads/" + target;
+    // Lagre på supplierMeta
+    const all = { ...(getConfig().supplierMeta || {}) };
+    const prev = all[name] || {};
+    all[name] = { ...prev, agreementUrl: url, agreementName: filename };
+    saveConfig({ supplierMeta: all });
+    res.json({ ok: true, url, ext });
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
@@ -1314,15 +1353,25 @@ app.post("/api/dept-kanban", requireAuth, (req, res) => {
       if (!dept || !obj || typeof obj !== "object") continue;
       const cards = Array.isArray(obj.cards) ? obj.cards : [];
       clean[String(dept).slice(0, 80)] = {
-        cards: cards.slice(0, 500).map((c) => ({
-          id: String(c.id || ("k_" + Math.random().toString(36).slice(2, 9))),
-          title: String(c.title || "").slice(0, 200),
-          customer: String(c.customer || "").slice(0, 120),
-          stage: STAGES.includes(String(c.stage)) ? String(c.stage) : "1",
-          projectNumber: String(c.projectNumber || "").slice(0, 30),
-          owner: String(c.owner || "").slice(0, 80),
-          dueDate: String(c.dueDate || "").slice(0, 20),
-        })),
+        cards: cards.slice(0, 500).map((c) => {
+          const stageOwners = {};
+          if (c.stageOwners && typeof c.stageOwners === "object") {
+            for (const k of STAGES) {
+              const v = c.stageOwners[k];
+              if (v) stageOwners[k] = String(v).slice(0, 80);
+            }
+          }
+          return {
+            id: String(c.id || ("k_" + Math.random().toString(36).slice(2, 9))),
+            title: String(c.title || "").slice(0, 200),
+            customer: String(c.customer || "").slice(0, 120),
+            stage: STAGES.includes(String(c.stage)) ? String(c.stage) : "1",
+            projectNumber: String(c.projectNumber || "").slice(0, 30),
+            owner: String(c.owner || "").slice(0, 80),
+            stageOwners,
+            dueDate: String(c.dueDate || "").slice(0, 20),
+          };
+        }),
       };
     }
     saveConfig({ deptKanban: clean });

@@ -232,6 +232,10 @@ async function loadCosts(force = false) {
         c.email ? `<a href="mailto:${esc(c.email)}" title="${esc(c.email)}" onclick="event.stopPropagation()">✉️</a>` : "",
         c.phone ? `<a href="tel:${esc(c.phone.replace(/\s/g, ''))}" title="${esc(c.phone)}" onclick="event.stopPropagation()">📞</a>` : "",
       ].join(" ") : `<span class="subnote">—</span>`;
+      const agreementUrl = m.agreementUrl || "";
+      const agreementCell = agreementUrl
+        ? `<div class="sup-agreement"><a href="${esc(agreementUrl)}" target="_blank" rel="noopener" title="${esc(m.agreementName || "Avtale")}" onclick="event.stopPropagation()">📄</a><button class="btn-ghost sm-agr-del" data-name="${esc(c.name)}" title="Fjern" onclick="event.stopPropagation()">×</button></div>`
+        : `<button class="btn-ghost sm-agr-upload" data-name="${esc(c.name)}" title="Last opp avtale" onclick="event.stopPropagation()">⬆</button>`;
       return [
         String(i + 1),
         `<a href="#" class="sup-link" data-name="${esc(c.name)}" title="Klikk for fakturaer">${esc(c.name)}</a>`,
@@ -239,16 +243,20 @@ async function loadCosts(force = false) {
         contact,
         num(c.count), nok(c.cost),
         `<label class="ramme-toggle"><input type="checkbox" class="sm-ramme" data-name="${esc(c.name)}" ${m.rammeavtale ? "checked" : ""}/> <span></span></label>`,
+        agreementCell,
         `<input class="sm-input sm-ansvarlig" data-name="${esc(c.name)}" value="${esc(m.ansvarlig || "")}" placeholder="Hvem forhandler?" />`,
         `<input class="sm-input sm-status" data-name="${esc(c.name)}" value="${esc(m.status || "")}" placeholder="Status / notat" />`,
         `<label class="ramme-toggle"><input type="checkbox" class="sm-term" data-name="${esc(c.name)}" ${m.terminated ? "checked" : ""}/> <span></span></label>`,
       ];
     });
-    rows.push(["", "<b>Total</b>", "", "", "", `<b>${nok(d.total || 0)}</b>`, "", "", "", ""]);
+    rows.push(["", "<b>Total</b>", "", "", "", `<b>${nok(d.total || 0)}</b>`, "", "", "", "", ""]);
     fillTable("kostTable",
       [{ label: "#" }, { label: "Leverandør" }, { label: "Hva er kostnaden? (antatt)" }, { label: "Kontakt" }, { label: "Antall", num: true }, { label: "Kostnad 12 mnd", num: true },
-       { label: "Rammeavtale" }, { label: "Forhandlingsansvarlig" }, { label: "Status / aksjon" }, { label: "Avslutt" }],
+       { label: "Rammeavtale" }, { label: "Avtale (PDF)" }, { label: "Forhandlingsansvarlig" }, { label: "Status / aksjon" }, { label: "Avslutt" }],
       rows, "Ingen kostnader funnet.");
+    // Avtale-opplasting og fjerning
+    document.querySelectorAll(".sm-agr-upload").forEach((btn) => btn.addEventListener("click", () => uploadSupplierAgreement(btn.dataset.name)));
+    document.querySelectorAll(".sm-agr-del").forEach((btn) => btn.addEventListener("click", () => removeSupplierAgreement(btn.dataset.name)));
     loadForwardable();
     const withRamme = sup.filter((c) => (supplierMeta[c.name] || {}).rammeavtale).length;
     const termCount = (d.terminated || []).length;
@@ -312,6 +320,41 @@ async function saveSupplierMeta(name) {
     if (payload.terminated) { costsLoaded = false; loadCosts(true); } // skjul rad
   } catch (e) { showError("Kunne ikke lagre leverandørinfo: " + e.message); }
 }
+function uploadSupplierAgreement(name) {
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = ".pdf,.docx,.doc,.xlsx,.xls,.jpg,.jpeg,.png";
+  inp.onchange = async () => {
+    const f = inp.files?.[0]; if (!f) return;
+    if (f.size > 15 * 1024 * 1024) { showError("Filen er for stor (maks 15 MB)."); return; }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const res = await fetch("/api/supplier-agreement/upload", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, filename: f.name, dataUrl: reader.result }),
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Opplasting feilet");
+        const d = await res.json();
+        supplierMeta[name] = { ...(supplierMeta[name] || {}), agreementUrl: d.url, agreementName: f.name };
+        costsLoaded = false; loadCosts(true);
+      } catch (e) { showError("Kunne ikke laste opp avtale: " + e.message); }
+    };
+    reader.readAsDataURL(f);
+  };
+  inp.click();
+}
+async function removeSupplierAgreement(name) {
+  if (!confirm("Fjerne avtalen fra " + name + "? Filen ligger igjen på serveren.")) return;
+  const m = supplierMeta[name] || {};
+  delete m.agreementUrl; delete m.agreementName;
+  supplierMeta[name] = m;
+  try {
+    await fetch("/api/suppliermeta", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, ...m, agreementUrl: "", agreementName: "" }) });
+    costsLoaded = false; loadCosts(true);
+  } catch (e) { showError("Kunne ikke fjerne: " + e.message); }
+}
+
 async function showSupplierDetail(name) {
   const modal = document.getElementById("supModal");
   const body = document.getElementById("supModalBody");

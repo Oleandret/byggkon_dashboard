@@ -195,11 +195,12 @@ export async function buildOverview() {
   const projectsById = new Map(projects.map((p) => [p.id, p]));
 
   const twoWeeksAgoStr = ymd(daysAgo(14, today));
+  const threeWeeksAgoStr = ymd(daysAgo(21, today));
   const projAgg = new Map(); // id -> aggregat
   for (const e of timeEntries) {
     if (!e.project) continue;
     const id = e.project.id;
-    const cur = projAgg.get(id) || { id, name: e.project.name || "", ytd: 0, ytdBillable: 0, last4w: 0, last2w: 0, last8w: 0, lastActivity: "", emp4wById: {}, emp2wById: {} };
+    const cur = projAgg.get(id) || { id, name: e.project.name || "", ytd: 0, ytdBillable: 0, last4w: 0, last3w: 0, last2w: 0, last8w: 0, lastActivity: "", emp4wById: {}, emp3wById: {}, emp2wById: {} };
     if (!cur.name && e.project.name) cur.name = e.project.name;
     cur.ytd += e.hours || 0;
     cur.ytdBillable += e.chargeableHours || 0;
@@ -207,6 +208,11 @@ export async function buildOverview() {
       cur.last4w += e.hours || 0;
       const eid = e.employee?.id ?? "?";
       cur.emp4wById[eid] = (cur.emp4wById[eid] || 0) + (e.hours || 0);
+    }
+    if (e.date >= threeWeeksAgoStr) {
+      cur.last3w += e.hours || 0;
+      const eid = e.employee?.id ?? "?";
+      cur.emp3wById[eid] = (cur.emp3wById[eid] || 0) + (e.hours || 0);
     }
     if (e.date >= twoWeeksAgoStr) {
       cur.last2w += e.hours || 0;
@@ -225,6 +231,11 @@ export async function buildOverview() {
       const nm = employeesById.get(Number(eid)) || "Ukjent";
       byEmp4w[nm] = (byEmp4w[nm] || 0) + h;
     }
+    const byEmp3w = {};
+    for (const [eid, h] of Object.entries(a.emp3wById || {})) {
+      const nm = employeesById.get(Number(eid)) || "Ukjent";
+      byEmp3w[nm] = (byEmp3w[nm] || 0) + h;
+    }
     const byEmp2w = {};
     for (const [eid, h] of Object.entries(a.emp2wById || {})) {
       const nm = employeesById.get(Number(eid)) || "Ukjent";
@@ -236,11 +247,13 @@ export async function buildOverview() {
       customer: p?.customer?.name || "",
       projectManager: fullName(p?.projectManager),
       hours4w: a.last4w,
+      hours3w: a.last3w,
       hours2w: a.last2w,
       hoursYTD: a.ytd,
       billableYTD: a.ytdBillable,
       lastActivity: a.lastActivity || null,
       byEmp4w,
+      byEmp3w,
       byEmp2w,
     };
   };
