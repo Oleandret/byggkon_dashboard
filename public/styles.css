@@ -956,3 +956,120 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .cal-form-row { display: flex; gap: 7px; }
 .cal-form-row > .kon-f { flex: 1; min-width: 0; }
 .cal-form .btn-primary { white-space: nowrap; }
+
+/* ============ AVDELINGER: UNDERTABS ============ */
+.subtabs { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin: 10px 0 14px; padding-bottom: 0; }
+.subtab { background: transparent; border: 1px solid transparent; border-bottom: 0; padding: 8px 14px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; border-radius: 8px 8px 0 0; transition: background .15s, color .15s; }
+.subtab:hover { color: var(--ink); background: #f5f3ef; }
+.subtab.active { background: #fff; border-color: var(--border); color: var(--accent-dark); margin-bottom: -1px; padding-bottom: 9px; }
+.subview { display: block; }
+.subview[hidden] { display: none; }
+
+/* ============ PROSJEKTOVERSIKT ============ */
+.dept-proj-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dept-proj-tbl th, .dept-proj-tbl td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+.dept-proj-tbl th { font-weight: 700; background: #faf8f4; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.dept-proj-tbl td.num, .dept-proj-tbl th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.dept-proj-tbl tbody tr:hover { background: #fafafa; }
+
+/* ============ KS-SAKER + DOKUMENTER ============ */
+.ks-docs { background: #faf8f4; border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+.ks-docs h3 { font-size: 15px; }
+.ks-doc-list { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.ks-doc { display: grid; grid-template-columns: 36px 1fr auto; gap: 10px; align-items: center; padding: 9px 12px; background: #fff; border: 1px solid var(--border); border-radius: 8px; }
+.ks-doc-rank { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 800; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+.ks-doc-body { min-width: 0; }
+.ks-doc-title { font-size: 13.5px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ks-doc-code { background: #efe9d8; color: #6b5a1a; font-size: 11px; padding: 2px 8px; border-radius: 12px; font-weight: 700; letter-spacing: .03em; }
+.ks-doc-actions { display: flex; gap: 4px; }
+.ks-doc-actions .btn-ghost { padding: 4px 8px; }
+.ks-doc-actions .btn-ghost:disabled { opacity: .35; cursor: not-allowed; }
+
+.ks-tbl { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+.ks-tbl th, .ks-tbl td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+.ks-tbl th { font-weight: 700; background: #faf8f4; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.ks-pill { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+.ks-pill.ks-åpen, .ks-pill.ks-apen { background: #fff4c8; color: #6b5a1a; }
+.ks-pill.ks-pågår, .ks-pill.ks-pagar { background: #d9ecff; color: #1c4f8a; }
+.ks-pill.ks-lukket { background: #d9f2dd; color: #1d6a3b; }
+.ks-pill.ks-utsatt { background: #f3e2e0; color: #8a3d2a; }
+
+.ks-list { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.ks-item.edit { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: #fff; border: 1px solid var(--border); border-radius: 8px; }
+.ks-item .ks-row { display: grid; grid-template-columns: 1fr 140px 160px auto; gap: 8px; }
+
+/* ============ KANBAN ============ */
+.kanban-board { display: grid; grid-template-columns: repeat(5, minmax(180px, 1fr)); gap: 10px; margin-top: 10px; align-items: start; }
+.kb-col { border: 1px solid var(--border); border-radius: 10px; padding: 10px 8px 12px; min-height: 360px; }
+.kb-col-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 10px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.kb-col-title { font-size: 13px; font-weight: 700; color: var(--ink); }
+.kb-col-count { font-size: 11px; color: var(--muted); background: #fff; border-radius: 10px; padding: 1px 8px; font-weight: 700; }
+.kb-cards { display: flex; flex-direction: column; gap: 8px; min-height: 80px; padding: 4px; border-radius: 8px; transition: background .15s; }
+.kb-cards.drop-target { background: rgba(43, 110, 184, 0.07); outline: 2px dashed var(--accent); }
+.kb-card { position: relative; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; box-shadow: 0 1px 2px rgba(0,0,0,.05); cursor: grab; font-size: 12.5px; }
+.kb-card.dragging { opacity: 0.4; }
+.kb-card:hover { box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+.kb-card-title { font-weight: 700; margin-bottom: 4px; padding-right: 16px; word-break: break-word; }
+.kb-card-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.kb-card-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 11px; }
+.kb-due { background: #fff4c8; color: #6b5a1a; padding: 1px 8px; border-radius: 10px; font-weight: 700; }
+.kb-del { position: absolute; top: 4px; right: 6px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; border-radius: 4px; }
+.kb-del:hover { background: var(--bad-bg); color: var(--bad); }
+.kb-edit-title:focus { outline: 2px solid var(--accent); background: #fff7e1; border-radius: 3px; padding: 1px 3px; }
+@media (max-width: 1100px) { .kanban-board { grid-template-columns: repeat(2, 1fr); } }
+
+/* ============ ØKONOMI ============ */
+.econ-kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 8px 0 14px; }
+.econ-kpi { background: #faf8f4; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.ek-lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+.ek-val { font-size: 18px; font-weight: 800; color: var(--ink); margin-top: 2px; font-variant-numeric: tabular-nums; }
+@media (max-width: 900px) { .econ-kpis { grid-template-columns: repeat(3, 1fr); } }
+
+.econ-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.econ-tbl th, .econ-tbl td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; }
+.econ-tbl th { font-weight: 700; background: #faf8f4; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.econ-tbl td.num, .econ-tbl th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.econ-tbl tbody tr:hover { background: #fafafa; }
+.econ-tbl .num.over { color: var(--bad); font-weight: 700; }
+.econ-type { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+.econ-type.fast { background: #d9f2dd; color: #1d6a3b; }
+.econ-type.medgatt { background: #fff4c8; color: #6b5a1a; }
+.econ-prog { position: relative; width: 110px; height: 16px; background: #eee9df; border-radius: 8px; overflow: hidden; display: inline-block; }
+.econ-prog-bar { position: absolute; top: 0; left: 0; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-dark)); }
+.econ-prog-bar.over { background: linear-gradient(90deg, #d18d3c, var(--bad)); }
+.econ-prog span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: var(--ink); }
+
+.econ-modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 5000; padding: 20px; }
+.econ-modal-card { background: #fff; border-radius: 12px; padding: 22px; width: 100%; max-width: 460px; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+.econ-modal-card h3 { margin: 0 0 4px; }
+.econ-fld { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; font-size: 12px; color: var(--muted); font-weight: 700; }
+.econ-fld input, .econ-fld select, .econ-fld textarea { font: inherit; color: var(--ink); font-weight: 400; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
+.econ-modal-act { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+/* ============ KI-BESTILLINGER ============ */
+.ki-orders-tbl { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 4px; }
+.ki-orders-tbl th, .ki-orders-tbl td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.ki-orders-tbl th { font-weight: 700; background: #faf8f4; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; text-align: left; }
+.ki-orders-tbl td.num, .ki-orders-tbl th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.ki-orders-tbl .kon-f { width: 100%; padding: 5px 8px; font-size: 12.5px; border: 1px solid var(--border); border-radius: 5px; background: #fff; }
+.ki-orders-tbl .kon-f.num { text-align: right; }
+
+/* ============ TILBUDSARBEID ============ */
+.tilbud-section { margin-bottom: 14px; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
+.tilbud-section-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #faf8f4; border-bottom: 1px solid var(--border); border-radius: 10px 10px 0 0; }
+.tilbud-sec-title { flex: 1; font-weight: 700; font-size: 14px; border: 1px solid transparent; padding: 6px 8px; border-radius: 6px; background: transparent; }
+.tilbud-sec-title:hover, .tilbud-sec-title:focus { background: #fff; border-color: var(--border); }
+.tilbud-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tilbud-tbl th, .tilbud-tbl td { padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.tilbud-tbl th { font-weight: 700; font-size: 11.5px; color: var(--muted); background: #fff; text-transform: uppercase; letter-spacing: .03em; text-align: left; }
+.tilbud-tbl td.num, .tilbud-tbl th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.tilbud-tbl .kon-f { width: 100%; padding: 5px 8px; font-size: 12.5px; border: 1px solid var(--border); border-radius: 5px; background: #fff; }
+.tilbud-tbl .kon-f.num { text-align: right; }
+.tilbud-tbl tbody tr:last-child td { border-bottom: 0; }
+
+/* ============ ARBEIDSMETODIKK ============ */
+.met-h { font-size: 16px; font-weight: 800; color: var(--accent-dark); margin: 16px 0 4px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+.met-h:first-child { margin-top: 0; }
+.met-principle { background: #fff7e1; border-left: 3px solid var(--accent); padding: 8px 12px; margin: 8px 0 6px; border-radius: 0 6px 6px 0; }
+.met-ul { margin: 4px 0 10px; padding-left: 22px; }
+.met-ul li { margin: 3px 0; line-height: 1.45; }

@@ -43,7 +43,7 @@ function defaults() {
     companyPhone: process.env.COMPANY_PHONE || "51 97 44 00",
     companyWebsite: process.env.COMPANY_WEBSITE || "www.byggkon.no",
     values: defaultValues(),
-    departments: ["Ledelse", "Intern administrasjon", "Prosjektadministrasjon / BYGG", "RIB", "ARK", "RIBr", "Andre rådgivende fag"],
+    departments: ["Ledelse", "Intern administrasjon", "Prosjektadministrasjon / BYGG", "RIB", "ARK", "RIBr", "Andre rådgivende fag", "KI-agenter"],
     floorplans: [
       { id: "stavanger", name: "Travbaneveien (Stavanger)", url: process.env.FLOORPLAN_URL || "/floorplan.png", pins: [] },
       { id: "haugesund", name: "Haugesund (RIBr)", url: "", pins: [] },
@@ -61,7 +61,14 @@ function defaults() {
     geocache: {},
     projectNotes: {},
     supplierMeta: {},
-    roleDescriptions: [],
+    roleDescriptions: [
+      {
+        name: "Ole-André Torjussen",
+        role: "Daglig leder",
+        description: "Tar i tillegg på meg oppdrag innen prosjektadministrasjon, helst som byggherreombud eller prosjektleder.\n\nDet forventes at ledelsen:\n• sikrer tilførsel av riktige og tilstrekkelige oppdrag\n• har åpen, direkte og ærlig dialog med ansatte\n• har lav terskel for innspill, spørsmål og tilbakemeldinger\n• prioriterer struktur, systemer og kontinuitet i driften\n• har tydelig fokus på økonomi, inntjening og bærekraftig vekst\n• ser menneskene bak rollene og bygger tillit i organisasjonen\n\nGjennom tydelig ledelse, gode systemer og felles retning skal Byggkon skape forutsigbarhet, stabilitet og langsiktig verdiskaping – for kunder, ansatte og samarbeidspartnere.",
+        photo: "",
+      },
+    ],
     leads: [],
     intentions: [],
     nextOfKin: [],
@@ -71,6 +78,12 @@ function defaults() {
     mcpServers: [],
     itSystems: defaultItSystems(),
     departmentMembers: {},
+    deptKs: {},           // { dept: [{id, title, owner, status, deadline, note}] }
+    deptKanban: {},       // { dept: { cards: [{id, title, customer, stage, projectNumber, owner, dueDate}] } }
+    deptEconomyMeta: {},  // { dept: { projects: { projId: { isFixedPrice, fixedPrice, hoursEstimated, note } } } }
+    deptKsDocs: {},       // { dept: [{id, name, url, code, note}] } – KS-dokumenter i prioritert rekkefølge
+    kiAgentOrders: [],    // [{id, agent, customer, customerEmail, orderDate, status, monthlyPrice, note}]
+    deptTilbud: {},       // { dept: { sections: [{title, rows: [{label, unit, price, note}]}] } }
     parking: { url: "", pins: [] },
     kiSuggestions: [],
     kiAgents: [
@@ -83,6 +96,7 @@ function defaults() {
       { name: "Saga", email: "saga@byggkon.ai", desc: "Testkonto for AI-agenter", status: "pågående" },
     ],
     vision: defaultVision(),
+    arbeidsmetodikk: defaultArbeidsmetodikk(),
     newsFeeds: [
       { name: "Aftenbladet", url: "https://www.aftenbladet.no/rss" },
       { name: "VG", url: "https://www.vg.no/rss/feed/" },
@@ -221,6 +235,76 @@ Ledelsen i Byggkon skal være synlig, tilgjengelig og tydelig. Det forventes at 
 • ser menneskene bak rollene og bygger tillit i organisasjonen
 
 Gjennom tydelig ledelse, gode systemer og felles retning skal Byggkon skape forutsigbarhet, stabilitet og langsiktig verdiskaping – for kunder, ansatte og samarbeidspartnere.`;
+}
+
+function defaultArbeidsmetodikk() {
+  return [
+    "1. Innledning (kort – sett retning)",
+    "• Målet er ikke mer arbeid, men bedre kontroll og mindre stress",
+    "• Dette handler om enkle vaner som gir stor effekt over tid",
+    "",
+    "2. Håndtering av oppgaver (få kontroll på arbeidsmengden)",
+    "Hovedprinsipp: Alt ut av hodet – inn i system",
+    "• Lag en mappe i innboksen for oppgaver (>2 min å svare på)",
+    "• Oppgavemappen — oppgaver kan ligge der noen dager. Hjernen kjører prosess i bakhånd",
+    "• Dra e-poster dit i stedet for å la dem ligge og «stresse» deg",
+    "• Sjekk mailen på morgenen og etter lunsj. Kun 2 ganger om dagen.",
+    "• Bruk korte notater (OneNote) for å holde oversikt",
+    "• Ikke skriv lange notater — det skal være raskt og praktisk",
+    "",
+    "3. Struktur i kalender og arbeidshverdag",
+    "(alle legger sine ting inn i kalenderen)",
+    "Hovedprinsipp: Kalenderen styrer dagen din — ikke motsatt",
+    "• Mandager for meg — belastning/igangsette og pushe prosjekt.",
+    "• Maks 2 møter per dag (vær forberedt)",
+    "• Teams-møter: hold dem til 45 min",
+    "• Fysiske møter: fortsatt viktig — bruk dem bevisst, f.eks. direkte møter med kunde. Ha god tid.",
+    "• Book møter når du vet du er opplagt",
+    "• Bruk korte, faste (recurring) møter der det gir mening",
+    "• Begrens multitasking (se i taket 2 min)",
+    "",
+    "4. Møte- og samarbeidsstruktur",
+    "Hovedprinsipp: Forutsigbarhet skaper ro",
+    "• Bruk recurring møter med eksterne samarbeidspartnere",
+    "• Recurring møter vil som regel redusere arbeidsoppgaver",
+    "• Juster intervall etter fremdrift i prosjekt",
+    "• Organiser møter på eget initiativ — ikke vent på andre",
+    "• «Presenter» arbeidet til den som har behov for det.",
+    "• Fredager: ikke eksterne møter, kanskje interne.",
+    "• Kalender og aktivitet kan organiseres etter kapasitet/sosialt behov/hva som fungerer for deg",
+    "",
+    "5. Kundeoppfølging",
+    "Hovedprinsipp: Fast rytme = mindre stress",
+    "• Sett av fast tid til oppfølging: torsdag/fredag ca. kl. 10",
+    "• Legg inn i kalender:",
+    "    • Hvem som skal følges opp",
+    "    • Leveringstidspunkt",
+    "• Vær realistisk på frister — si heller realistisk levering enn å bomme. Avklar alltid forventet leveringstidspunkt. Utfordre dem om det høres urealistisk ut.",
+    "",
+    "6. Planlegging og prioritering",
+    "Hovedprinsipp: Planlegg fremover — ikke bare reager",
+    "• Hver fredag:",
+    "    • Planlegg 2 uker frem i tid",
+    "    • Lag prioriteringsliste over oppgaver",
+    "    • Sorter etter viktighet",
+    "• Legg inn i kalender:",
+    "    • Hva du skal jobbe med neste uke",
+    "• Hold deg mest mulig til planlagte (recurring) aktiviteter",
+    "",
+    "7. Ressursstyring og belastning",
+    "Hovedprinsipp: Si ifra før det blir et problem",
+    "• Be om bistand når det blir for mye",
+    "• Ikke vent til du er overbelastet",
+    "• Struktur og prioritering er det viktigste verktøyet mot stress",
+    "• Ikke sjekk mail etter jobb",
+    "• Noe er viktig, noe kan skyves på, noe er mindre viktig.",
+    "• Hva er en typisk rådgiver for en frustrert prosjektleder? Venter på å få arbeidsoppgave, i stedet for å ta grep for å igangsette oppgaven, eller gir ikke tilbakemelding om oppgaven er fullført. Prosjektleder VS Rådgiver.",
+    "",
+    "8. Avslutning",
+    "• Dette er ikke «regler», men anbefalte arbeidsvaner",
+    "• Ta med dere det som fungerer",
+    "• Små justeringer kan gi stor effekt over tid",
+  ].join("\n");
 }
 
 function defaultMarketing() {

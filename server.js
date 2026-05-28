@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 import { buildOverview } from "./src/metrics.js";
 import { buildEconomy } from "./src/economy.js";
 import { getNewsFeed } from "./src/newsfeed.js";
-import { clearCache, resetClient, getInvoices, getCustomers, getSupplierInvoices, getSupplierInvoiceDetails, getSuppliers, getForwardableInvoices, getProjects, getProjectAddresses, getTimeEntries, getEmployees, ymd } from "./src/tripletex.js";
+import { clearCache, resetClient, getInvoices, getCustomers, getSupplierInvoices, getSupplierInvoiceDetails, getSuppliers, getForwardableInvoices, getProjects, getProjectAddresses, getTimeEntries, getEmployees, getProjectsEconomyDetails, ymd } from "./src/tripletex.js";
 import { geocodeOne, sleep } from "./src/geocode.js";
 import { serveWithSnapshot, expireSnapshots } from "./src/snapshot.js";
 const snapTtl = () => getConfig().cacheTtlMs || 300000;
@@ -830,6 +830,15 @@ app.post("/api/hrdocfiles/delete", requireAuth, (req, res) => {
 });
 
 // ---- Visjon / felles målsetning ----
+app.get("/api/arbeidsmetodikk", requireAuth, (req, res) => res.json({ arbeidsmetodikk: getConfig().arbeidsmetodikk || "" }));
+app.post("/api/arbeidsmetodikk", requireAuth, (req, res) => {
+  try {
+    const txt = String(req.body?.arbeidsmetodikk || "");
+    saveConfig({ arbeidsmetodikk: txt.slice(0, 20000) });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
 app.get("/api/vision", requireAuth, (req, res) => res.json({ vision: getConfig().vision || "" }));
 app.post("/api/vision", requireAuth, (req, res) => {
   try { saveConfig({ vision: String(req.body?.vision || "").slice(0, 8000) }); res.json({ ok: true }); }
@@ -1171,6 +1180,260 @@ app.post("/api/department-members", requireAuth, (req, res) => {
       clean[String(dept).slice(0, 80)] = list.map((x) => String(x || "").slice(0, 80)).filter(Boolean);
     }
     saveConfig({ departmentMembers: clean });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- KS-saker per avdeling ----
+app.get("/api/dept-ks", requireAuth, (req, res) => res.json({ ks: getConfig().deptKs || {} }));
+app.post("/api/dept-ks", requireAuth, (req, res) => {
+  try {
+    const k = req.body?.ks;
+    if (!k || typeof k !== "object") return res.status(400).json({ error: "Mangler ks-objekt" });
+    const clean = {};
+    for (const [dept, list] of Object.entries(k)) {
+      if (!dept || !Array.isArray(list)) continue;
+      clean[String(dept).slice(0, 80)] = list.slice(0, 500).map((x) => ({
+        id: String(x.id || ("ks_" + Math.random().toString(36).slice(2, 9))),
+        title: String(x.title || "").slice(0, 200),
+        owner: String(x.owner || "").slice(0, 80),
+        status: String(x.status || "Åpen").slice(0, 30),
+        deadline: String(x.deadline || "").slice(0, 20),
+        note: String(x.note || "").slice(0, 1000),
+      }));
+    }
+    saveConfig({ deptKs: clean });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Tilbudsarbeid: pris-matrise per avdeling ----
+app.get("/api/dept-tilbud", requireAuth, (req, res) => res.json({ tilbud: getConfig().deptTilbud || {} }));
+app.post("/api/dept-tilbud", requireAuth, (req, res) => {
+  try {
+    const t = req.body?.tilbud;
+    if (!t || typeof t !== "object") return res.status(400).json({ error: "Mangler tilbud-objekt" });
+    const clean = {};
+    for (const [dept, obj] of Object.entries(t)) {
+      if (!dept || !obj || typeof obj !== "object") continue;
+      const sections = Array.isArray(obj.sections) ? obj.sections : [];
+      clean[String(dept).slice(0, 80)] = {
+        sections: sections.slice(0, 50).map((sec) => ({
+          title: String(sec.title || "").slice(0, 120),
+          rows: (Array.isArray(sec.rows) ? sec.rows : []).slice(0, 500).map((r) => ({
+            label: String(r.label || "").slice(0, 200),
+            unit: String(r.unit || "").slice(0, 40),
+            price: Math.max(0, Number(r.price) || 0),
+            note: String(r.note || "").slice(0, 300),
+          })),
+        })),
+      };
+    }
+    saveConfig({ deptTilbud: clean });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- KI-agent-bestillinger (egen avdeling: KI-agenter) ----
+app.get("/api/ki-orders", requireAuth, (req, res) => res.json({ orders: getConfig().kiAgentOrders || [] }));
+app.post("/api/ki-orders", requireAuth, (req, res) => {
+  try {
+    const list = Array.isArray(req.body?.orders) ? req.body.orders : null;
+    if (!list) return res.status(400).json({ error: "Mangler orders-liste" });
+    const clean = list.slice(0, 500).map((o) => ({
+      id: String(o.id || ("ki_" + Math.random().toString(36).slice(2, 9))),
+      agent: String(o.agent || "").slice(0, 60),
+      customer: String(o.customer || "").slice(0, 160),
+      customerEmail: String(o.customerEmail || "").slice(0, 160),
+      orderDate: String(o.orderDate || "").slice(0, 20),
+      status: String(o.status || "Aktiv").slice(0, 30),
+      monthlyPrice: Math.max(0, Number(o.monthlyPrice) || 0),
+      note: String(o.note || "").slice(0, 600),
+    }));
+    saveConfig({ kiAgentOrders: clean });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- KS-dokumenter per avdeling (prioritert rekkefølge) ----
+app.get("/api/dept-ksdocs", requireAuth, (req, res) => res.json({ docs: getConfig().deptKsDocs || {} }));
+app.post("/api/dept-ksdocs", requireAuth, (req, res) => {
+  try {
+    const d = req.body?.docs;
+    if (!d || typeof d !== "object") return res.status(400).json({ error: "Mangler docs-objekt" });
+    const clean = {};
+    for (const [dept, list] of Object.entries(d)) {
+      if (!dept || !Array.isArray(list)) continue;
+      clean[String(dept).slice(0, 80)] = list.slice(0, 200).map((x) => ({
+        id: String(x.id || ("d_" + Math.random().toString(36).slice(2, 9))),
+        name: String(x.name || "").slice(0, 200),
+        url: String(x.url || "").slice(0, 500),
+        code: String(x.code || "").slice(0, 40),
+        note: String(x.note || "").slice(0, 600),
+      }));
+    }
+    saveConfig({ deptKsDocs: clean });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post("/api/dept-ksdocs/upload", requireAuth, (req, res) => {
+  try {
+    const dept = String(req.body?.dept || "").trim();
+    const filename = String(req.body?.filename || "dokument").slice(0, 160);
+    const m = /^data:([^;]+);base64,(.+)$/i.exec(req.body?.dataUrl || "");
+    if (!dept || !m) return res.status(400).json({ error: "Ugyldig fil eller mangler dept." });
+    const mime = m[1].toLowerCase();
+    const ext = mime.includes("pdf") ? "pdf"
+      : mime.includes("wordprocessingml") ? "docx"
+      : mime.includes("spreadsheetml") ? "xlsx"
+      : mime.includes("presentationml") ? "pptx"
+      : mime.includes("msword") ? "doc"
+      : mime.includes("ms-excel") ? "xls"
+      : (filename.split(".").pop() || "bin").toLowerCase().slice(0, 5);
+    const buf = Buffer.from(m[2], "base64");
+    if (buf.length > 15 * 1024 * 1024) return res.status(400).json({ error: "Filen er for stor (maks 15 MB)." });
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    const safeDept = String(dept).replace(/[^A-Za-z0-9_-]+/g, "_").slice(0, 40);
+    const safeName = filename.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 80);
+    const stamp = Date.now();
+    const target = `ksdoc-${safeDept}-${stamp}-${safeName}`;
+    fs.writeFileSync(path.join(UPLOAD_DIR, target), buf);
+    res.json({ ok: true, url: "/uploads/" + target, ext });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Prosjektkoordinering (kanban) per avdeling ----
+app.get("/api/dept-kanban", requireAuth, (req, res) => res.json({ kanban: getConfig().deptKanban || {} }));
+app.post("/api/dept-kanban", requireAuth, (req, res) => {
+  try {
+    const k = req.body?.kanban;
+    if (!k || typeof k !== "object") return res.status(400).json({ error: "Mangler kanban-objekt" });
+    const STAGES = ["1", "2", "3", "4", "5"]; // 1-Reg, 2-Oppstart, 3-Under arbeid, 4-Til kontroll, 5-Utsendt
+    const clean = {};
+    for (const [dept, obj] of Object.entries(k)) {
+      if (!dept || !obj || typeof obj !== "object") continue;
+      const cards = Array.isArray(obj.cards) ? obj.cards : [];
+      clean[String(dept).slice(0, 80)] = {
+        cards: cards.slice(0, 500).map((c) => ({
+          id: String(c.id || ("k_" + Math.random().toString(36).slice(2, 9))),
+          title: String(c.title || "").slice(0, 200),
+          customer: String(c.customer || "").slice(0, 120),
+          stage: STAGES.includes(String(c.stage)) ? String(c.stage) : "1",
+          projectNumber: String(c.projectNumber || "").slice(0, 30),
+          owner: String(c.owner || "").slice(0, 80),
+          dueDate: String(c.dueDate || "").slice(0, 20),
+        })),
+      };
+    }
+    saveConfig({ deptKanban: clean });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Økonomi per avdeling: prosjektregnskap (fast pris / medgått) ----
+app.get("/api/dept-economy", requireAuth, async (req, res) => {
+  try {
+    const dept = String(req.query.dept || "").trim();
+    if (!dept) return res.status(400).json({ error: "Mangler dept-parameter" });
+    res.json(await serveWithSnapshot("dept-economy:" + dept, async () => {
+      const today = new Date();
+      const to = ymd(today);
+      const from = ymd(new Date(today.getFullYear() - 1, today.getMonth(), today.getDate()));
+      const cfg = getConfig();
+      const members = (cfg.departmentMembers || {})[dept] || [];
+      const memberNorm = new Set(members.map((m) => String(m || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[.\-]/g, " ").replace(/\s+/g, " ").trim()));
+      const [projects, details, timeEntries, invoices] = await Promise.all([
+        getProjects().catch(() => []),
+        getProjectsEconomyDetails().catch(() => new Map()),
+        getTimeEntries(from, to).catch(() => []),
+        getInvoices(from, to).catch(() => []),
+      ]);
+      // Hours per project total + per medlem (filter til de som har timer fra avdelingsmedlemmer)
+      const projHours = new Map();      // projId -> total hours
+      const projDeptHours = new Map();  // projId -> dept-medlemmers timer
+      for (const e of timeEntries) {
+        if (!e.project) continue;
+        const pid = e.project.id;
+        projHours.set(pid, (projHours.get(pid) || 0) + (e.hours || 0));
+        const empName = `${e.employee?.firstName || ""} ${e.employee?.lastName || ""}`.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[.\-]/g, " ").replace(/\s+/g, " ").trim();
+        const parts = empName.split(" ").filter(Boolean);
+        const flKey = parts.length >= 2 ? (parts[0] + " " + parts[parts.length - 1]) : empName;
+        if (memberNorm.has(empName) || memberNorm.has(flKey)) {
+          projDeptHours.set(pid, (projDeptHours.get(pid) || 0) + (e.hours || 0));
+        }
+      }
+      // Fakturert per prosjekt (best effort — invoices har customer, ikke project. Vi fordeler per kunde→prosjekt om mulig)
+      const projInvoiced = new Map();   // projId -> invoiced (best effort)
+      const overrides = (cfg.deptEconomyMeta || {})[dept]?.projects || {};
+      const rows = [];
+      for (const p of projects) {
+        // Bare ta med prosjekter der avdelingen har timer (eller manuell override)
+        const deptH = projDeptHours.get(p.id) || 0;
+        if (deptH <= 0 && !overrides[p.id]) continue;
+        const d = details.get(p.id) || {};
+        const ov = overrides[p.id] || {};
+        const isFixed = (typeof ov.isFixedPrice === "boolean") ? ov.isFixedPrice : !!d.isFixed;
+        const fixedPrice = Number(ov.fixedPrice) || d.fixedPriceAmount || 0;
+        const hoursEstimated = Number(ov.hoursEstimated) || d.hoursEstimated || 0;
+        const hoursLogged = projHours.get(p.id) || 0;
+        rows.push({
+          id: p.id,
+          number: p.number || "",
+          name: p.name || "",
+          customer: p.customer?.name || "",
+          projectManager: p.projectManager ? `${p.projectManager.firstName || ""} ${p.projectManager.lastName || ""}`.trim() : "",
+          type: isFixed ? "Fast pris" : "Medgått",
+          isFixedPrice: isFixed,
+          fixedPrice,
+          hoursEstimated,
+          hoursLogged,
+          hoursDept: deptH,
+          startDate: p.startDate || "",
+          endDate: p.endDate || "",
+          note: String(ov.note || ""),
+          invoiced: projInvoiced.get(p.id) || 0,
+        });
+      }
+      rows.sort((a, b) => b.hoursLogged - a.hoursLogged);
+      return {
+        updatedAt: new Date().toISOString(),
+        dept,
+        projects: rows,
+        summary: {
+          count: rows.length,
+          fixedCount: rows.filter((r) => r.isFixedPrice).length,
+          medgattCount: rows.filter((r) => !r.isFixedPrice).length,
+          totalFixedPrice: rows.reduce((s, r) => s + (r.isFixedPrice ? r.fixedPrice : 0), 0),
+          totalHoursLogged: rows.reduce((s, r) => s + r.hoursLogged, 0),
+          totalHoursEstimated: rows.reduce((s, r) => s + (r.hoursEstimated || 0), 0),
+        },
+      };
+    }, 10 * 60 * 1000));
+  } catch (err) {
+    console.error("Feil i /api/dept-economy:", err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// ---- Manuell override av prosjekt-økonomi (fast pris, estimerte timer, type) ----
+app.post("/api/dept-economy/meta", requireAuth, (req, res) => {
+  try {
+    const dept = String(req.body?.dept || "").trim();
+    const meta = req.body?.projects;
+    if (!dept || !meta || typeof meta !== "object") return res.status(400).json({ error: "Mangler dept eller projects" });
+    const all = getConfig().deptEconomyMeta || {};
+    const clean = {};
+    for (const [pid, ov] of Object.entries(meta)) {
+      if (!pid) continue;
+      clean[pid] = {
+        isFixedPrice: typeof ov.isFixedPrice === "boolean" ? ov.isFixedPrice : undefined,
+        fixedPrice: Number(ov.fixedPrice) || 0,
+        hoursEstimated: Number(ov.hoursEstimated) || 0,
+        note: String(ov.note || "").slice(0, 1000),
+      };
+    }
+    all[dept] = { projects: clean };
+    saveConfig({ deptEconomyMeta: all });
     res.json({ ok: true });
   } catch (err) { res.status(400).json({ error: err.message }); }
 });

@@ -418,11 +418,6 @@
         </div>
       </div>
       <div class="card">
-        <h2>Ressursfordeling — timer per prosjekt <span class="subnote">siste 2 uker</span></h2>
-        <p class="subnote">Prosjektene med flest timer øverst og hvem som jobber på dem.</p>
-        <div id="pmResourceGrid" class="pm-res-grid"></div>
-      </div>
-      <div class="card">
         <div class="proj-head">
           <h2>Per ansatt — prosjekter <span class="subnote">siste 2 uker</span></h2>
           <select id="pmEmpFilter" class="kon-f" style="max-width:200px"></select>
@@ -439,6 +434,11 @@
         <h2>Kapasitet — siste 2 uker <span class="subnote">faktureringsgrad nå</span></h2>
         <p class="subnote">Lavest øverst – mest ledig kapasitet til neste oppdrag.</p>
         <div class="table-wrap"><table id="pmCapacity2w"></table></div>
+      </div>
+      <div class="card">
+        <h2>Ressursfordeling — timer per prosjekt <span class="subnote">siste 2 uker</span></h2>
+        <p class="subnote">Prosjektene med flest timer øverst og hvem som jobber på dem.</p>
+        <div id="pmResourceGrid" class="pm-res-grid"></div>
       </div>
     </main>
   </section>
@@ -491,6 +491,7 @@
         <button class="subtab" data-sub="onboarding">Onboarding</button>
         <button class="subtab" data-sub="cv">CV-er</button>
         <button class="subtab" data-sub="visjon">Visjon</button>
+        <button class="subtab" data-sub="arbeidsmetodikk">Arbeidsmetodikk</button>
         <button class="subtab" data-sub="dokumenter">Dokumenter</button>
         <button class="subtab" data-sub="parkering">Parkering</button>
         <button class="subtab" data-sub="oilers">Oilers-losj</button>
@@ -670,6 +671,21 @@
           <p class="subnote">Bygg-Kons felles retning og forventninger.</p>
           <div id="visView" class="vision-text"></div>
           <textarea id="visText" class="doc-text" rows="22" hidden></textarea>
+        </div>
+      </div>
+
+      <div class="hr-sub" id="hrsub-arbeidsmetodikk">
+        <div class="card">
+          <div class="proj-head">
+            <h2>Arbeidsmetodikk — anbefalte arbeidsvaner</h2>
+            <div class="org-actions">
+              <button id="metEdit" class="btn-ghost">🔓 Lås opp</button>
+              <button id="metSave" class="btn-primary" hidden>Lagre</button>
+            </div>
+          </div>
+          <p class="subnote">Felles arbeidsvaner som gir bedre kontroll og mindre stress. Ta med dere det som fungerer.</p>
+          <div id="metView" class="vision-text"></div>
+          <textarea id="metText" class="doc-text" rows="40" hidden></textarea>
         </div>
       </div>
 
@@ -967,10 +983,83 @@
             <button id="deptReload" class="btn-ghost">↻</button>
           </div>
         </div>
-        <p class="subnote" id="deptDashSub">Klikk på en avdelings-chip øverst. Hver avdeling viser sine ansatte med løpende prosjekter (timer siste 4 uker fra Tripletex).</p>
+        <p class="subnote" id="deptDashSub">Klikk på en avdelings-chip øverst. Hver avdeling har egne underfaner: timer, prosjekter, KS, koordinering og økonomi.</p>
+
+        <!-- Undertabs (vises når en avdeling er valgt) -->
+        <div class="subtabs" id="deptSubtabs" hidden>
+          <button class="subtab active" data-sub="timer">⏱ Timeoversikt</button>
+          <button class="subtab" data-sub="prosjekter">📁 Prosjektoversikt</button>
+          <button class="subtab" data-sub="ks">✅ KS</button>
+          <button class="subtab" data-sub="kanban">🗂 Prosjektkoordinering</button>
+          <button class="subtab" data-sub="okonomi">💰 Økonomi</button>
+          <button class="subtab" data-sub="tilbud">💼 Tilbudsarbeid</button>
+          <button class="subtab" data-sub="kiorders" hidden>🤖 Bestillinger</button>
+        </div>
+
         <div id="deptMemberEdit" class="dept-member-edit" hidden></div>
         <div id="deptStatus" class="subnote" hidden></div>
-        <div id="deptGrid" class="rib-grid"></div>
+
+        <!-- Undervisning: Timeoversikt -->
+        <div class="subview active" id="subTimer">
+          <div id="deptGrid" class="rib-grid"></div>
+        </div>
+
+        <!-- Undervisning: Prosjektoversikt -->
+        <div class="subview" id="subProsjekter" hidden>
+          <p class="subnote">Alle løpende prosjekter for avdelingen (siste 12 uker aktivitet) med totaltimer, prosjektleder og kunde.</p>
+          <div id="deptProjects"></div>
+        </div>
+
+        <!-- Undervisning: KS -->
+        <div class="subview" id="subKs" hidden>
+          <div class="proj-head" style="margin-top:6px">
+            <p class="subnote" style="margin:0">KS-saker, avvik og forbedringspunkter. Lås opp for å redigere.</p>
+            <div class="org-actions">
+              <button id="ksEdit" class="btn-ghost">🔓 Lås opp</button>
+              <button id="ksAdd" class="btn-ghost" hidden>+ Sak</button>
+              <button id="ksSave" class="btn-primary" hidden>Lagre</button>
+            </div>
+          </div>
+          <div id="ksList"></div>
+        </div>
+
+        <!-- Undervisning: Prosjektkoordinering (kanban) -->
+        <div class="subview" id="subKanban" hidden>
+          <div class="proj-head" style="margin-top:6px">
+            <p class="subnote" style="margin:0">Dra-og-slipp prosjekter mellom faser. Endringer lagres automatisk per avdeling.</p>
+            <div class="org-actions">
+              <button id="kanbanAdd" class="btn-ghost">+ Kort</button>
+              <button id="kanbanFromActive" class="btn-ghost">⤓ Hent aktive prosjekter</button>
+            </div>
+          </div>
+          <div id="kanbanBoard" class="kanban-board"></div>
+        </div>
+
+        <!-- Undervisning: Tilbudsarbeid (pris-matrise) -->
+        <div class="subview" id="subTilbud" hidden>
+          <p class="subnote">Pris-matrise for tilbud: fastpriser, enhetspriser, timepriser. Bygg opp seksjoner som passer fagområdet ditt — informasjonen lagres når du klikker «Lagre».</p>
+          <div id="tilbudList"></div>
+        </div>
+
+        <!-- Undervisning: KI-bestillinger (kun for KI-agenter-avdelingen) -->
+        <div class="subview" id="subKiOrders" hidden>
+          <div class="proj-head" style="margin-top:6px">
+            <p class="subnote" style="margin:0">Registrer kunder som har bestilt KI-agenter, med dato og pris.</p>
+            <div class="org-actions">
+              <button id="kiOrderAdd" class="btn-ghost">+ Bestilling</button>
+              <button id="kiOrderSave" class="btn-primary">Lagre</button>
+            </div>
+          </div>
+          <div id="kiOrdersTop"></div>
+          <div id="kiOrdersList"></div>
+        </div>
+
+        <!-- Undervisning: Økonomi -->
+        <div class="subview" id="subOkonomi" hidden>
+          <p class="subnote">Prosjektregnskap fra Tripletex — type (fast pris / medgått), avtalt fast pris, estimerte timer, påløpte timer og fakturert hittil.</p>
+          <div id="deptEconomyTop"></div>
+          <div id="deptEconomy"></div>
+        </div>
       </div>
     </main>
   </section>
@@ -1232,10 +1321,17 @@
       <div class="page-intro"><span class="pi-ico">💻</span><span class="pi-txt"><b>Hva siden gjør:</b> Alfabetisk oversikt over IT-systemene og lisensene våre, med kort forklaring på hvert. <b>Hensikt:</b> Vite hvilke verktøy vi har og hvem som eier dem. Passord ligger i 1Password — aldri her.</span></div>
       <div class="card intro-card">
         <h2>🤖 Slik bruker vi Claude og KI-agentene</h2>
-        <p><b>Claude</b> er motoren bak dette dashbordet og Cowork-arbeidsstasjonen vår. Den leser/skriver til Tripletex via Regnskapsagent-MCP-en, og genererer rapporter, dokumenter og analyser på sekunder.</p>
-        <p><b>Fyxer AI</b> håndterer innboksen vår — sorterer, foreslår svar og lærer av hvordan vi vanligvis svarer. Sammen med Claude reduserer det e-posttiden vesentlig.</p>
-        <p><b>De andre agentene</b> (Loki, Nova, Hilde, Embla/KI Tilbud, Stein, Eira) er spesialiserte: Loki finner svar i alle prosjektdokumentene våre, Nova svarer på fag og regelverk, Hilde slår opp eiendom i Kartverket/Brønnøysund, Embla produserer komplette tilbud etter NS-standarder, Stein gjør kalkyle, og Eira følger opp kunder. Alle er koblet sammen i <b>Bygg-Kon AI Hub</b> (se KI-agenter-fanen), og resultatet er at vi kan hente ut og produsere dokumenter på minutter i stedet for dager.</p>
-        <p class="subnote">Alt sammen kjører på vår byggkon.ai-plattform med felles innlogging (ai@byggkon.no for delt tilgang).</p>
+        <p><b>Claude</b> er front-end-språkmodellen vi snakker og skriver med — det er den vi bruker for å gi instruksjoner til agentene, stille spørsmål og få ut tekst, rapporter og dokumenter. Den binder agentene sammen.</p>
+        <p>Akkurat nå har vi <b>fem aktiverte koblinger</b>:</p>
+        <ul>
+          <li><b>Loki</b> — søker i alle prosjektdokumentene våre (OneDrive/SharePoint).</li>
+          <li><b>Nova</b> — svarer på fag og regelverk (TEK, NS-standarder m.m.).</li>
+          <li><b>Hilde</b> — slår opp eiendom i Kartverket og Brønnøysund.</li>
+          <li><b>Fyxer (e-post)</b> — håndterer innboksen, sorterer og foreslår svar.</li>
+          <li><b>Tripletex (Regnskapsagenten)</b> — leser/skriver økonomi, timer, prosjekter og fakturadata.</li>
+        </ul>
+        <p>Sammen gjør Claude + disse fem at vi kan hente ut og produsere dokumenter på minutter i stedet for dager. Alt henger sammen i <b>Bygg-Kon AI Hub</b> (se KI-agenter-fanen).</p>
+        <p class="subnote">Felles innlogging via ai@byggkon.no for delt tilgang.</p>
       </div>
       <div class="card">
         <div class="proj-head">

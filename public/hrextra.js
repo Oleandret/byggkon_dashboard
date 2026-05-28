@@ -27,6 +27,54 @@
     const tab = document.querySelector('.tab[data-tab="hr"]'); if (tab) tab.addEventListener("click", load);
   })();
 
+  /* ---------- Arbeidsmetodikk ---------- */
+  (function () {
+    const view = document.getElementById("metView"), ta = document.getElementById("metText");
+    const eb = document.getElementById("metEdit"), sb = document.getElementById("metSave");
+    if (!view) return;
+    let loaded = false;
+    function show(text) {
+      // Pen formatering: linjer som starter med tall+punktum blir overskrifter,
+      // linjer som starter med * eller - blir punkter, ellers vanlig avsnitt.
+      const lines = String(text || "").split("\n");
+      let html = "", inUl = false;
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t) { if (inUl) { html += "</ul>"; inUl = false; } html += "<br>"; continue; }
+        if (/^\d+\.\s/.test(t)) {
+          if (inUl) { html += "</ul>"; inUl = false; }
+          html += `<h3 class="met-h">${esc(t)}</h3>`;
+        } else if (/^[•*\-]\s/.test(t)) {
+          if (!inUl) { html += `<ul class="met-ul">`; inUl = true; }
+          html += `<li>${esc(t.replace(/^[•*\-]\s+/, ""))}</li>`;
+        } else if (/^Hovedprinsipp:/i.test(t)) {
+          if (inUl) { html += "</ul>"; inUl = false; }
+          html += `<p class="met-principle"><b>${esc(t)}</b></p>`;
+        } else {
+          if (inUl) { html += "</ul>"; inUl = false; }
+          html += `<p>${esc(t)}</p>`;
+        }
+      }
+      if (inUl) html += "</ul>";
+      view.innerHTML = html || `<div class="empty">Ingen tekst lagret ennå. Lås opp for å redigere.</div>`;
+      ta.value = text;
+    }
+    eb.addEventListener("click", () => {
+      if (ta.hidden) { ta.hidden = false; view.hidden = true; eb.textContent = "🔒 Lås"; sb.hidden = false; ta.focus(); }
+      else { ta.hidden = true; view.hidden = false; eb.textContent = "🔓 Lås opp"; sb.hidden = true; }
+    });
+    sb.addEventListener("click", async () => {
+      sb.disabled = true;
+      try {
+        const res = await fetch("/api/arbeidsmetodikk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ arbeidsmetodikk: ta.value }) });
+        if (!res.ok) throw new Error("Lagring feilet");
+        show(ta.value); ta.hidden = true; view.hidden = false; eb.textContent = "🔓 Lås opp"; sb.hidden = true;
+      } catch (e2) { err("Kunne ikke lagre: " + e2.message); } finally { sb.disabled = false; }
+    });
+    async function load() { if (loaded) return; loaded = true; try { const d = await (await fetch("/api/arbeidsmetodikk")).json(); show(d.arbeidsmetodikk || ""); } catch {} }
+    const tab = document.querySelector('.tab[data-tab="hr"]'); if (tab) tab.addEventListener("click", load);
+  })();
+
   /* ---------- Dokumentbibliotek ---------- */
   (function () {
     const listEl = document.getElementById("docList"), upBox = document.getElementById("docUpload"), eb = document.getElementById("docEdit");

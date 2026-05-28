@@ -182,4 +182,39 @@ export async function getBalanceSheet(fromDate, toDate, numberFrom = 1000, numbe
   });
 }
 
+// Best-effort: hent prosjekter med alle felt for å trekke ut økonomi-info
+// (fast pris, estimerte timer, timepris). Feiler stille til tom Map.
+let _projDetailsCache = { ts: 0, map: null };
+export async function getProjectsEconomyDetails() {
+  if (_projDetailsCache.map && Date.now() - _projDetailsCache.ts < 30 * 60 * 1000) return _projDetailsCache.map;
+  const map = new Map();
+  try {
+    const data = await callTool("search_projects", { isClosed: false, from: 0, count: 1000, fields: "*" });
+    assertOk("search_projects", data);
+    for (const p of (data?.values || [])) {
+      // Tripletex har varierte feltnavn — vi prøver flere
+      const isFixed =
+        p.isFixedPrice === true ||
+        p.fixedPrice === true ||
+        /(fast\s*pris|fixed)/i.test(String(p.projectCategory?.name || p.category || p.type || ""));
+      // Avtalt fast pris (NOK)
+      const fixedPriceAmount =
+        Number(p.fixedPriceAmount || 0) ||
+        Number(p.budget || 0) ||
+        Number(p.contractedAmount || 0) ||
+        (typeof p.fixedPrice === "number" ? p.fixedPrice : 0) || 0;
+      // Estimerte timer
+      const hoursEstimated =
+        Number(p.numberOfHoursEstimated || 0) ||
+        Number(p.estimatedHours || 0) ||
+        Number(p.hoursBudget || 0) || 0;
+      const hourlyRate = Number(p.hourlyRate || 0) || 0;
+      const description = String(p.description || "");
+      map.set(p.id, { isFixed, fixedPriceAmount, hoursEstimated, hourlyRate, description });
+    }
+  } catch { /* tom map om ikke støttet */ }
+  _projDetailsCache = { ts: Date.now(), map };
+  return map;
+}
+
 export { ymd };

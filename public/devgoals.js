@@ -35,7 +35,34 @@
       saveBtn.textContent = "Lagret ✓"; setTimeout(() => (saveBtn.textContent = "Lagre"), 2000);
     } catch (e2) { err("Kunne ikke lagre: " + e2.message); } finally { saveBtn.disabled = false; }
   });
-  async function load() { if (loaded) return; try { const d = await (await fetch("/api/devgoals")).json(); rows = (d.devGoals || []).map((r) => ({ ...r })); loaded = true; render(); } catch (e2) { err("Kunne ikke hente mål: " + e2.message); } }
+  async function ensureAllEmployees() {
+    try {
+      const org = await (await fetch("/api/org")).json();
+      const names = (org.nodes || []).map((n) => n.name).filter(Boolean);
+      const have = new Set(rows.map((r) => (r.name || "").trim().toLowerCase()));
+      let added = 0;
+      for (const n of names) {
+        if (!have.has(n.trim().toLowerCase())) { rows.push({ name: n, goals: "" }); added++; }
+      }
+      // Sorter alfabetisk så det er lett å finne
+      rows.sort((a, b) => (a.name || "").localeCompare(b.name || "", "nb"));
+      if (added > 0) {
+        // auto-lagre nye ansatte så de blir liggende
+        try { await fetch("/api/devgoals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ devGoals: rows }) }); } catch {}
+      }
+      render();
+    } catch {}
+  }
+  async function load() {
+    if (loaded) return;
+    try {
+      const d = await (await fetch("/api/devgoals")).json();
+      rows = (d.devGoals || []).map((r) => ({ ...r }));
+      loaded = true;
+      render();
+      ensureAllEmployees(); // legg inn manglende ansatte fra org-kart
+    } catch (e2) { err("Kunne ikke hente mål: " + e2.message); }
+  }
   const tab = document.querySelector('.tab[data-tab="fagmoter"]');
   if (tab) tab.addEventListener("click", load);
   load();
