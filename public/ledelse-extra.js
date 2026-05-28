@@ -167,7 +167,9 @@
       const res = await fetch("/api/ledelse/auto");
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || ("Feil " + res.status));
       autoData = await res.json();
-      renderLikv(); renderRes(); renderBud();
+      renderRes(); renderBud();
+      // Likviditet kommer fra eget endepunkt med Excel-stil tabell
+      loadLikv();
     } catch (e) {
       Object.values(targets).forEach((el) => { if (el) el.innerHTML = `<div class="empty">Kunne ikke hente: ${escAuto(e.message)}</div>`; });
     }
@@ -204,30 +206,153 @@
     </div>`;
   }
 
+  /* ---- Excel-stil Likviditetsprognose ---- */
+  let likvData = null;
+  let likvDirty = false;
+
+  async function loadLikv() {
+    const box = document.getElementById("ledAutoLikv");
+    if (!box) return;
+    box.innerHTML = `<div class="subnote">Henter likviditetsdata fra Tripletex …</div>`;
+    try {
+      const res = await fetch("/api/ledelse/likviditet");
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || ("Feil " + res.status));
+      likvData = await res.json();
+      likvDirty = false;
+      renderLikv();
+    } catch (e) {
+      box.innerHTML = `<div class="empty">Kunne ikke hente: ${escAuto(e.message)}</div>`;
+    }
+  }
+  async function saveLikv(payload) {
+    try {
+      const res = await fetch("/api/ledelse/likviditet", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (!res.ok) throw new Error("Lagring feilet");
+    } catch (e) { console.warn("Likv save:", e); }
+  }
+  function getAdj(rowKey, monthKey) {
+    return Number(likvData?.adjustments?.[rowKey]?.[monthKey] || 0);
+  }
+  function setAdj(rowKey, monthKey, val) {
+    if (!likvData.adjustments[rowKey]) likvData.adjustments[rowKey] = {};
+    const n = Number(val) || 0;
+    if (n === 0) delete likvData.adjustments[rowKey][monthKey];
+    else likvData.adjustments[rowKey][monthKey] = Math.round(n);
+    likvDirty = true;
+  }
+  function effective(row, mi) {
+    const monthKey = likvData.months[mi].key;
+    return (row.auto[mi] || 0) + getAdj(row.key, monthKey);
+  }
+
   function renderLikv() {
-    const box = document.getElementById("ledAutoLikv"); if (!box || !autoData) return;
-    const rows = autoData.likviditet || [];
-    // Reset accumulated based on justeringer-in tillagt
-    let acc = 0;
-    box.innerHTML = `<table class="auto-tbl">
-      <thead><tr>
-        <th>Måned</th><th class="num">Innbetalinger</th><th class="num">Utbetalinger</th>
-        <th class="num">Justeringer</th><th class="num">Netto</th><th class="num">Akkumulert</th>
-      </tr></thead>
-      <tbody>${rows.map((r) => {
-        const adj = sumAdjForMonth("likviditet", r.key);
-        const net = r.cashIn - r.cashOut + adj;
-        acc += net;
-        return `<tr>
-          <td><b>${escAuto(r.label)}</b></td>
-          <td class="num">${nokfmt(r.cashIn)}</td>
-          <td class="num">${nokfmt(r.cashOut)}</td>
-          <td class="num ${adj >= 0 ? "" : "neg"}">${adj === 0 ? "—" : (adj > 0 ? "+" : "") + nokfmt(adj)}</td>
-          <td class="num ${net >= 0 ? "" : "neg"}"><b>${nokfmt(net)}</b></td>
-          <td class="num ${acc >= 0 ? "" : "neg"}">${nokfmt(acc)}</td>
+    const box = document.getElementById("ledAutoLikv");
+    if (!box || !likvData) return;
+    const months = likvData.months;
+    // KPI / setup øverst
+    const setupHtml = `
+      <div class="likv-setup">
+        <label>Disponibel saldo (start)<input type="number" id="likvStart" value="${likvData.startBalance || 0}" step="10000" /></label>
+        <label>Kassekredittgrense<input type="number" id="likvKK" value="${likvData.kassekreditt || 0}" step="100000" /></label>
+        <label>KK-saldo (start)<input type="number" id="likvKKSaldo" value="${likvData.kassekredittSaldo || 0}" step="100000" /></label>
+        <label>Rente (årlig)<input type="number" id="likvRente" value="${likvData.rente || 0}" step="0.0001" /></label>
+        <button class="btn-primary" id="likvSaveSetup">Lagre oppsett</button>
+        <button class="btn-primary" id="likvSaveAdj" ${likvDirty ? "" : "disabled"}>Lagre justeringer</button>
+      </div>`;
+
+    // Tabellrendering
+    const monthHeader = months.map((m) => `<th class="num">${escAuto(m.label)}</th>`).join("");
+    let html = `${setupHtml}<div class="likv-scroll"><table class="likv-tbl">
+      <thead><tr><th class="lt-row">Post</th>${monthHeader}<th class="num">SUM</th></tr></thead>
+      <tbody>`;
+
+    // Akkumulatorer for sumlinje per seksjon
+    const sectionSums = {};
+    likvData.sections.forEach((sec) => {
+      sectionSums[sec.key] = months.map(() => 0);
+      html += `<tr class="lt-group"><td colspan="${months.length + 2}">${escAuto(sec.title)}</td></tr>`;
+      sec.rows.forEach((row) => {
+        const cells = months.map((m, i) => {
+          const auto = row.auto[i] || 0;
+          const adj = getAdj(row.key, m.key);
+          const eff = auto + adj;
+          sectionSums[sec.key][i] += eff;
+          return `<td class="num lt-cell">
+            <div class="lt-auto" title="Auto fra Tripletex">${auto ? nokshort(auto) : "—"}</div>
+            <input type="number" class="lt-adj" data-row="${escAuto(row.key)}" data-month="${escAuto(m.key)}" value="${adj || 0}" step="1000" placeholder="0" />
+          </td>`;
+        }).join("");
+        const rowSum = months.reduce((s, _, i) => s + (row.auto[i] || 0) + getAdj(row.key, months[i].key), 0);
+        html += `<tr class="lt-row-itm">
+          <td class="lt-row"><b>${escAuto(row.label)}</b><span class="subnote"> ${escAuto(row.source || "")}</span></td>
+          ${cells}
+          <td class="num"><b>${nokshort(rowSum)}</b></td>
         </tr>`;
-      }).join("")}</tbody>
-    </table>${adjustmentEditor("likviditet")}`;
+      });
+      // Sumrad for seksjonen
+      const sectionTotalCells = sectionSums[sec.key].map((v) => `<td class="num lt-sum-cell">${nokshort(v)}</td>`).join("");
+      const sectionTotal = sectionSums[sec.key].reduce((s, v) => s + v, 0);
+      html += `<tr class="lt-sum">
+        <td>Sum ${escAuto(sec.title.toLowerCase())}</td>
+        ${sectionTotalCells}
+        <td class="num">${nokshort(sectionTotal)}</td>
+      </tr>`;
+    });
+
+    // Beregn likviditet linje for linje
+    const sumIn = sectionSums.innbetalinger;
+    const sumUt = sectionSums.utbetalinger;
+    const sumFast = sectionSums.fasteKostnader;
+    let ib = likvData.startBalance || 0;
+    const netto = months.map((_, i) => (sumIn[i] || 0) - (sumUt[i] || 0) - (sumFast[i] || 0));
+    const ubArr = []; let ubAcc = ib;
+    netto.forEach((n) => { ubAcc += n; ubArr.push(ubAcc); });
+
+    html += `<tr class="lt-totals lt-totals-h"><td colspan="${months.length + 2}">Likviditet</td></tr>`;
+    // Disponibelt IB
+    html += `<tr class="lt-totals"><td>Disponibelt IB</td>${months.map((_, i) => {
+      const ibThis = i === 0 ? (likvData.startBalance || 0) : ubArr[i - 1];
+      return `<td class="num">${nokshort(ibThis)}</td>`;
+    }).join("")}<td></td></tr>`;
+    html += `<tr class="lt-totals"><td>Netto kontantstrøm</td>${netto.map((n) => `<td class="num ${n >= 0 ? "" : "neg"}">${nokshort(n)}</td>`).join("")}<td class="num">${nokshort(netto.reduce((s, n) => s + n, 0))}</td></tr>`;
+    html += `<tr class="lt-totals lt-ub"><td>UB bank (inkl. KK)</td>${ubArr.map((v) => `<td class="num ${v >= 0 ? "" : "neg"}"><b>${nokshort(v)}</b></td>`).join("")}<td></td></tr>`;
+    const kk = likvData.kassekreditt || 0;
+    html += `<tr class="lt-totals"><td>UB bank (eksl. KK)</td>${ubArr.map((v) => `<td class="num ${v - kk >= 0 ? "" : "neg"}">${nokshort(v - kk)}</td>`).join("")}<td></td></tr>`;
+
+    html += `</tbody></table></div>`;
+    box.innerHTML = html;
+
+    // Event hooks
+    box.querySelectorAll(".lt-adj").forEach((inp) => {
+      inp.addEventListener("input", () => {
+        setAdj(inp.dataset.row, inp.dataset.month, Number(inp.value) || 0);
+        document.getElementById("likvSaveAdj").disabled = false;
+      });
+      inp.addEventListener("change", renderLikv);
+    });
+    document.getElementById("likvSaveSetup")?.addEventListener("click", async () => {
+      const payload = {
+        startBalance: Number(document.getElementById("likvStart").value) || 0,
+        kassekreditt: Number(document.getElementById("likvKK").value) || 0,
+        kassekredittSaldo: Number(document.getElementById("likvKKSaldo").value) || 0,
+        rente: Number(document.getElementById("likvRente").value) || 0,
+      };
+      Object.assign(likvData, payload);
+      await saveLikv(payload);
+      renderLikv();
+    });
+    document.getElementById("likvSaveAdj")?.addEventListener("click", async () => {
+      await saveLikv({ adjustments: likvData.adjustments });
+      likvDirty = false;
+      renderLikv();
+    });
+  }
+
+  function nokshort(n) {
+    n = Math.round(n || 0);
+    if (Math.abs(n) >= 1000000) return (n / 1000000).toFixed(2).replace(/\.?0+$/, "") + "M";
+    if (Math.abs(n) >= 10000) return Math.round(n / 1000) + "k";
+    return n.toLocaleString("nb-NO");
   }
 
   function renderRes() {
@@ -287,27 +412,31 @@
       });
       if (!res.ok) throw new Error("Lagring feilet");
       // Re-render etter lagring
-      if (slot === "likviditet") renderLikv();
-      else if (slot === "resultat") renderRes();
-      else renderBud();
+      if (slot === "resultat") renderRes();
+      else if (slot === "budsjett") renderBud();
     } catch (e) { alert("Kunne ikke lagre: " + e.message); }
   }
 
   document.addEventListener("click", (e) => {
-    if (e.target.classList && e.target.classList.contains("led-auto-reload")) { loadAuto(); return; }
+    if (e.target.classList && e.target.classList.contains("led-auto-reload")) {
+      const slot = e.target.dataset.slot;
+      if (slot === "likviditet") loadLikv(); else loadAuto();
+      return;
+    }
     if (e.target.classList && e.target.classList.contains("adj-add")) {
       const slot = e.target.dataset.slot;
-      if (!autoData) return;
+      if (!autoData || slot === "likviditet") return;
       autoData.adjustments[slot] = autoData.adjustments[slot] || [];
       const monthKey = new Date().toISOString().slice(0, 7);
       autoData.adjustments[slot].push({ id: "a_" + Math.random().toString(36).slice(2, 9), month: monthKey, label: "", type: "in", amount: 0, note: "" });
-      if (slot === "likviditet") renderLikv(); else if (slot === "resultat") renderRes(); else renderBud();
+      if (slot === "resultat") renderRes(); else if (slot === "budsjett") renderBud();
       return;
     }
     if (e.target.classList && e.target.classList.contains("adj-del")) {
       const slot = e.target.dataset.slot, i = Number(e.target.dataset.i);
+      if (!autoData?.adjustments?.[slot]) return;
       autoData.adjustments[slot].splice(i, 1);
-      if (slot === "likviditet") renderLikv(); else if (slot === "resultat") renderRes(); else renderBud();
+      if (slot === "resultat") renderRes(); else if (slot === "budsjett") renderBud();
       return;
     }
     if (e.target.classList && e.target.classList.contains("adj-save")) {
@@ -321,8 +450,7 @@
     const a = autoData?.adjustments?.[slot]?.[i]; if (!a) return;
     const f = e.target.dataset.f;
     a[f] = (f === "amount") ? (Number(e.target.value) || 0) : e.target.value;
-    // Re-render bare tabellen (ikke editor) for å vise oppdaterte summer
-    if (slot === "likviditet") renderLikv(); else if (slot === "resultat") renderRes(); else renderBud();
+    if (slot === "resultat") renderRes(); else if (slot === "budsjett") renderBud();
   });
 
   // Last filene + auto-data når Ledelse-fanen åpnes

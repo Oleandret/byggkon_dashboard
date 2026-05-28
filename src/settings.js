@@ -76,6 +76,14 @@ function defaults() {
     hrDocs: [],
     ledelseFiles: { likviditet: {}, rapport: {}, resultat: {}, budsjett: {} },
     ledelseAdjustments: { likviditet: [], resultat: [], budsjett: [] }, // { slot: [{month, label, amount, note}] }
+    ledelseLikviditet: {
+      startBalance: 0,
+      kassekreditt: 1000000,
+      kassekredittSaldo: 0,
+      rente: 0.0747,
+      // adjustments[rowKey][monthKey] = beløp (positivt = inn, negativt = ut for innbetalinger)
+      adjustments: {},
+    },
     mcpServers: [],
     itSystems: defaultItSystems(),
     departmentMembers: {},

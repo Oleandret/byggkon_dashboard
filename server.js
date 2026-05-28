@@ -1316,6 +1316,160 @@ app.get("/api/ledelse/auto", requireAdmin, async (req, res) => {
   }
 });
 
+// ---- Ledelse: Likviditetsprognose i Excel-stil (12 mnd × poster) ----
+app.get("/api/ledelse/likviditet", requireAdmin, async (req, res) => {
+  try {
+    res.json(await serveWithSnapshot("ledelse-likviditet", async () => {
+      const today = new Date();
+      const todayStr = ymd(today);
+      const yearStart = ymd(new Date(today.getFullYear(), 0, 1));
+
+      // 12 måneder framover, starter med inneværende måned
+      const months = [];
+      for (let i = 0; i < 12; i++) {
+        const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+        months.push({
+          key: ymd(d).slice(0, 7),
+          label: d.toLocaleDateString("nb-NO", { month: "short", year: "2-digit" }),
+        });
+      }
+      const monthKeys = new Set(months.map((m) => m.key));
+
+      // Hent data
+      const [invoicesCust, supplierInvs, accounts, monthSums] = await Promise.all([
+        getInvoices(yearStart, todayStr).catch(() => []),
+        getSupplierInvoices(ymd(new Date(today.getFullYear() - 1, today.getMonth(), 1)), todayStr).catch(() => []),
+        getAccounts().catch(() => []),
+        Promise.all(
+          [...Array(6)].map((_, i) => {
+            const d = new Date(today.getFullYear(), today.getMonth() - (6 - i), 1);
+            const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+            return getBalanceSheet(ymd(d), ymd(end > today ? today : end), 3000, 8299).catch(() => []);
+          })
+        ),
+      ]);
+
+      // Beregn snitt lønn / drift / andre fra siste 6 mnd
+      const accById = new Map(accounts.map((a) => [a.id, a]));
+      const sum6 = { lonn: 0, drift: 0, andre: 0, leie: 0, mvaaga: 0 };
+      const monthsCount = monthSums.length || 1;
+      for (const rows of monthSums) {
+        for (const r of rows) {
+          const a = accById.get(r.account?.id); if (!a) continue;
+          const n = Number(a.number);
+          const ch = r.balanceChange || 0;
+          if (n >= 5000 && n < 5900) sum6.lonn += ch;
+          else if (n >= 6300 && n < 6400) sum6.leie += ch;
+          else if (n >= 6000 && n < 8000) sum6.drift += ch;
+          else if (n >= 2700 && n < 2780) sum6.mvaaga += ch;
+        }
+      }
+      const avg = {
+        lonn: Math.round(sum6.lonn / monthsCount),
+        drift: Math.round(sum6.drift / monthsCount),
+        leie: Math.round(sum6.leie / monthsCount),
+        mvaaga: Math.round(sum6.mvaaga / monthsCount),
+      };
+
+      // Kundefordringer per måned (forfallsdato)
+      const kundefordr = {};
+      for (const inv of invoicesCust) {
+        const due = inv.invoiceDueDate || inv.invoiceDate;
+        if (!due) continue;
+        const out = Number(inv.amountOutstanding || 0);
+        if (out <= 0) continue;
+        const key = monthKeys.has(due.slice(0, 7)) ? due.slice(0, 7) : months[0].key; // forfalt → første måned
+        kundefordr[key] = (kundefordr[key] || 0) + out;
+      }
+      // Leverandørgjeld per måned (forfallsdato)
+      const levgjeld = {};
+      for (const si of supplierInvs) {
+        const due = si.invoiceDueDate || si.invoiceDate;
+        if (!due) continue;
+        const amt = Math.abs(Number(si.amount || 0));
+        if (amt <= 0) continue;
+        const key = monthKeys.has(due.slice(0, 7)) ? due.slice(0, 7) : months[0].key;
+        levgjeld[key] = (levgjeld[key] || 0) + amt;
+      }
+
+      // Bygg seksjoner
+      const sections = [
+        {
+          key: "innbetalinger", title: "Innbetalinger", positive: true,
+          rows: [
+            { key: "kundefordringer", label: "Kundefordringer", auto: months.map((m) => Math.round(kundefordr[m.key] || 0)), source: "Utestående kundefakturaer fra Tripletex" },
+            { key: "innbetalingProsjekt", label: "Innbetaling prosjekter", auto: months.map(() => 0), source: "Legg inn forventet prosjektomsetning manuelt" },
+            { key: "laneopptak", label: "Låneopptak / tilskudd", auto: months.map(() => 0), source: "Manuell" },
+            { key: "annetInn", label: "Annen innbetaling", auto: months.map(() => 0), source: "Manuell" },
+          ],
+        },
+        {
+          key: "utbetalinger", title: "Utbetalinger", positive: false,
+          rows: [
+            { key: "leverandorgjeld", label: "Leverandørgjeld", auto: months.map((m) => Math.round(levgjeld[m.key] || 0)), source: "Utestående leverandørfakturaer" },
+            { key: "kjopTomt", label: "Kjøp av tomt / investering", auto: months.map(() => 0), source: "Manuell" },
+            { key: "annetUt", label: "Annen utbetaling", auto: months.map(() => 0), source: "Manuell" },
+          ],
+        },
+        {
+          key: "fasteKostnader", title: "Faste kostnader", positive: false,
+          rows: [
+            { key: "lonn", label: "Lønnsutbetalinger", auto: months.map(() => avg.lonn), source: "Snitt 6 mnd (kontoklasse 5xxx)" },
+            { key: "innleie", label: "Innleie personell", auto: months.map(() => 0), source: "Manuell" },
+            { key: "husleie", label: "Husleie", auto: months.map(() => avg.leie), source: "Snitt 6 mnd (konto 63xx)" },
+            { key: "drift", label: "Andre driftskostnader", auto: months.map(() => avg.drift), source: "Snitt 6 mnd (øvrige 6xxx-7xxx)" },
+            { key: "mvaaga", label: "MVA / AGA / skattetrekk", auto: months.map(() => avg.mvaaga), source: "Snitt 6 mnd (27xx)" },
+            { key: "annetFast", label: "Andre betalinger", auto: months.map(() => 0), source: "Manuell" },
+          ],
+        },
+      ];
+
+      const cfg = getConfig().ledelseLikviditet || {};
+      return {
+        months,
+        sections,
+        startBalance: Number(cfg.startBalance) || 0,
+        kassekreditt: Number(cfg.kassekreditt) || 1000000,
+        kassekredittSaldo: Number(cfg.kassekredittSaldo) || 0,
+        rente: Number(cfg.rente) || 0.0747,
+        adjustments: cfg.adjustments || {},
+        updatedAt: new Date().toISOString(),
+      };
+    }, 10 * 60 * 1000));
+  } catch (err) {
+    console.error("Feil i /api/ledelse/likviditet:", err.message);
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// Lagre likviditet-innstillinger (start, KK) + justeringer per rad/måned
+app.post("/api/ledelse/likviditet", requireAdmin, (req, res) => {
+  try {
+    const prev = getConfig().ledelseLikviditet || {};
+    const next = { ...prev };
+    if (req.body?.startBalance !== undefined) next.startBalance = Number(req.body.startBalance) || 0;
+    if (req.body?.kassekreditt !== undefined) next.kassekreditt = Number(req.body.kassekreditt) || 0;
+    if (req.body?.kassekredittSaldo !== undefined) next.kassekredittSaldo = Number(req.body.kassekredittSaldo) || 0;
+    if (req.body?.rente !== undefined) next.rente = Number(req.body.rente) || 0;
+    if (req.body?.adjustments && typeof req.body.adjustments === "object") {
+      const clean = {};
+      for (const [rowKey, byMonth] of Object.entries(req.body.adjustments)) {
+        if (!rowKey || !byMonth || typeof byMonth !== "object") continue;
+        const m = {};
+        for (const [mk, v] of Object.entries(byMonth)) {
+          if (!/^\d{4}-\d{2}$/.test(mk)) continue;
+          const n = Number(v);
+          if (Number.isFinite(n) && n !== 0) m[mk] = Math.round(n);
+        }
+        if (Object.keys(m).length) clean[String(rowKey).slice(0, 60)] = m;
+      }
+      next.adjustments = clean;
+    }
+    saveConfig({ ledelseLikviditet: next });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
 // ---- Ledelse: justeringer (admin) ----
 app.get("/api/ledelse/adjustments", requireAdmin, (req, res) => res.json({ adjustments: getConfig().ledelseAdjustments || {} }));
 app.post("/api/ledelse/adjustments", requireAdmin, (req, res) => {

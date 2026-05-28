@@ -1141,3 +1141,29 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .adj-tbl td.num { text-align: right; }
 .adj-tbl .kon-f { width: 100%; padding: 4px 7px; font-size: 12px; border: 1px solid var(--border); border-radius: 5px; }
 .adj-tbl .kon-f.num { text-align: right; }
+
+/* ============ LEDELSE: EXCEL-STIL LIKVIDITET ============ */
+.likv-setup { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; padding: 10px 12px; background: #faf8f4; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; }
+.likv-setup label { display: flex; flex-direction: column; font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .02em; }
+.likv-setup input { padding: 6px 8px; border: 1px solid var(--border); border-radius: 5px; font-size: 13px; min-width: 140px; }
+.likv-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+.likv-tbl { width: 100%; border-collapse: collapse; font-size: 11.5px; min-width: 1000px; }
+.likv-tbl th, .likv-tbl td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.likv-tbl thead th { background: #faf8f4; font-weight: 700; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .02em; position: sticky; top: 0; z-index: 2; }
+.likv-tbl .lt-row { text-align: left; min-width: 220px; max-width: 280px; background: #fff; }
+.likv-tbl .lt-row .subnote { font-size: 10px; display: block; margin-top: 1px; }
+.likv-tbl td.num, .likv-tbl th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.likv-tbl td.num.neg, .likv-tbl th.num.neg { color: var(--bad); }
+.lt-group td { background: #2b6eb8; color: #fff; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; padding: 6px 10px; font-size: 11px; }
+.lt-sum td { background: #eef4ff; font-weight: 700; }
+.lt-totals td { background: #fff7e1; font-weight: 700; }
+.lt-totals.lt-totals-h td { background: #d18d3c; color: #fff; text-transform: uppercase; letter-spacing: .04em; font-size: 11px; padding: 6px 10px; }
+.lt-totals.lt-ub td { background: #fff4c8; font-size: 12.5px; }
+.lt-cell { padding: 2px 4px; }
+.lt-auto { font-size: 11px; color: var(--muted); padding: 1px 3px; text-align: right; }
+.lt-adj { width: 88px; padding: 2px 4px; font-size: 11px; border: 1px solid var(--border); border-radius: 3px; text-align: right; background: #fff; }
+.lt-adj:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+.lt-adj[value="0"] { color: #aaa; background: #fafafa; }
+.lt-sum-cell { background: #eef4ff; }
+.lt-row-itm:hover td { background: #fafafa; }
+.lt-row-itm:hover .lt-row { background: #f4f4f4; }
