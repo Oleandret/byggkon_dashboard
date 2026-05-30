@@ -24,6 +24,7 @@ function persist() {
 
 export function getSnapshot(key) { return loadAll()[key] || null; }
 export function saveSnapshot(key, data) { const a = loadAll(); a[key] = { savedAt: Date.now(), data }; persist(); }
+export function deleteSnapshot(key) { const a = loadAll(); if (a[key]) { delete a[key]; persist(); return true; } return false; }
 // Marker alle snapshots som utløpt (manuell «Oppdater»). Beholder dataene som
 // fallback, men tvinger ny bygging ved neste kall.
 export function expireSnapshots() { const a = loadAll(); for (const k of Object.keys(a)) a[k].savedAt = 0; persist(); }

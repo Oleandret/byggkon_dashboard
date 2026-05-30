@@ -9,7 +9,7 @@ import { buildEconomy } from "./src/economy.js";
 import { getNewsFeed } from "./src/newsfeed.js";
 import { clearCache, resetClient, getInvoices, getCustomers, getSupplierInvoices, getSupplierInvoiceDetails, getSuppliers, getForwardableInvoices, getProjects, getProjectAddresses, getTimeEntries, getTimeEntriesDetailed, getEmployees, getProjectsEconomyDetails, getAccounts, getBalanceSheet, ymd } from "./src/tripletex.js";
 import { geocodeOne, sleep } from "./src/geocode.js";
-import { serveWithSnapshot, expireSnapshots, startBackgroundWarmer, getSnapshot, saveSnapshot } from "./src/snapshot.js";
+import { serveWithSnapshot, expireSnapshots, startBackgroundWarmer, getSnapshot, saveSnapshot, deleteSnapshot } from "./src/snapshot.js";
 const snapTtl = () => getConfig().cacheTtlMs || 300000;
 import { getConfig, saveConfig, getConfigForAdmin, SETTINGS_PATH } from "./src/settings.js";
 
@@ -2515,6 +2515,16 @@ app.post("/api/employee-project-meta", requireAuth, (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
+// Manuell sletting av automasjons-cache (brukes når brukeren vil rydde feil-tekst)
+app.post("/api/employee-automations/clear", requireAuth, (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    if (!name) return res.status(400).json({ error: "Mangler navn" });
+    const ok = deleteSnapshot("emp-automations:" + name);
+    res.json({ ok: true, cleared: ok });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ---- Manuell refresh av kolonne 4 (automasjoner) — kjører bare når brukeren ber om det ----
 // Henter siste 3 måneder med e-post fra Orion + sender til Claude. Lagrer i snapshot.
 app.post("/api/employee-automations/refresh", requireAuth, async (req, res) => {
@@ -2525,6 +2535,8 @@ app.post("/api/employee-automations/refresh", requireAuth, async (req, res) => {
     const orion = cfg?.orion;
     if (!orion?.enabled || !orion?.url) return res.status(400).json({ error: "Orion MCP ikke aktivert for denne ansatte" });
     if (!ANTHROPIC_API_KEY) return res.status(400).json({ error: "ANTHROPIC_API_KEY ikke satt" });
+    // Rydd eksisterende cache FØR vi forsøker — så gammel feil-tekst forsvinner uansett utfall
+    deleteSnapshot("emp-automations:" + name);
 
     const today = new Date();
     const from90 = new Date(today.getTime() - 90 * 86400000).toISOString();

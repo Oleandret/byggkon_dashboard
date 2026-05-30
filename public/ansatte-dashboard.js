@@ -499,10 +499,13 @@
       // Kolonne 4: Automasjoner — manuell refresh
       const c4 = document.getElementById("statusCol4");
       const refreshBtn = `<button class="btn-primary auto-refresh-btn" data-name="${esc(emp.name)}">↻ Oppdater forslag <span class="subnote">(bruker tokens)</span></button>`;
+      const clearBtn = `<button class="btn-ghost auto-clear-btn" data-name="${esc(emp.name)}" title="Slett gammel cache">🗑 Tøm</button>`;
+      // Sjekk om "forslag" faktisk er en feilmelding (Claude rasjonaliserer)
+      const looksLikeError = d.col4_automations && /beklager|teknisk feil|kunne ikke|kan ikke analysere|mailFolderId|mcp error|invalid arguments/i.test(d.col4_automations.slice(0, 300));
       let c4Body;
-      if (d.col4_automations) {
+      if (d.col4_automations && !looksLikeError) {
         const generated = d.col4_generatedAt ? new Date(d.col4_generatedAt).toLocaleString("nb-NO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
-        c4Body = `<div class="auto-meta"><span class="subnote">Sist oppdatert: ${esc(generated)}</span> ${refreshBtn}</div>
+        c4Body = `<div class="auto-meta"><span class="subnote">Sist oppdatert: ${esc(generated)}</span> ${refreshBtn} ${clearBtn}</div>
           <div class="automation-list">${esc(d.col4_automations)
             .replace(/\*\*Forslag:\*\*\s*([^\n]+)/g, '<div class="auto-sug"><div class="auto-sug-h">⚡ $1</div>')
             .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
@@ -512,10 +515,21 @@
         c4Body = `<div class="empty">Krever <code>ANTHROPIC_API_KEY</code> på Railway.</div>`;
       } else if (!d.orionEnabled) {
         c4Body = `<div class="empty">Krever Orion MCP for å lese e-poster.</div>`;
+      } else if (looksLikeError) {
+        c4Body = `<div class="empty">Tidligere forsøk feilet. Klikk knappen under for å prøve på nytt med Fyxer.</div>${refreshBtn} ${clearBtn}`;
       } else {
         c4Body = `<div class="empty">Ingen forslag generert ennå.<br>Klikk knappen under for å analysere siste 3 måneder med e-post.</div>${refreshBtn}`;
       }
       c4.innerHTML = c4.querySelector("h3").outerHTML + c4Body;
+
+      // "Tøm cache"-knapp
+      c4.querySelectorAll(".auto-clear-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (!confirm("Slette lagrede automasjons-forslag?")) return;
+          await fetch("/api/employee-automations/clear", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: btn.dataset.name }) });
+          statusData = null; renderStatus(emp);
+        });
+      });
 
       // Seksjon 5: Prosjekt-spesifikk oppsummering + redigerbare felter (rolle + beskrivelse)
       const c5 = document.getElementById("statusProjects");
