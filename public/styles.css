@@ -1280,3 +1280,12 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .probe-tbl code { background: #fff; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
 .probe-ok { color: #1d6a3b; }
 .probe-err { color: var(--bad); }
+
+/* ============ MICROSOFT SIGN-IN ============ */
+.ms-signin { display: flex; align-items: center; justify-content: center; gap: 10px; background: #fff; border: 1px solid #8c8c8c; color: #5e5e5e; padding: 10px 14px; text-decoration: none; font-weight: 600; font-size: 14px; border-radius: 4px; font-family: "Segoe UI", -apple-system, system-ui, sans-serif; transition: background .15s; margin-bottom: 8px; }
+.ms-signin:hover { background: #f4f4f4; border-color: #5e5e5e; }
+.ms-signin svg { width: 18px; height: 18px; }
+.ms-hint { text-align: center; color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+.ms-divider { position: relative; text-align: center; margin: 16px 0; }
+.ms-divider::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--border); }
+.ms-divider span { position: relative; background: #fff; padding: 0 12px; color: var(--muted); font-size: 12px; }

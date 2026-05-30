@@ -13,17 +13,52 @@
   <div class="login-card">
     <div class="login-logo">BYGG-KON</div>
     <p class="login-sub">Internt driftsdashboard</p>
+
+    <div id="msSignIn" hidden>
+      <a class="ms-signin" href="/auth/microsoft">
+        <svg viewBox="0 0 23 23" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect x="1" y="1" width="10" height="10" fill="#f25022"/>
+          <rect x="12" y="1" width="10" height="10" fill="#7fba00"/>
+          <rect x="1" y="12" width="10" height="10" fill="#00a4ef"/>
+          <rect x="12" y="12" width="10" height="10" fill="#ffb900"/>
+        </svg>
+        <span>Logg inn med Microsoft</span>
+      </a>
+      <p class="ms-hint">Kun ansatte med <b>@byggkon.no</b>-konto.</p>
+      <div class="ms-divider"><span>eller</span></div>
+    </div>
+
     <form method="POST" action="/login">
-      <label for="password">Passord</label>
+      <label for="password">Felles passord</label>
       <input type="password" id="password" name="password" autofocus required
              placeholder="Skriv inn felles passord" />
       <button type="submit">Logg inn</button>
     </form>
-    <p id="error" class="login-error" hidden>Feil passord, prøv igjen.</p>
+    <p id="error" class="login-error" hidden></p>
   </div>
   <script>
-    if (new URLSearchParams(location.search).has("error")) {
-      document.getElementById("error").hidden = false;
+    // Vis Microsoft-knapp hvis OAuth er konfigurert
+    fetch("/api/auth/config").then((r) => r.json()).then((d) => {
+      if (d.oauthEnabled) document.getElementById("msSignIn").hidden = false;
+    }).catch(() => {});
+
+    // Vis feilmelding fra OAuth-redirects
+    const q = new URLSearchParams(location.search);
+    if (q.has("error")) {
+      const e = q.get("error");
+      const got = q.get("got");
+      const errEl = document.getElementById("error");
+      const map = {
+        "1": "Feil passord, prøv igjen.",
+        "state-mismatch": "Sesjon utløpt — prøv på nytt.",
+        "token-exchange": "Klarte ikke å validere innloggingen.",
+        "userinfo": "Klarte ikke å hente brukerinfo.",
+        "wrong-domain": got ? `Kun @byggkon.no-kontoer kan logge inn. Du brukte @${got}.` : "Kun @byggkon.no-kontoer kan logge inn.",
+        "oauth-disabled": "Microsoft-innlogging er ikke konfigurert ennå.",
+        "server": "Serverfeil — prøv igjen.",
+      };
+      errEl.textContent = map[e] || e;
+      errEl.hidden = false;
     }
   </script>
 </body>

@@ -65,6 +65,115 @@ app.post("/logout", (req, res) => {
   res.redirect("/login");
 });
 
+// ---- Microsoft Entra ID (Azure AD) OAuth — begrenset til @byggkon.no ----
+// Aktiveres kun hvis miljøvariabler er satt på Railway.
+// Krever MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, MICROSOFT_TENANT_ID (byggkon-tenant ID
+// eller domenenavn), og MICROSOFT_REDIRECT_URI.
+const MS_CLIENT_ID = process.env.MICROSOFT_CLIENT_ID || "";
+const MS_CLIENT_SECRET = process.env.MICROSOFT_CLIENT_SECRET || "";
+const MS_TENANT = process.env.MICROSOFT_TENANT_ID || "byggkon.no"; // tenant-ID eller "byggkon.no"
+const MS_REDIRECT_URI = process.env.MICROSOFT_REDIRECT_URI || ""; // https://din-app.up.railway.app/auth/microsoft/callback
+const ALLOWED_DOMAIN = process.env.OAUTH_ALLOWED_DOMAIN || "byggkon.no";
+const OAUTH_ENABLED = !!(MS_CLIENT_ID && MS_CLIENT_SECRET && MS_REDIRECT_URI);
+
+// Hjelper: er Microsoft-login tilgjengelig? (Brukes av login-siden)
+app.get("/api/auth/config", (req, res) => res.json({
+  oauthEnabled: OAUTH_ENABLED,
+  provider: "microsoft",
+  allowedDomain: ALLOWED_DOMAIN,
+  user: req.session?.user || null,
+}));
+
+// Start OAuth-flyt: send brukeren til Microsoft
+app.get("/auth/microsoft", (req, res) => {
+  if (!OAUTH_ENABLED) return res.status(503).send("Microsoft OAuth ikke konfigurert. Sett MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, MICROSOFT_TENANT_ID og MICROSOFT_REDIRECT_URI som env-variabler.");
+  const state = Math.random().toString(36).slice(2);
+  req.session.oauthState = state;
+  const params = new URLSearchParams({
+    client_id: MS_CLIENT_ID,
+    redirect_uri: MS_REDIRECT_URI,
+    response_type: "code",
+    response_mode: "query",
+    scope: "openid email profile User.Read",
+    prompt: "select_account",
+    domain_hint: ALLOWED_DOMAIN, // tipser Microsoft til å velge riktig tenant
+    state,
+  });
+  res.redirect(`https://login.microsoftonline.com/${encodeURIComponent(MS_TENANT)}/oauth2/v2.0/authorize?` + params.toString());
+});
+
+// OAuth-callback
+app.get("/auth/microsoft/callback", async (req, res) => {
+  try {
+    if (!OAUTH_ENABLED) return res.redirect("/login?error=oauth-disabled");
+    const { code, state, error, error_description } = req.query;
+    if (error) return res.redirect("/login?error=" + encodeURIComponent(error_description || error));
+    if (!code || state !== req.session?.oauthState) return res.redirect("/login?error=state-mismatch");
+    delete req.session.oauthState;
+
+    // Bytt code for token
+    const tokenRes = await fetch(`https://login.microsoftonline.com/${encodeURIComponent(MS_TENANT)}/oauth2/v2.0/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code: String(code),
+        client_id: MS_CLIENT_ID,
+        client_secret: MS_CLIENT_SECRET,
+        redirect_uri: MS_REDIRECT_URI,
+        grant_type: "authorization_code",
+        scope: "openid email profile User.Read",
+      }),
+    });
+    if (!tokenRes.ok) {
+      const txt = await tokenRes.text();
+      console.error("MS token-feil:", txt.slice(0, 300));
+      return res.redirect("/login?error=token-exchange");
+    }
+    const tokens = await tokenRes.json();
+
+    // Hent brukerinfo fra Microsoft Graph
+    const userRes = await fetch("https://graph.microsoft.com/v1.0/me", {
+      headers: { Authorization: "Bearer " + tokens.access_token },
+    });
+    if (!userRes.ok) return res.redirect("/login?error=userinfo");
+    const user = await userRes.json();
+
+    // Verifiser domene — userPrincipalName / mail
+    const email = String(user.mail || user.userPrincipalName || "").toLowerCase();
+    const domain = email.split("@")[1] || "";
+    if (!email || domain !== ALLOWED_DOMAIN) {
+      return res.redirect("/login?error=wrong-domain&got=" + encodeURIComponent(domain));
+    }
+
+    // Logg inn
+    req.session.loggedIn = true;
+    req.session.user = {
+      email,
+      name: user.displayName || email,
+      provider: "microsoft",
+      jobTitle: user.jobTitle || "",
+      loggedInAt: Date.now(),
+    };
+    // Loggfør innlogging
+    const cfg = getConfig();
+    const log = Array.isArray(cfg.loginLog) ? cfg.loginLog : [];
+    log.push({ email, name: req.session.user.name, at: new Date().toISOString() });
+    saveConfig({ loginLog: log.slice(-500) });
+    res.redirect("/");
+  } catch (err) {
+    console.error("OAuth-feil:", err);
+    res.redirect("/login?error=server");
+  }
+});
+
+// "Hvem er jeg innlogget som?" — brukes av frontend til å vise navn i header
+app.get("/api/me", requireAuth, (req, res) => {
+  res.json({
+    user: req.session?.user || { email: "", name: "Passord-bruker", provider: "password" },
+    isAdmin: !!req.session?.isAdmin,
+  });
+});
+
 // ---- Admin-innlogging ----
 app.get("/admin/login", (req, res) => res.sendFile(path.join(__dirname, "views", "admin-login.html")));
 app.post("/admin/login", (req, res) => {
