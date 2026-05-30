@@ -2357,7 +2357,12 @@ async function orionListTools(orion) {
   return [];
 }
 
+// Spesielle feilmeldinger som indikerer at brukeren må logge inn på en datakilde
+const LOGIN_ERROR_RE = /no\s+accounts?\s+found|please\s+login|login\s+first|not\s+authenticated|sign\s+in|unauthorized|invalid_grant/i;
+function isLoginError(text) { return LOGIN_ERROR_RE.test(String(text || "")); }
+
 // Hjelper: prøv et MCP-verktøy via Orion. Returnerer raw resultat eller null.
+// Hvis vi får en login-error returneres { _loginRequired: true, message } slik at caller kan vise tydelig instruks.
 async function orionToolCall(orion, toolName, args) {
   if (!orion?.url || !orion.enabled) return null;
   const chatPath = normalizePath(orion.chatPath, "/mcp");
@@ -2374,9 +2379,12 @@ async function orionToolCall(orion, toolName, args) {
       if (!result?.ok) continue;
       const data = result.data;
       const errMsg = data?.error?.message || "";
-      if (errMsg && /ukjent\s+verktøy|unknown\s+tool|not\s+found/i.test(errMsg)) return null;
-      if (errMsg) continue;
+      if (errMsg && /ukjent\s+verktøy|unknown\s+tool/i.test(errMsg)) return null;
+      // Sjekk også content-blokken for login-feil (M365 returnerer dem i innholdet, ikke error)
       const txt = data?.result?.content?.[0]?.text || data?.result?.text || data?.result?.message;
+      const combined = errMsg + " " + (txt || "");
+      if (isLoginError(combined)) return { _loginRequired: true, source: toolName, message: errMsg || txt };
+      if (errMsg) continue;
       if (txt) return String(txt);
       if (data?.result) return JSON.stringify(data.result);
     }
@@ -2431,22 +2439,29 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
       const from90 = ymd(new Date(today.getTime() - 90 * 86400000));
       const entries90 = await getTimeEntriesDetailed(from90, todayStr, empId).catch(() => []);
 
-      // Kolonne 2: Prosjekter + Aktiviteter (slå sammen ekte prosjekter og aktiviteter for internt arbeid)
+      // Kolonne 2: Prosjekter + Aktiviteter + grupper-fra-kommentar når ingenting annet finnes
+      // Trekker ut første nøkkelord/setning fra kommentar slik at intern-arbeid får meningsfull gruppering
+      function commentBucket(comment) {
+        const c = String(comment || "").trim();
+        if (!c) return "Internt (uten beskrivelse)";
+        // Ta første del før vanlige skilletegn, opp til 40 tegn
+        const first = c.split(/[.,;:\-—|]/)[0].trim();
+        return first.slice(0, 40) || "Internt arbeid";
+      }
       const projMap = new Map();
       for (const e of entries90) {
-        // Bygg label: bruk prosjektnavn hvis det finnes, ellers aktivitet, ellers "Internt"
         const projName = e.project?.name;
         const actName = e.activity?.name;
         let label, type;
         if (projName && projName !== "(uten prosjekt)") { label = projName; type = "prosjekt"; }
         else if (actName) { label = actName; type = "aktivitet"; }
-        else { label = "Internt arbeid"; type = "internt"; }
-        const cur = projMap.get(label) || { name: label, type, hours: 0, customer: e.project?.customer?.name || "", lastDate: "" };
+        else { label = commentBucket(e.comment); type = "internt"; }
+        const cur = projMap.get(label) || { name: label, type, hours: 0, customer: e.project?.customer?.name || "", lastDate: "", lastComment: "" };
         cur.hours += Number(e.hours) || 0;
-        if (e.date > cur.lastDate) cur.lastDate = e.date;
+        if (e.date > cur.lastDate) { cur.lastDate = e.date; cur.lastComment = e.comment || cur.lastComment; }
         projMap.set(label, cur);
       }
-      const projects = [...projMap.values()].sort((a, b) => b.hours - a.hours).slice(0, 15);
+      const projects = [...projMap.values()].sort((a, b) => b.hours - a.hours).slice(0, 20);
 
       // Smart tool-discovery via tools/list
       let orionCalendar = null, orionEmails = null, calendarTool = null, emailTool = null, orionTools = [];
@@ -2466,11 +2481,14 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
           { name: "m365__list-online-meetings", args: { $top: 20 } },
           { name: "fyxer__search_meetings", args: { from: startISO, to: endISO } },
         ];
+        let calLoginRequired = false;
         for (const c of calCandidates) {
           if (!tools.find((t) => t.name === c.name)) continue;
           const r = await orionToolCall(orion, c.name, c.args);
+          if (r && typeof r === "object" && r._loginRequired) { calLoginRequired = true; calendarTool = c.name; continue; }
           if (r) { orionCalendar = r; calendarTool = c.name; break; }
         }
+        var _calLoginRequired = calLoginRequired;
         // Fallback til keyword-matching hvis ingen av M365-tools fungerte
         if (!orionCalendar) {
           const calPatterns = [/calendar/i, /meeting/i, /kalender/i, /upcoming/i, /schedule/i];
@@ -2506,11 +2524,14 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
             args: { from: from28ISO, to: new Date().toISOString(), limit: 50 },
           },
         ];
+        let emailLoginRequired = false;
         for (const c of emailCandidates) {
           if (!tools.find((t) => t.name === c.name)) continue;
           const r = await orionToolCall(orion, c.name, c.args);
+          if (r && typeof r === "object" && r._loginRequired) { emailLoginRequired = true; emailTool = c.name; continue; }
           if (r) { orionEmails = r; emailTool = c.name; break; }
         }
+        var _emailLoginRequired = emailLoginRequired;
         // Fallback til keyword-matching
         if (!orionEmails) {
           const emailPatterns = [/list[_-]?mail/i, /^(get_|list_)?(email|mail)s?$/i, /innboks|inbox/i, /mail|email/i];
@@ -2570,6 +2591,9 @@ Svar på norsk. Lag 3-5 konkrete forslag som punktliste. Hvert punkt skal være 
         calendarTool, emailTool,
         availableOrionTools: orionTools,
         entryCount: entries.length,
+        // M365-login varsel
+        m365LoginRequired: typeof _calLoginRequired !== "undefined" && _calLoginRequired || typeof _emailLoginRequired !== "undefined" && _emailLoginRequired,
+        orionChatUrl: orion.url,
       };
     }, 15 * 60 * 1000)); // 15 min cache for å spare LLM-kall
   } catch (err) { res.status(502).json({ error: err.message }); }

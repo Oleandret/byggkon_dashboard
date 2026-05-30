@@ -431,12 +431,27 @@
         return `<details style="margin-top:10px"><summary class="subnote" style="cursor:pointer">Tilgjengelige Orion-verktøy</summary><div class="subnote" style="margin-top:4px">${d.availableOrionTools.map((t) => `<code>${esc(t)}</code>`).join(", ")}</div></details>`;
       }
 
+      // Tydelig M365-login-melding når Microsoft-konto ikke er logget inn på Orion
+      const loginNotice = d.m365LoginRequired ? `
+        <div class="m365-login-notice">
+          <h4>🔐 Microsoft-pålogging trengs i Orion</h4>
+          <p>Orion sine M365-verktøy krever at du logger inn med Microsoft først (device code-flyt).</p>
+          <ol>
+            <li>Åpne <a href="${esc(d.orionChatUrl || "#")}" target="_blank" rel="noopener">Orion-chatten</a> i en ny fane</li>
+            <li>Skriv: «<b>logg meg inn på Microsoft</b>»</li>
+            <li>Klikk på lenken Orion gir deg og lim inn koden</li>
+            <li>Bekreft med «<b>verify-login</b>» når den ber om det</li>
+            <li>Last denne siden på nytt</li>
+          </ol>
+        </div>` : "";
+
       // Kolonne 3: Kalender
       const c3 = document.getElementById("statusCol3");
       c3.innerHTML = c3.querySelector("h3").outerHTML +
         (d.col3_calendar ? `<div class="status-cal-text">${esc(d.col3_calendar).replace(/\n/g, "<br>")}</div>`
          : !d.orionEnabled ? `<div class="empty">Orion MCP ikke aktivert.<br>Gå til <b>⚙ Innstillinger</b>.</div>`
-         : !d.hasOrionCalendar ? `<div class="empty">Fant ikke et kalender-verktøy i Orion.<br>Orion må ha et verktøy som matcher: <code>calendar</code>, <code>get_upcoming_meetings</code>, <code>kalender</code> eller lignende.${orionToolsHint(d)}</div>`
+         : d.m365LoginRequired ? loginNotice
+         : !d.hasOrionCalendar ? `<div class="empty">Fant ikke et kalender-verktøy i Orion.${orionToolsHint(d)}</div>`
          : `<div class="empty">Ingen kommende møter.</div>`);
 
       // Kolonne 4: Automasjoner
@@ -449,7 +464,8 @@
           .replace(/\n/g, "<br>")}</div>`
          : !d.claudeEnabled ? `<div class="empty">Krever <code>ANTHROPIC_API_KEY</code> på Railway.</div>`
          : !d.orionEnabled ? `<div class="empty">Krever Orion MCP for å lese e-poster.</div>`
-         : !d.hasOrionEmails ? `<div class="empty">Fant ikke et e-post-verktøy i Orion.<br>Orion må ha et verktøy som matcher: <code>emails</code>, <code>get_recent_emails</code>, <code>innboks</code> eller lignende.${orionToolsHint(d)}</div>`
+         : d.m365LoginRequired ? loginNotice
+         : !d.hasOrionEmails ? `<div class="empty">Fant ikke et e-post-verktøy i Orion.${orionToolsHint(d)}</div>`
          : `<div class="empty">Ingen mønstre funnet.</div>`);
 
     } catch (e) {
@@ -617,7 +633,8 @@
 
   /* ============ EVENTS ============ */
   document.addEventListener("click", (e) => {
-    const chip = e.target.closest("#ansChipBar .ans-chip");
+    // Klikk på en ansatt-chip (både gammel .ans-chip og ny .ans-chip-mini)
+    const chip = e.target.closest("#ansChipBar .ans-chip-mini, #ansChipBar .ans-chip");
     if (chip && chip.dataset.name) { setActive(chip.dataset.name); return; }
     if (e.target.id === "ansReload") { loaded = false; loadAll(); return; }
     const sub = e.target.closest("#ansSubtabs .ans-subtab");

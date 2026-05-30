@@ -1399,3 +1399,10 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .loading-dots span { width: 8px; height: 8px; background: var(--muted); border-radius: 50%; animation: chatdot 1.2s infinite ease-in-out; }
 .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
 .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+/* ============ M365-LOGIN-NOTICE ============ */
+.m365-login-notice { background: #fff7e1; border: 1px solid #d18d3c; border-radius: 8px; padding: 12px 14px; font-size: 13px; }
+.m365-login-notice h4 { margin: 0 0 6px; color: #6b5a1a; font-size: 14px; }
+.m365-login-notice p { margin: 0 0 8px; color: var(--ink); }
+.m365-login-notice ol { margin: 4px 0 0; padding-left: 22px; line-height: 1.6; }
+.m365-login-notice a { color: var(--accent); font-weight: 600; }
