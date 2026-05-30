@@ -2714,8 +2714,8 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
     if (!name) return res.status(400).json({ error: "Mangler navn" });
     const force = req.query.force === "1" || req.query.force === "true";
 
-    // Hjelper: injiser fersk projekt-meta (rolle + beskrivelse) inn i et status-objekt
-    // — slik at brukerens manuelle endringer ALLTID vises, selv om snapshot er cached
+    // Hjelper: injiser fersk projekt-meta (rolle + beskrivelse) + fersk automasjons-cache
+    // inn i et status-objekt — slik at brukerens manuelle endringer ALLTID vises
     function injectFreshMeta(statusData) {
       if (!statusData) return statusData;
       const freshMeta = (getConfig().employeeProjectMeta || {})[name] || {};
@@ -2725,6 +2725,17 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
       };
       if (Array.isArray(statusData.col2_projects)) statusData.col2_projects = statusData.col2_projects.map(enrich);
       if (Array.isArray(statusData.col5_projectSummaries)) statusData.col5_projectSummaries = statusData.col5_projectSummaries.map(enrich);
+      // Alltid hent fersk automasjons-cache — den cleares ved refresh og er separat fra status-cache
+      const freshAuto = getSnapshot("emp-automations:" + name);
+      if (freshAuto?.data) {
+        statusData.col4_automations = freshAuto.data.suggestions || null;
+        statusData.col4_generatedAt = freshAuto.data.generatedAt || null;
+        statusData.col4_emailCount = freshAuto.data.emailCount || 0;
+      } else {
+        // Cache er tom (f.eks. etter en mislykket refresh) → fjern gammel data
+        statusData.col4_automations = null;
+        statusData.col4_generatedAt = null;
+      }
       return statusData;
     }
 
