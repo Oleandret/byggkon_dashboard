@@ -535,9 +535,15 @@
     }
     content.innerHTML = `<div class="ans-dash-block">
       <h3>💬 Chat med Orion <span class="subnote">— stiller spørsmål til ${esc(emp.name)} sin Orion-hub</span></h3>
+      <div class="chat-status-bar">
+        <span class="chat-status-item"><span class="chat-status-dot" id="chatOrionDot">●</span> Orion: <span id="chatOrionLbl">sjekker …</span></span>
+        <span class="chat-status-item"><span class="chat-status-dot" id="chatClaudeDot">●</span> Claude: <span id="chatClaudeLbl">sjekker …</span></span>
+        <span class="chat-status-item"><span class="chat-status-dot" id="chatFyxerDot">●</span> Fyxer: <span id="chatFyxerLbl">sjekker …</span></span>
+        <button class="btn-ghost" id="chatTestConn" title="Test tilkoblinger på nytt">↻</button>
+      </div>
       <div class="chat-box" id="chatLog">
         ${chatHistory.length ? chatHistory.map((m) => `<div class="chat-msg chat-${esc(m.role)}"><div class="chat-bubble">${esc(m.text).replace(/\n/g, "<br>")}</div></div>`).join("")
-                            : `<div class="empty">Still et spørsmål for å starte. Eksempler: «Hva jobber jeg med i dag?», «Vis siste e-poster», «Hvor mye har jeg ført i dag?», «Hva er status på X?»</div>`}
+                            : `<div class="empty">Still et spørsmål for å starte. Claude bruker Orion (Fyxer/M365/Tripletex/Loki/Hilde) til å hente kontekst.<br>Eksempler:<br>• «Hvilke møter har jeg neste uke?»<br>• «Vis e-poster om Stavanger Markise»<br>• «Hvor mange timer har jeg ført siste uke?»</div>`}
       </div>
       <form class="chat-form" id="chatForm">
         <input id="chatInput" class="kon-f" type="text" placeholder="Skriv en melding til Orion …" autocomplete="off" />
@@ -545,6 +551,42 @@
         <button class="btn-ghost" id="chatClear" type="button">Tøm</button>
       </form>
     </div>`;
+
+    // Test tilkoblinger: hent Orion-tools + sjekk claude-config
+    async function testConnections() {
+      const setDot = (id, ok, txt) => {
+        const dot = document.getElementById("chat" + id + "Dot");
+        const lbl = document.getElementById("chat" + id + "Lbl");
+        if (!dot || !lbl) return;
+        dot.style.color = ok === true ? "#1d6a3b" : ok === false ? "var(--bad)" : "#d18d3c";
+        lbl.textContent = txt;
+      };
+      setDot("Orion", null, "tester …");
+      setDot("Claude", null, "tester …");
+      setDot("Fyxer", null, "tester …");
+      try {
+        const r = await fetch("/api/employee-orion-tools?name=" + encodeURIComponent(emp.name));
+        const d = await r.json();
+        if (d.ok && d.tools?.length) {
+          setDot("Orion", true, `tilkoblet (${d.tools.length} verktøy)`);
+          const fyxerTools = d.tools.filter((t) => /^fyxer/.test(t.name));
+          if (fyxerTools.length) setDot("Fyxer", true, `${fyxerTools.length} verktøy`);
+          else setDot("Fyxer", false, "ikke tilgjengelig");
+        } else {
+          setDot("Orion", false, d.reason || "ikke tilkoblet");
+          setDot("Fyxer", false, "—");
+        }
+      } catch (e) { setDot("Orion", false, "feil"); setDot("Fyxer", false, "—"); }
+      try {
+        const r = await fetch("/api/admin/claude/config");
+        if (r.ok) {
+          const d = await r.json();
+          setDot("Claude", !!d.claudeEnabled, d.claudeEnabled ? "API-nøkkel satt" : "ikke konfigurert");
+        } else { setDot("Claude", null, "krever leder"); }
+      } catch { setDot("Claude", false, "feil"); }
+    }
+    testConnections();
+    document.getElementById("chatTestConn")?.addEventListener("click", testConnections);
     const input = document.getElementById("chatInput");
     const log = document.getElementById("chatLog");
     function scrollLog() { log.scrollTop = log.scrollHeight; }

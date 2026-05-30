@@ -2968,11 +2968,31 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
         if (m) { p.role = m.role || ""; p.description = m.description || ""; }
       }
 
-      // Kolonne 5: Prosjekt-spesifikk oppsummering
-      // Bruker kommentarer fra time entries der det finnes, ellers bare metadata fra overview
+      // Kolonne 5: Prosjekt-spesifikk oppsummering + oppfølging
+      // Bruker kommentarer fra time entries + e-post-kontekst per prosjekt fra Fyxer
       let projectSummaries = [];
       if (ANTHROPIC_API_KEY && projects.length) {
         const topProjects = projects.slice(0, 6);
+
+        // Hent e-post-kontekst per prosjekt parallelt via Fyxer hvis tilgjengelig
+        const orionTools = orionEnabled ? await orionListTools(orion) : [];
+        const hasFyxer = orionTools.find((t) => t.name === "fyxer__search_context");
+        const projectEmailContext = {};
+        if (hasFyxer) {
+          const days90 = new Date(Date.now() - 90 * 86400000).toISOString();
+          const nowISO = new Date().toISOString();
+          // Maks 4 parallelle søk for å spare tid og tokens
+          const projsToSearch = topProjects.slice(0, 4);
+          await Promise.all(projsToSearch.map(async (p) => {
+            // Søk på både prosjektnavn og kundenavn for bredere treff
+            const query = [p.name, p.customer].filter(Boolean).join(" OR ");
+            try {
+              const r = await orionToolCall(orion, "fyxer__search_context", { query, from: days90, to: nowISO, limit: 8 });
+              if (r && typeof r === "string") projectEmailContext[p.name] = r.slice(0, 2500);
+            } catch {}
+          }));
+        }
+
         const perProjectInfo = topProjects.map((p) => {
           // Match entries90 mot prosjektnavn (case-insensitive)
           const projEntries = entries90.filter((e) => e.project?.name && e.project.name.toLowerCase() === p.name.toLowerCase());
@@ -2985,7 +3005,10 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
           const manualMeta = p.role || p.description
             ? `Manuelt registrert:${p.role ? `\n  Rolle: ${p.role}` : ""}${p.description ? `\n  Beskrivelse: ${p.description}` : ""}\n`
             : "";
-          return `### ${p.name}${p.customer ? ` (${p.customer})` : ""}\nDine timer: ${Math.round(p.hours)}t · Team total: ${Math.round(p.teamHours || 0)}t · Sist aktivitet: ${p.lastDate || "—"}${p.isManager ? " · DU ER PROSJEKTLEDER" : ""}\n${manualMeta}Kommentarer fra dine timeoppføringer:\n${recentComments || "  (du har ikke ført kommentarer på dette prosjektet)"}`;
+          const emailCtx = projectEmailContext[p.name]
+            ? `\nE-post/møte-kontekst fra Fyxer (siste 3 mnd):\n${projectEmailContext[p.name]}\n`
+            : "";
+          return `### ${p.name}${p.customer ? ` (${p.customer})` : ""}\nDine timer: ${Math.round(p.hours)}t · Team total: ${Math.round(p.teamHours || 0)}t · Sist aktivitet: ${p.lastDate || "—"}${p.isManager ? " · DU ER PROSJEKTLEDER" : ""}\n${manualMeta}Kommentarer fra dine timeoppføringer:\n${recentComments || "  (du har ikke ført kommentarer på dette prosjektet)"}${emailCtx}`;
         }).join("\n\n");
 
         const sys = `Du analyserer prosjekter og gir TO ting per prosjekt:
@@ -3045,7 +3068,104 @@ Bare JSON.`;
 });
 
 // ---- Orion MCP chat-proxy ----
+// NY chat-implementasjon: Claude orchestrerer Orion-verktøy basert på spørsmålet
 app.post("/api/employee-chat", requireAuth, async (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    const message = String(req.body?.message || "").trim();
+    const history = Array.isArray(req.body?.history) ? req.body.history.slice(-20) : [];
+    if (!name || !message) return res.status(400).json({ error: "Mangler navn eller melding" });
+    const cfg = (getConfig().employeeSettings || {})[name];
+    const orion = cfg?.orion;
+    if (!orion || !orion.enabled || !orion.url) {
+      return res.json({ ok: false, reason: "Orion MCP er ikke aktivert for denne ansatte" });
+    }
+    if (!ANTHROPIC_API_KEY) {
+      return res.json({ ok: false, reason: "ANTHROPIC_API_KEY ikke satt på Railway — chat krever Claude som orkestrator" });
+    }
+
+    // 1) Sjekk at Orion er tilkoblet og hent verktøy
+    const tools = await orionListTools(orion);
+    if (!tools.length) {
+      return res.json({ ok: false, reason: "Orion svarte ikke. Sjekk at MCP-URL/nøkkel er riktig i Innstillinger." });
+    }
+
+    // 2) Basert på meldingen, samle relevant kontekst fra Orion
+    const ctx = [];
+    const lowerMsg = message.toLowerCase();
+    const wantsCalendar = /kalender|møte|moter|meeting|agenda|i\s+dag|i\s+morgen|denne uka|neste uke/i.test(lowerMsg);
+    const wantsEmail = /e-?post|mail|innboks|inbox|fyxer|sendte/i.test(lowerMsg);
+    const wantsHours = /timer|tripletex|prosjekt|fakturer/i.test(lowerMsg);
+
+    // Kalender
+    if (wantsCalendar && tools.find((t) => t.name === "m365__get-calendar-view")) {
+      const today = new Date();
+      const end = new Date(today.getTime() + 14 * 86400000);
+      const calRes = await orionToolCall(orion, "m365__get-calendar-view", {
+        startDateTime: today.toISOString(), endDateTime: end.toISOString(),
+      });
+      if (calRes && typeof calRes === "string") ctx.push("KALENDER (neste 2 uker):\n" + calRes.slice(0, 3000));
+      else if (calRes && typeof calRes === "object" && calRes._loginRequired) ctx.push("[Kalender utilgjengelig: Microsoft-pålogging trengs i Orion]");
+    }
+    // E-post via Fyxer
+    if (wantsEmail && tools.find((t) => t.name === "fyxer__search_context")) {
+      const days30 = new Date(Date.now() - 30 * 86400000).toISOString();
+      const searchRes = await orionToolCall(orion, "fyxer__search_context", { query: message, from: days30, to: new Date().toISOString(), limit: 20 });
+      if (searchRes && typeof searchRes === "string") ctx.push("E-POST/MØTE-KONTEKST (Fyxer):\n" + searchRes.slice(0, 4000));
+    }
+    // Timer fra Tripletex (lokal data, ikke Orion)
+    if (wantsHours) {
+      try {
+        const today = new Date();
+        const from7 = ymd(new Date(today.getTime() - 7 * 86400000));
+        const todayStr = ymd(today);
+        const employees = await getEmployees().catch(() => []);
+        const norm = (s) => String(s || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[.\-]/g, " ").replace(/\s+/g, " ").trim();
+        const emp = employees.find((e) => {
+          const fullName = `${e.firstName || ""} ${e.lastName || ""}`.trim();
+          return norm(fullName) === norm(name);
+        });
+        if (emp) {
+          const entries = await getTimeEntriesDetailed(from7, todayStr, emp.id).catch(() => []);
+          const total = entries.reduce((s, e) => s + (e.hours || 0), 0);
+          const summary = entries.slice(-15).map((e) => `${e.date}: ${e.hours}t ${e.project?.name || "(intern)"}${e.comment ? " — " + e.comment.slice(0, 80) : ""}`).join("\n");
+          ctx.push(`TIMEFØRING SISTE 7 DAGER (Tripletex):\nTotalt: ${total}t\n${summary}`);
+        }
+      } catch {}
+    }
+
+    // 3) Hvis ingen kontekst-bryter traff, prøv Fyxer search_context som default
+    if (!ctx.length && tools.find((t) => t.name === "fyxer__search_context")) {
+      const days30 = new Date(Date.now() - 30 * 86400000).toISOString();
+      const searchRes = await orionToolCall(orion, "fyxer__search_context", { query: message, from: days30, to: new Date().toISOString(), limit: 10 });
+      if (searchRes && typeof searchRes === "string") ctx.push("KONTEKST (Fyxer):\n" + searchRes.slice(0, 4000));
+      else if (searchRes && typeof searchRes === "object" && searchRes._loginRequired) ctx.push("[Fyxer-tilgang utilgjengelig — pålogging trengs]");
+    }
+
+    // 4) Send til Claude med kontekst
+    const sys = `Du er en assistent for ${name} på Bygg-Kon. Du har tilgang til Orion MCP-hub med følgende verktøy: Microsoft 365 (kalender, e-post, OneDrive), Fyxer (e-post + møter), Tripletex (timer), Loki (dokumentsøk), Hilde (eiendom).
+
+Svar konkret og kort på norsk basert på kontekst-data fra Orion under. Hvis konteksten er tom eller ikke svarer på spørsmålet, si det åpent og foreslå hva brukeren kan spørre om i stedet.
+
+Format dato/tid på norsk vis (f.eks. "torsdag 14:00").
+
+Tilgjengelige verktøy i Orion (${tools.length} totalt): ${tools.slice(0, 30).map((t) => t.name).join(", ")}${tools.length > 30 ? "..." : ""}`;
+
+    const usr = `Spørsmål: ${message}\n\n${ctx.length ? "Kontekst fra Orion:\n\n" + ctx.join("\n\n---\n\n") : "(Ingen kontekst-data hentet — svar generelt eller foreslå spørsmål)"}`;
+
+    const reply = await callClaude(sys, usr, "claude-sonnet-4-6");
+    if (!reply) return res.json({ ok: false, reason: "Claude svarte ikke" });
+
+    return res.json({
+      ok: true, reply,
+      source: `Claude + Orion (${ctx.length} kontekst-kilder, ${tools.length} verktøy tilgjengelig)`,
+      contextUsed: ctx.map((c) => c.split("\n")[0]),
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Gammel endpoint (legacy) — beholder for å ikke breake noe
+app.post("/api/employee-chat-legacy", requireAuth, async (req, res) => {
   try {
     const name = String(req.body?.name || "").trim();
     const message = String(req.body?.message || "").trim();
