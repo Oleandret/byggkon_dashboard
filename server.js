@@ -2373,10 +2373,20 @@ app.get("/api/employee-time", requireAuth, async (req, res) => {
       const target = nameKeys(name);
       const matches = (full) => { const k = nameKeys(full); for (const x of k) if (target.has(x)) return true; return false; };
 
-      // Finn ansatt-ID (lar oss bruke employeeId-filter for raskere kall)
-      const employees = await getEmployees().catch(() => []);
-      const emp = employees.find((e) => matches(`${e.firstName || ""} ${e.lastName || ""}`.trim()));
+      // Finn ansatt-ID via robust matching (eksakt → første+siste → fuzzy)
+      const matchResult = await findTripletexEmployee(name);
+      const emp = matchResult.employee;
       const empId = emp?.id;
+      if (!empId) {
+        // Returnér tomt objekt i stedet for ALLE ansattes timer
+        return {
+          last2w: { totalHours: 0, billableHours: 0, billingRate: 0, internHours: 0, fravarHours: 0, projectHours: 0, byCategory: {}, projects: [], activities: [], entries: [] },
+          last4w: { totalHours: 0, billableHours: 0, billingRate: 0, internHours: 0, fravarHours: 0, projectHours: 0, byCategory: {}, projects: [], activities: [], entries: [] },
+          _matchError: `Fant ikke ${name} i Tripletex. Sjekk at navnet i organisasjonskartet matcher Tripletex-navnet.`,
+          _matchType: matchResult.matchType,
+          _availableTripletexNames: matchResult.employees.map((e) => `${e.firstName || ""} ${e.lastName || ""}`.trim()).filter(Boolean).slice(0, 30),
+        };
+      }
 
       const timeEntries = await getTimeEntriesDetailed(from, todayStr, empId).catch(() => []);
       const d14 = ymd(new Date(today.getTime() - 14 * 86400000));
@@ -2457,6 +2467,68 @@ async function callClaude(systemPrompt, userMessage, model = "claude-sonnet-4-6"
     const data = await r.json();
     return data.content?.[0]?.text || null;
   } catch { return null; }
+}
+
+// ============ Robust Tripletex-employee lookup ============
+// Matchstrategi: eksakt fullt navn → fornavn+etternavn → kun etternavn (om unikt) → fuzzy
+function _normForMatch(s) {
+  return String(s || "").toLowerCase()
+    .normalize("NFKD").replace(/[̀-ͯ]/g, "")
+    .replace(/[.\-]/g, " ").replace(/\s+/g, " ").trim();
+}
+function _levenshtein(a, b) {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const m = [];
+  for (let i = 0; i <= b.length; i++) m[i] = [i];
+  for (let j = 0; j <= a.length; j++) m[0][j] = j;
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      m[i][j] = b.charAt(i - 1) === a.charAt(j - 1)
+        ? m[i - 1][j - 1]
+        : Math.min(m[i - 1][j - 1] + 1, m[i][j - 1] + 1, m[i - 1][j] + 1);
+    }
+  }
+  return m[b.length][a.length];
+}
+async function findTripletexEmployee(orgChartName) {
+  const employees = await getEmployees().catch(() => []);
+  if (!employees.length) return { employee: null, employees, matchType: "no-tripletex-data" };
+  const targetNorm = _normForMatch(orgChartName);
+  const targetParts = targetNorm.split(" ").filter(Boolean);
+  const targetFirst = targetParts[0] || "";
+  const targetLast = targetParts[targetParts.length - 1] || "";
+
+  // 1) Eksakt fullt navn (normalisert)
+  let match = employees.find((e) => _normForMatch(`${e.firstName || ""} ${e.lastName || ""}`) === targetNorm);
+  if (match) return { employee: match, employees, matchType: "exact" };
+
+  // 2) Fornavn + etternavn (ignorer mellomnavn)
+  match = employees.find((e) => {
+    const f = _normForMatch(e.firstName || "");
+    const l = _normForMatch(e.lastName || "");
+    return f.split(" ")[0] === targetFirst && l.split(" ").pop() === targetLast;
+  });
+  if (match) return { employee: match, employees, matchType: "first+last" };
+
+  // 3) Etternavn alene (kun hvis unikt)
+  const lastMatches = employees.filter((e) => _normForMatch(e.lastName || "").split(" ").pop() === targetLast);
+  if (lastMatches.length === 1) return { employee: lastMatches[0], employees, matchType: "last-only-unique" };
+
+  // 4) Fuzzy — Levenshtein distance ≤ 2 på fornavn+etternavn separat
+  let best = null, bestScore = 99;
+  for (const e of employees) {
+    const f = _normForMatch(e.firstName || "").split(" ")[0] || "";
+    const l = _normForMatch(e.lastName || "").split(" ").pop() || "";
+    const dF = _levenshtein(f, targetFirst);
+    const dL = _levenshtein(l, targetLast);
+    const score = dF + dL;
+    if (score <= 3 && score < bestScore) { best = e; bestScore = score; }
+  }
+  if (best) return { employee: best, employees, matchType: `fuzzy (d=${bestScore})` };
+
+  return { employee: null, employees, matchType: "no-match" };
 }
 
 // Hjelper: hent alle verktøy fra Orion (cached per kjøring)
@@ -2820,18 +2892,20 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
       const today = new Date();
       const todayStr = ymd(today);
       const from = ymd(new Date(today.getTime() - 28 * 86400000));
-      const norm = (s) => String(s || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[.\-]/g, " ").replace(/\s+/g, " ").trim();
-      const nameKeys = (n) => { const p = norm(n).split(" ").filter(Boolean); const k = new Set([p.join(" ")]); if (p.length >= 2) k.add(p[0] + " " + p[p.length - 1]); return k; };
-      const target = nameKeys(name);
-      const matches = (full) => { const k = nameKeys(full); for (const x of k) if (target.has(x)) return true; return false; };
-      const employees = await getEmployees().catch(() => []);
-      const emp = employees.find((e) => matches(`${e.firstName || ""} ${e.lastName || ""}`.trim()));
+      // Robust matching: eksakt → fornavn+etternavn → kun etternavn → fuzzy
+      const matchResult = await findTripletexEmployee(name);
+      const emp = matchResult.employee;
       const empId = emp?.id;
-      const entries = await getTimeEntriesDetailed(from, todayStr, empId).catch(() => []);
+      const entries = empId ? await getTimeEntriesDetailed(from, todayStr, empId).catch(() => []) : [];
+      const _empMatch = {
+        matched: !!emp,
+        matchType: matchResult.matchType,
+        availableNames: emp ? null : matchResult.employees.map((e) => `${e.firstName || ""} ${e.lastName || ""}`.trim()).filter(Boolean).slice(0, 30),
+      };
 
       // Kolonne 2: Hent prosjekter siste 3 måneder (90 dager)
       const from90 = ymd(new Date(today.getTime() - 90 * 86400000));
-      const entries90 = await getTimeEntriesDetailed(from90, todayStr, empId).catch(() => []);
+      const entries90 = empId ? await getTimeEntriesDetailed(from90, todayStr, empId).catch(() => []) : [];
 
       // Kolonne 2: Prosjekter du har ført timer på siste 3 måneder
       // Bruker samme metode som Prosjektmøter — iterer byEmp12w fra overview-snapshoten
@@ -3052,6 +3126,7 @@ Bare JSON.`;
         col4_emailCount: automationEmailCount,
         col5_projectSummaries: projectSummaries,
         _projDebug,
+        _empMatch,
         // Diagnostikk
         hasOrionCalendar: !!orionCalendar,
         hasOrionEmails: !!automationSuggestions,

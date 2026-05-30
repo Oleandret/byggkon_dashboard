@@ -514,7 +514,26 @@
         </table>
         ${(timeData.last4w?.entries || []).length > 50 ? `<p class="subnote">Viser de 50 nyeste oppføringene.</p>` : ""}
       </div>` : "";
-    content.innerHTML = `<div class="grid-2" style="margin-top:14px">
+    // Diagnostikk: hvis Tripletex-matching feilet, vis dropdown med tilgjengelige navn
+    let matchWarning = "";
+    if (timeData._matchError) {
+      const availList = timeData._availableTripletexNames || [];
+      const opts = availList.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+      matchWarning = `<div class="ans-dash-block" style="background:#fff3cd;border-left:4px solid #f59e0b;margin-bottom:14px">
+        <h3 style="color:#92400e">⚠ Fant ikke ${esc(emp.name)} i Tripletex</h3>
+        <p>${esc(timeData._matchError)}</p>
+        <p class="subnote">Match-strategi prøvd: <b>${esc(timeData._matchType || "ukjent")}</b></p>
+        ${availList.length ? `<div style="margin-top:10px">
+          <label class="subnote">Tilgjengelige navn i Tripletex (${availList.length}):</label>
+          <select style="width:100%;padding:6px;margin-top:4px;border-radius:4px;border:1px solid #d1d5db">
+            <option>— velg for å se —</option>
+            ${opts}
+          </select>
+          <p class="subnote" style="margin-top:8px">💡 Endre navnet i <b>Organisasjon</b>-fanen slik at det matcher Tripletex-navnet ovenfor.</p>
+        </div>` : `<p class="subnote">Ingen ansatte funnet i Tripletex — sjekk Regnskapsagent-tilkoblingen.</p>`}
+      </div>`;
+    }
+    content.innerHTML = `${matchWarning}<div class="grid-2" style="margin-top:14px">
       ${renderPeriod("⏱ Siste 2 uker", timeData.last2w)}
       ${renderPeriod("📅 Siste 4 uker", timeData.last4w)}
     </div>${detailHtml}`;
@@ -696,6 +715,27 @@
           c.innerHTML = h.outerHTML + `<div class="empty">Feil: ${esc(d.error)}</div>`;
         });
         return;
+      }
+
+      // Tripletex-match advarsel: vis dropdown med tilgjengelige navn hvis matching feilet
+      if (d._empMatch && !d._empMatch.matched) {
+        const bar = document.getElementById("statusRefreshBar");
+        const availList = d._empMatch.availableNames || [];
+        const opts = availList.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+        const warn = document.createElement("div");
+        warn.className = "ans-dash-block";
+        warn.style.cssText = "background:#fff3cd;border-left:4px solid #f59e0b;margin:10px 0";
+        warn.innerHTML = `
+          <h3 style="color:#92400e;margin:0 0 8px">⚠ Fant ikke ${esc(emp.name)} i Tripletex</h3>
+          <p class="subnote">Match-strategi prøvd: <b>${esc(d._empMatch.matchType)}</b>. Timer-relaterte kolonner blir tomme.</p>
+          ${availList.length ? `<div style="margin-top:8px">
+            <label class="subnote">Tilgjengelige navn i Tripletex (${availList.length}):</label>
+            <select style="width:100%;padding:6px;margin-top:4px;border-radius:4px;border:1px solid #d1d5db">
+              <option>— bla gjennom for å finne riktig navn —</option>${opts}
+            </select>
+            <p class="subnote" style="margin-top:6px">💡 Endre navnet i <b>Organisasjon</b>-fanen til å matche Tripletex.</p>
+          </div>` : `<p class="subnote">Ingen ansatte funnet — sjekk Regnskapsagent-tilkoblingen.</p>`}`;
+        bar.insertAdjacentElement("afterend", warn);
       }
 
       // Kolonne 1: Hva jobber han med
