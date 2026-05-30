@@ -1426,3 +1426,14 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 
 /* ============ PROSJEKTLEDER-BADGE ============ */
 .proj-mgr-badge { background: #2b6eb8; color: #fff; padding: 1px 6px; border-radius: 4px; font-size: 9.5px; font-weight: 700; letter-spacing: .03em; vertical-align: middle; }
+
+/* ============ MICROSOFT INLINE LOGIN-FLYT ============ */
+.m365-login-start { margin: 8px 0; }
+.m365-login-flow { margin-top: 12px; padding: 12px 14px; background: #fff; border: 1px solid var(--border); border-radius: 8px; }
+.m365-flow-step { margin: 8px 0; font-size: 13px; line-height: 1.5; }
+.m365-link { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; word-break: break-all; }
+.m365-code { display: inline-flex; align-items: center; gap: 10px; background: #1e1f22; color: #ffeb3b; padding: 10px 16px; border-radius: 6px; font-family: ui-monospace, monospace; font-size: 20px; font-weight: 700; letter-spacing: .15em; margin: 6px 0 10px; }
+.m365-code .btn-ghost { background: rgba(255,255,255,.15); color: #fff; border-color: rgba(255,255,255,.3); font-size: 11px; font-weight: 600; padding: 3px 10px; letter-spacing: 0; }
+.m365-code-raw { background: #1e1f22; color: #d6d6d6; padding: 10px 14px; border-radius: 6px; font-family: ui-monospace, monospace; font-size: 12px; margin: 6px 0; }
+.m365-verify { margin-top: 6px; }
+.m365-verify-msg { margin-top: 8px; font-size: 13px; }

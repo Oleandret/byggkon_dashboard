@@ -2174,6 +2174,71 @@ app.get("/api/employee-orion-tools", requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ---- Microsoft device-code login via Orion ----
+// Hjelper brukeren å logge inn på Microsoft uten å forlate dashbordet.
+// GET = sjekk status (list-accounts + verify-login). POST = trigg m365__login og returner device code + URL.
+app.get("/api/employee-m365-status", requireAuth, async (req, res) => {
+  try {
+    const name = String(req.query.name || "").trim();
+    if (!name) return res.status(400).json({ error: "Mangler navn" });
+    const cfg = (getConfig().employeeSettings || {})[name];
+    const orion = cfg?.orion;
+    if (!orion?.enabled || !orion?.url) return res.json({ ok: false, reason: "Orion ikke aktivert" });
+
+    const accountsResult = await orionToolCall(orion, "m365__list-accounts", {});
+    let accounts = [];
+    if (accountsResult && typeof accountsResult === "string") {
+      // Forsøk å parse ut e-postadresser fra svaret
+      const emails = accountsResult.match(/[\w.+-]+@[\w-]+\.[\w.-]+/g) || [];
+      accounts = [...new Set(emails)];
+    } else if (Array.isArray(accountsResult)) {
+      accounts = accountsResult.map((a) => a.email || a.username || String(a)).filter(Boolean);
+    }
+
+    res.json({ ok: true, hasAccount: accounts.length > 0, accounts, rawResponse: typeof accountsResult === "string" ? accountsResult.slice(0, 500) : null });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/employee-m365-login", requireAuth, async (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    if (!name) return res.status(400).json({ error: "Mangler navn" });
+    const cfg = (getConfig().employeeSettings || {})[name];
+    const orion = cfg?.orion;
+    if (!orion?.enabled || !orion?.url) return res.status(400).json({ error: "Orion ikke aktivert" });
+
+    // Kall m365__login — returnerer device code + URL i tekst-respons
+    const loginResult = await orionToolCall(orion, "m365__login", {});
+    if (!loginResult) return res.status(502).json({ error: "Orion svarte ikke på m365__login" });
+
+    const text = typeof loginResult === "string" ? loginResult : JSON.stringify(loginResult);
+    // Parse ut URL og kode
+    const urlMatch = text.match(/https?:\/\/[^\s)\]]+/);
+    const codeMatch = text.match(/\b([A-Z0-9]{8,10})\b/);
+    res.json({
+      ok: true,
+      verificationUrl: urlMatch ? urlMatch[0] : "https://microsoft.com/devicelogin",
+      userCode: codeMatch ? codeMatch[1] : null,
+      raw: text.slice(0, 1000),
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/employee-m365-verify", requireAuth, async (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    if (!name) return res.status(400).json({ error: "Mangler navn" });
+    const cfg = (getConfig().employeeSettings || {})[name];
+    const orion = cfg?.orion;
+    if (!orion?.enabled || !orion?.url) return res.status(400).json({ error: "Orion ikke aktivert" });
+
+    const verifyResult = await orionToolCall(orion, "m365__verify-login", {});
+    const text = typeof verifyResult === "string" ? verifyResult : JSON.stringify(verifyResult || {});
+    const success = /signed?\s*in|authenticated|success|innlogget|aktiv|ok/i.test(text);
+    res.json({ ok: success, raw: text.slice(0, 500) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ---- Orion discovery: prober vanlige stier og rapporterer hva som svarer ----
 app.get("/api/employee-orion-probe", requireAuth, async (req, res) => {
   try {

@@ -448,18 +448,13 @@
         return `<details style="margin-top:10px"><summary class="subnote" style="cursor:pointer">Tilgjengelige Orion-verktøy</summary><div class="subnote" style="margin-top:4px">${d.availableOrionTools.map((t) => `<code>${esc(t)}</code>`).join(", ")}</div></details>`;
       }
 
-      // Tydelig M365-login-melding når Microsoft-konto ikke er logget inn på Orion
+      // Innebygd Microsoft device-code login når M365-tilgang trengs
       const loginNotice = d.m365LoginRequired ? `
         <div class="m365-login-notice">
-          <h4>🔐 Microsoft-pålogging trengs i Orion</h4>
-          <p>Orion sine M365-verktøy krever at du logger inn med Microsoft først (device code-flyt).</p>
-          <ol>
-            <li>Åpne <a href="${esc(d.orionChatUrl || "#")}" target="_blank" rel="noopener">Orion-chatten</a> i en ny fane</li>
-            <li>Skriv: «<b>logg meg inn på Microsoft</b>»</li>
-            <li>Klikk på lenken Orion gir deg og lim inn koden</li>
-            <li>Bekreft med «<b>verify-login</b>» når den ber om det</li>
-            <li>Last denne siden på nytt</li>
-          </ol>
+          <h4>🔐 Microsoft-pålogging trengs</h4>
+          <p>For å hente kalender og e-post fra Outlook må du logge inn på Microsoft i Orion én gang.</p>
+          <button class="btn-primary m365-login-start" data-name="${esc(emp.name)}">▶ Start innlogging</button>
+          <div class="m365-login-flow" hidden></div>
         </div>` : "";
 
       // Kolonne 3: Kalender
@@ -510,6 +505,55 @@
           `).join("")}</div>` : !d.claudeEnabled ? `<div class="empty">Krever ANTHROPIC_API_KEY for prosjekt-oppsummering.</div>`
            : `<div class="empty">Ingen prosjekter med timer siste 3 mnd.</div>`);
       }
+
+      // Hook up Microsoft login-flyt (innebygd device code)
+      document.querySelectorAll(".m365-login-start").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          btn.disabled = true;
+          btn.innerHTML = `<span class="loading-dots" style="padding:0;display:inline-flex;gap:3px"><span></span><span></span><span></span></span> Genererer kode …`;
+          const flow = btn.parentElement.querySelector(".m365-login-flow");
+          try {
+            const r = await fetch("/api/employee-m365-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: btn.dataset.name }) });
+            const d2 = await r.json();
+            if (!r.ok) throw new Error(d2.error || "Feil");
+            flow.hidden = false;
+            flow.innerHTML = `
+              <div class="m365-flow-step"><b>1.</b> Klikk: <a href="${esc(d2.verificationUrl)}" target="_blank" rel="noopener" class="m365-link">${esc(d2.verificationUrl)}</a></div>
+              <div class="m365-flow-step"><b>2.</b> Lim inn denne koden i Microsoft-vinduet:</div>
+              ${d2.userCode ? `<div class="m365-code">${esc(d2.userCode)} <button class="btn-ghost m365-copy" data-code="${esc(d2.userCode)}">📋 Kopier</button></div>` : `<div class="m365-code-raw">${esc(d2.raw).replace(/\n/g, "<br>")}</div>`}
+              <div class="m365-flow-step"><b>3.</b> Fullfør innlogging i Microsoft, så klikk:</div>
+              <button class="btn-primary m365-verify" data-name="${esc(btn.dataset.name)}">✓ Jeg er ferdig — bekreft innlogging</button>
+              <div class="m365-verify-msg subnote"></div>
+            `;
+            btn.remove();
+            flow.querySelector(".m365-copy")?.addEventListener("click", (ev) => {
+              navigator.clipboard.writeText(ev.target.dataset.code);
+              ev.target.textContent = "✓ Kopiert";
+              setTimeout(() => { ev.target.textContent = "📋 Kopier"; }, 1500);
+            });
+            flow.querySelector(".m365-verify").addEventListener("click", async (ev) => {
+              ev.target.disabled = true;
+              const msg = flow.querySelector(".m365-verify-msg");
+              msg.textContent = "Bekrefter …";
+              try {
+                const v = await fetch("/api/employee-m365-verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: btn.dataset.name }) });
+                const vd = await v.json();
+                if (vd.ok) {
+                  msg.textContent = "✓ Innlogget! Laster statussiden på nytt …";
+                  msg.style.color = "#1d6a3b";
+                  setTimeout(() => { statusData = null; renderStatus(emp); }, 1500);
+                } else {
+                  msg.textContent = "✗ Ikke innlogget ennå. Sjekk at du fullførte i Microsoft-vinduet og prøv igjen.";
+                  msg.style.color = "var(--bad)";
+                  ev.target.disabled = false;
+                }
+              } catch (e) { msg.textContent = "✗ " + e.message; ev.target.disabled = false; }
+            });
+          } catch (e) {
+            btn.outerHTML = `<div class="empty">Feil: ${esc(e.message)}</div>`;
+          }
+        });
+      });
 
       // Hook up refresh button
       const refreshBtnEl = c4.querySelector(".auto-refresh-btn");
