@@ -1724,6 +1724,54 @@ app.get("/api/employee-status", requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// MCP streamable HTTP-helper. Sender JSON-RPC og parser både rene JSON-svar
+// og SSE-strømmer (text/event-stream). Returnerer { ok, status, data, raw }.
+async function mcpCall(url, key, jsonrpcBody) {
+  const r = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json, text/event-stream",
+      "MCP-Protocol-Version": "2024-11-05",
+      ...(key ? { Authorization: "Bearer " + key, "X-Api-Key": key } : {}),
+    },
+    body: JSON.stringify(jsonrpcBody),
+    signal: AbortSignal.timeout(30000),
+  });
+  const ct = r.headers.get("content-type") || "";
+  const txt = await r.text();
+  if (!r.ok) return { ok: false, status: r.status, raw: txt.slice(0, 400) };
+  // SSE: linjer som "data: {...}"
+  if (ct.includes("text/event-stream")) {
+    const lines = txt.split("\n").filter((l) => l.startsWith("data:"));
+    for (const line of lines) {
+      const payload = line.slice(5).trim();
+      try { const data = JSON.parse(payload); return { ok: true, status: r.status, data, raw: txt.slice(0, 400) }; } catch {}
+    }
+    return { ok: true, status: r.status, data: { raw: txt.slice(0, 800) }, raw: txt.slice(0, 400) };
+  }
+  try { return { ok: true, status: r.status, data: JSON.parse(txt), raw: txt.slice(0, 400) }; }
+  catch { return { ok: true, status: r.status, data: { raw: txt }, raw: txt.slice(0, 400) }; }
+}
+
+// ---- Orion tools/list: oppdager hvilke verktøy som finnes ----
+app.get("/api/employee-orion-tools", requireAuth, async (req, res) => {
+  try {
+    const name = String(req.query.name || "").trim();
+    if (!name) return res.status(400).json({ error: "Mangler navn" });
+    const cfg = (getConfig().employeeSettings || {})[name];
+    const orion = cfg?.orion;
+    if (!orion?.url) return res.json({ ok: false, reason: "Mangler Orion-URL" });
+    const url = orion.url.replace(/\/+$/, "").replace(/([^:])\/{2,}/g, "$1/");
+    const chatPath = orion.chatPath || "/mcp";
+    const target = chatPath.startsWith("http") ? chatPath : url + (chatPath.startsWith("/") ? chatPath : "/" + chatPath);
+    const result = await mcpCall(target, orion.key, { jsonrpc: "2.0", id: 1, method: "tools/list" });
+    if (!result.ok) return res.json({ ok: false, reason: "HTTP " + result.status, snippet: result.raw });
+    const tools = result.data?.result?.tools || result.data?.tools || [];
+    res.json({ ok: true, tools, raw: result.data });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ---- Orion discovery: prober vanlige stier og rapporterer hva som svarer ----
 app.get("/api/employee-orion-probe", requireAuth, async (req, res) => {
   try {
@@ -1889,9 +1937,16 @@ app.post("/api/employee-chat", requireAuth, async (req, res) => {
       tryEndpoints.push({ method: "POST", url: customUrl, body: { messages: [...history.map((h) => ({ role: h.role, content: h.text })), { role: "user", content: message }] }, label: "custom-openai" });
     }
     if (proto === "auto" || proto === "mcp") {
-      tryEndpoints.push({ method: "POST", url: url, body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: tool, arguments: { employee: name, message, history } } }, label: "mcp-root" });
-      tryEndpoints.push({ method: "POST", url: url + "/mcp", body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: tool, arguments: { employee: name, message, history } } }, label: "mcp" });
-      tryEndpoints.push({ method: "POST", url: url + "/rpc", body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: tool, arguments: { employee: name, message, history } } }, label: "rpc" });
+      // MCP streamable HTTP — bruk mcpCall med riktige headers
+      const mcpTargets = [url + "/mcp", url, url + "/rpc"];
+      for (const target of mcpTargets) {
+        const mcpResult = await mcpCall(target, orion.key, { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: tool, arguments: { employee: name, message, history } } }).catch(() => null);
+        if (mcpResult && mcpResult.ok) {
+          const data = mcpResult.data;
+          const reply = data?.result?.content?.[0]?.text || data?.result?.text || data?.reply || data?.message;
+          if (reply) return res.json({ ok: true, reply: String(reply), raw: data, source: "mcp " + target });
+        }
+      }
     }
     if (proto === "auto" || proto === "rest") {
       tryEndpoints.push({ method: "POST", url: url + "/chat", body: { employee: name, message, history }, label: "rest /chat" });

@@ -456,6 +456,7 @@
           <div class="org-actions">
             <button class="btn-primary" id="orionSave">Lagre</button>
             <button class="btn-ghost" id="orionTest">Test status</button>
+            <button class="btn-ghost" id="orionTools">🔧 Vis verktøy</button>
             <button class="btn-ghost" id="orionProbe">🔍 Diagnostikk</button>
             <span id="orionTestMsg" class="subnote"></span>
           </div>
@@ -506,6 +507,29 @@
             out.innerHTML = `<h4>Forsøkte:</h4><table class="probe-tbl"><thead><tr><th>Label</th><th>URL</th><th>Status</th></tr></thead><tbody>${d.attempts.map((a) => `<tr><td>${esc(a.label)}</td><td><code>${esc(a.url)}</code></td><td>${a.error ? `<span class="probe-err">${esc(a.error)}</span>` : esc(String(a.status))}</td></tr>`).join("")}</tbody></table>`;
           }
         }
+      } catch (e) { msg.textContent = "✗ " + e.message; }
+    });
+    document.getElementById("orionTools").addEventListener("click", async () => {
+      const msg = document.getElementById("orionTestMsg");
+      const out = document.getElementById("orionProbeOut");
+      msg.textContent = "Henter verktøy fra Orion …"; out.hidden = true;
+      try {
+        const r = await fetch("/api/employee-orion-tools?name=" + encodeURIComponent(emp.name));
+        const d = await r.json();
+        if (!d.ok) { msg.textContent = "✗ " + (d.reason || "Feil"); if (d.snippet) { out.hidden = false; out.innerHTML = `<h4>Svar fra Orion:</h4><pre class="code-snip">${esc(d.snippet)}</pre>`; } return; }
+        const tools = d.tools || [];
+        msg.textContent = "✓ " + tools.length + " verktøy funnet";
+        out.hidden = false;
+        out.innerHTML = `<h4>Verktøy i Orion:</h4>
+          <table class="probe-tbl">
+            <thead><tr><th>Navn</th><th>Beskrivelse</th></tr></thead>
+            <tbody>${tools.map((t) => `<tr><td><b>${esc(t.name || "")}</b> <button class="btn-ghost orion-pick-tool" data-name="${esc(t.name || "")}">Bruk</button></td><td class="subnote">${esc(t.description || "")}</td></tr>`).join("")}</tbody>
+          </table>
+          <p class="subnote">Klikk «Bruk» for å sette verktøyet som default for chat.</p>`;
+        out.querySelectorAll(".orion-pick-tool").forEach((b) => b.addEventListener("click", () => {
+          document.getElementById("orionTool").value = b.dataset.name;
+          msg.textContent = "Sett verktøy: " + b.dataset.name + ". Klikk Lagre.";
+        }));
       } catch (e) { msg.textContent = "✗ " + e.message; }
     });
     document.getElementById("orionProbe").addEventListener("click", async () => {
