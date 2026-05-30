@@ -382,7 +382,7 @@
         <div class="loading-dots"><span></span><span></span><span></span></div>
       </div>
       <div class="ans-dash-block status-col" id="statusCol2">
-        <h3>📁 Prosjekter <span class="subnote">(siste 4 uker)</span></h3>
+        <h3>📁 Prosjekter <span class="subnote">(siste 3 mnd)</span></h3>
         <div class="loading-dots"><span></span><span></span><span></span></div>
       </div>
       <div class="ans-dash-block status-col" id="statusCol3">
@@ -415,21 +415,28 @@
          : !d.claudeEnabled ? `<div class="empty">Krever <code>ANTHROPIC_API_KEY</code> på Railway.</div>`
          : `<div class="empty">Kunne ikke generere sammendrag.</div>`);
 
-      // Kolonne 2: Prosjekter
+      // Kolonne 2: Prosjekter + aktiviteter (med type-badge)
       const c2 = document.getElementById("statusCol2");
       const projs = d.col2_projects || [];
+      const typeLabel = { prosjekt: "📁", aktivitet: "🏷", internt: "🏢" };
       c2.innerHTML = c2.querySelector("h3").outerHTML +
         (projs.length ? `<table class="ans-tbl">
-          <thead><tr><th>Prosjekt</th><th class="num">Timer</th></tr></thead>
-          <tbody>${projs.map((p) => `<tr><td><b>${esc(p.name)}</b>${p.lastDate ? `<br><span class="subnote">Sist: ${esc(p.lastDate)}</span>` : ""}</td><td class="num">${num(Math.round(p.hours))} t</td></tr>`).join("")}</tbody>
-        </table>` : `<div class="empty">Ingen prosjekter siste 4 uker.</div>`);
+          <thead><tr><th>Hva</th><th class="num">Timer</th></tr></thead>
+          <tbody>${projs.map((p) => `<tr><td><span class="proj-type-ico" title="${esc(p.type)}">${typeLabel[p.type] || "·"}</span> <b>${esc(p.name)}</b>${p.lastDate ? `<br><span class="subnote">Sist: ${esc(p.lastDate)}</span>` : ""}${p.customer ? `<br><span class="subnote">${esc(p.customer)}</span>` : ""}</td><td class="num">${num(Math.round(p.hours))} t</td></tr>`).join("")}</tbody>
+        </table>` : `<div class="empty">Ingen timer registrert siste 4 uker.</div>`);
+
+      // Hjelper: vis tilgjengelige Orion-verktøy hvis Orion er på men relevant tool mangler
+      function orionToolsHint(d) {
+        if (!d.availableOrionTools?.length) return "";
+        return `<details style="margin-top:10px"><summary class="subnote" style="cursor:pointer">Tilgjengelige Orion-verktøy</summary><div class="subnote" style="margin-top:4px">${d.availableOrionTools.map((t) => `<code>${esc(t)}</code>`).join(", ")}</div></details>`;
+      }
 
       // Kolonne 3: Kalender
       const c3 = document.getElementById("statusCol3");
       c3.innerHTML = c3.querySelector("h3").outerHTML +
         (d.col3_calendar ? `<div class="status-cal-text">${esc(d.col3_calendar).replace(/\n/g, "<br>")}</div>`
-         : !d.orionEnabled ? `<div class="empty">Orion MCP ikke aktivert. Gå til <b>⚙ Innstillinger</b>.</div>`
-         : !d.hasOrionCalendar ? `<div class="empty">Orion har ikke et kalender-verktøy ennå. Sjekk «🔧 Vis verktøy» under Innstillinger.</div>`
+         : !d.orionEnabled ? `<div class="empty">Orion MCP ikke aktivert.<br>Gå til <b>⚙ Innstillinger</b>.</div>`
+         : !d.hasOrionCalendar ? `<div class="empty">Fant ikke et kalender-verktøy i Orion.<br>Orion må ha et verktøy som matcher: <code>calendar</code>, <code>get_upcoming_meetings</code>, <code>kalender</code> eller lignende.${orionToolsHint(d)}</div>`
          : `<div class="empty">Ingen kommende møter.</div>`);
 
       // Kolonne 4: Automasjoner
@@ -442,7 +449,7 @@
           .replace(/\n/g, "<br>")}</div>`
          : !d.claudeEnabled ? `<div class="empty">Krever <code>ANTHROPIC_API_KEY</code> på Railway.</div>`
          : !d.orionEnabled ? `<div class="empty">Krever Orion MCP for å lese e-poster.</div>`
-         : !d.hasOrionEmails ? `<div class="empty">Orion har ikke et e-post-verktøy tilgjengelig. Sjekk «🔧 Vis verktøy».</div>`
+         : !d.hasOrionEmails ? `<div class="empty">Fant ikke et e-post-verktøy i Orion.<br>Orion må ha et verktøy som matcher: <code>emails</code>, <code>get_recent_emails</code>, <code>innboks</code> eller lignende.${orionToolsHint(d)}</div>`
          : `<div class="empty">Ingen mønstre funnet.</div>`);
 
     } catch (e) {

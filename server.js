@@ -2306,18 +2306,65 @@ async function callClaude(systemPrompt, userMessage, model = "claude-sonnet-4-6"
   } catch { return null; }
 }
 
+// Hjelper: hent alle verktøy fra Orion (cached per kjøring)
+const _orionToolsCache = new Map(); // url -> {ts, tools}
+async function orionListTools(orion) {
+  if (!orion?.url) return [];
+  const url = orion.url.replace(/\/+$/, "").replace(/([^:])\/{2,}/g, "$1/");
+  const cached = _orionToolsCache.get(url);
+  if (cached && Date.now() - cached.ts < 5 * 60 * 1000) return cached.tools;
+  for (const target of [url + "/mcp", url, url + "/rpc"]) {
+    const r = await mcpCall(target, orion.key, { jsonrpc: "2.0", id: 0, method: "tools/list" }).catch(() => null);
+    if (r?.ok) {
+      const tools = r.data?.result?.tools || r.data?.tools || [];
+      if (tools.length) {
+        _orionToolsCache.set(url, { ts: Date.now(), tools });
+        return tools;
+      }
+    }
+  }
+  return [];
+}
+
 // Hjelper: prøv et MCP-verktøy via Orion. Returnerer raw resultat eller null.
 async function orionToolCall(orion, toolName, args) {
   if (!orion?.url || !orion.enabled) return null;
   const url = orion.url.replace(/\/+$/, "").replace(/([^:])\/{2,}/g, "$1/");
+  // Prøv ulike argumentvarianter
+  const argVariants = [args || {}, { ...args }, {}, { input: JSON.stringify(args || {}) }];
   for (const target of [url + "/mcp", url, url + "/rpc"]) {
-    const result = await mcpCall(target, orion.key, { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: toolName, arguments: args || {} } }).catch(() => null);
-    if (result?.ok && !result.data?.error) {
-      const txt = result.data?.result?.content?.[0]?.text || result.data?.result?.text;
-      return txt || JSON.stringify(result.data?.result || {});
+    for (const a of argVariants) {
+      const result = await mcpCall(target, orion.key, { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: toolName, arguments: a } }).catch(() => null);
+      if (!result?.ok) continue;
+      const data = result.data;
+      const errMsg = data?.error?.message || "";
+      if (errMsg && /ukjent\s+verktøy|unknown\s+tool|not\s+found/i.test(errMsg)) return null;
+      if (errMsg) continue;
+      const txt = data?.result?.content?.[0]?.text || data?.result?.text || data?.result?.message;
+      if (txt) return String(txt);
+      if (data?.result) return JSON.stringify(data.result);
     }
   }
   return null;
+}
+
+// Smart tool-discovery: finn beste verktøy fra Orion basert på keyword-matching i navn/beskrivelse
+function findOrionTool(tools, patterns) {
+  // patterns: regex-array. Returnerer beste match basert på tool-navn + description.
+  for (const re of patterns) {
+    const match = tools.find((t) => re.test(t.name || "") || re.test(t.description || ""));
+    if (match) return match.name;
+  }
+  return null;
+}
+
+async function smartOrionCall(orion, patterns, args) {
+  const tools = await orionListTools(orion);
+  if (!tools.length) return { reply: null, toolName: null, toolsAvailable: [] };
+  const toolName = findOrionTool(tools, patterns);
+  if (!toolName) return { reply: null, toolName: null, toolsAvailable: tools.map((t) => t.name) };
+  const reply = await orionToolCall(orion, toolName, args);
+  return { reply, toolName, toolsAvailable: tools.map((t) => t.name) };
 }
 
 // ---- Rik status for en ansatt: 4 kolonner med LLM-analyse ----
@@ -2344,31 +2391,53 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
       const empId = emp?.id;
       const entries = await getTimeEntriesDetailed(from, todayStr, empId).catch(() => []);
 
-      // Kolonne 2: Prosjekter
+      // Kolonne 2: Hent prosjekter siste 3 måneder (90 dager)
+      const from90 = ymd(new Date(today.getTime() - 90 * 86400000));
+      const entries90 = await getTimeEntriesDetailed(from90, todayStr, empId).catch(() => []);
+
+      // Kolonne 2: Prosjekter + Aktiviteter (slå sammen ekte prosjekter og aktiviteter for internt arbeid)
       const projMap = new Map();
-      for (const e of entries) {
-        const pname = e.project?.name || "(uten prosjekt)";
-        const cur = projMap.get(pname) || { name: pname, hours: 0, customer: "", lastDate: "" };
+      for (const e of entries90) {
+        // Bygg label: bruk prosjektnavn hvis det finnes, ellers aktivitet, ellers "Internt"
+        const projName = e.project?.name;
+        const actName = e.activity?.name;
+        let label, type;
+        if (projName && projName !== "(uten prosjekt)") { label = projName; type = "prosjekt"; }
+        else if (actName) { label = actName; type = "aktivitet"; }
+        else { label = "Internt arbeid"; type = "internt"; }
+        const cur = projMap.get(label) || { name: label, type, hours: 0, customer: e.project?.customer?.name || "", lastDate: "" };
         cur.hours += Number(e.hours) || 0;
         if (e.date > cur.lastDate) cur.lastDate = e.date;
-        projMap.set(pname, cur);
+        projMap.set(label, cur);
       }
-      const projects = [...projMap.values()].sort((a, b) => b.hours - a.hours).slice(0, 12);
+      const projects = [...projMap.values()].sort((a, b) => b.hours - a.hours).slice(0, 15);
 
-      // Hent rådata fra Orion (kalender + e-post) — best effort
-      let orionCalendar = null, orionEmails = null;
+      // Smart tool-discovery via tools/list
+      let orionCalendar = null, orionEmails = null, calendarTool = null, emailTool = null, orionTools = [];
       if (orionEnabled) {
-        orionCalendar = await Promise.race([
-          orionToolCall(orion, "get_calendar", { employee: name }),
-          orionToolCall(orion, "calendar", { employee: name }),
-          orionToolCall(orion, "get_upcoming_meetings", { employee: name }),
-        ].map((p) => p.then((v) => v).catch(() => null))).catch(() => null);
-        orionEmails = await Promise.race([
-          orionToolCall(orion, "get_emails", { employee: name, days: 28 }),
-          orionToolCall(orion, "emails", { employee: name, days: 28 }),
-          orionToolCall(orion, "list_emails", { employee: name }),
-          orionToolCall(orion, "get_recent_emails", { employee: name }),
-        ].map((p) => p.then((v) => v).catch(() => null))).catch(() => null);
+        // Hent verktøy-listen først (cached)
+        const tools = await orionListTools(orion);
+        orionTools = tools.map((t) => t.name);
+        // Kalender: matcher på keywords
+        const calPatterns = [
+          /^(get_)?calendar/i, /^(get_)?upcoming_?meet/i, /^kalender/i, /møter|moter|meeting|agenda/i,
+          /schedule|appointment|booking/i,
+        ];
+        const calToolName = findOrionTool(tools, calPatterns);
+        if (calToolName) {
+          calendarTool = calToolName;
+          orionCalendar = await orionToolCall(orion, calToolName, { employee: name, days: 14, days_ahead: 14, range: "upcoming" });
+        }
+        // E-post: matcher på keywords
+        const emailPatterns = [
+          /^(get_|list_)?(email|mail)s?$/i, /^(get_)?recent_?email/i, /^innboks|inbox/i,
+          /email|mail|post/i,
+        ];
+        const emailToolName = findOrionTool(tools, emailPatterns);
+        if (emailToolName) {
+          emailTool = emailToolName;
+          orionEmails = await orionToolCall(orion, emailToolName, { employee: name, days: 28, limit: 100 });
+        }
       }
 
       // Kolonne 1: Hva jobber X med (LLM-sammendrag av timer)
@@ -2413,9 +2482,11 @@ Svar på norsk. Lag 3-5 konkrete forslag som punktliste. Hvert punkt skal være 
         col2_projects: projects,
         col3_calendar: calendarPretty,
         col4_automations: automationSuggestions,
-        // Råresursdata for feilsøking
+        // Diagnostikk
         hasOrionCalendar: !!orionCalendar,
         hasOrionEmails: !!orionEmails,
+        calendarTool, emailTool,
+        availableOrionTools: orionTools,
         entryCount: entries.length,
       };
     }, 15 * 60 * 1000)); // 15 min cache for å spare LLM-kall
