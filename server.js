@@ -2529,15 +2529,22 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
       const from90 = ymd(new Date(today.getTime() - 90 * 86400000));
       const entries90 = await getTimeEntriesDetailed(from90, todayStr, empId).catch(() => []);
 
-      // Kolonne 2: Prosjekter — kombinerer egne timer + prosjekter der personen er prosjektleder
+      // Kolonne 2: Prosjekter — alle prosjekter du har ført timer på siste 3 mnd, sortert mest øverst
       const projMap = new Map();
+      let _projDebug = { totalEntries: 0, withProject: 0, withProjectName: 0, withProjectId: 0 };
       // a) Prosjekter med egne timer (siste 3 mnd)
       for (const e of entries90) {
+        _projDebug.totalEntries++;
+        if (e.project) _projDebug.withProject++;
         const projName = e.project?.name;
-        if (!projName || projName === "(uten prosjekt)" || !e.project?.id) continue;
-        const key = projName;
+        const projId = e.project?.id;
+        // Relaxed filter: accept ANY entry with project name (id optional)
+        if (!projName && !projId) continue;
+        if (projName) _projDebug.withProjectName++;
+        if (projId) _projDebug.withProjectId++;
+        const key = projName || `Prosjekt #${projId}`;
         const cur = projMap.get(key) || {
-          name: projName, type: "prosjekt",
+          name: key, type: "prosjekt",
           number: e.project?.number || "",
           customer: e.project?.customer?.name || "",
           hours: 0, lastDate: "",
@@ -2547,40 +2554,58 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
         if (e.date > cur.lastDate) cur.lastDate = e.date;
         projMap.set(key, cur);
       }
-      // b) Prosjekter der personen er prosjektleder (selv uten egne timer)
+      // b) Fallback: bruk overview byEmp4w/byEmp3w for å finne prosjekter der personen er nevnt
+      //    (selv om time entry-fetch ikke fant project-link). Gjør match på navn.
       try {
         const overviewSnap = getSnapshot("overview");
         const ovProjects = overviewSnap?.data?.projectsDetailed || [];
-        const personNorm = String(name).toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").trim();
+        const personNorm = String(name).toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[.\-]/g, " ").replace(/\s+/g, " ").trim();
+        const personKeys = (() => {
+          const parts = personNorm.split(" ").filter(Boolean);
+          const keys = new Set([parts.join(" ")]);
+          if (parts.length >= 2) keys.add(parts[0] + " " + parts[parts.length - 1]);
+          return keys;
+        })();
+        const nameMatches = (n) => {
+          const nn = String(n || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[.\-]/g, " ").replace(/\s+/g, " ").trim();
+          const parts = nn.split(" ").filter(Boolean);
+          if (personKeys.has(nn)) return true;
+          if (parts.length >= 2 && personKeys.has(parts[0] + " " + parts[parts.length - 1])) return true;
+          return false;
+        };
         for (const p of ovProjects) {
-          const pmName = String(p.projectManager || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").trim();
-          if (!pmName) continue;
-          // Match på fullt navn eller fornavn+etternavn
-          const pmParts = pmName.split(" ").filter(Boolean);
-          const personParts = personNorm.split(" ").filter(Boolean);
-          const match = pmName === personNorm
-            || (pmParts.length >= 2 && personParts.length >= 2 && pmParts[0] === personParts[0] && pmParts[pmParts.length-1] === personParts[personParts.length-1]);
-          if (!match) continue;
-          // Bare med på siste 3 mnd-aktivitet
-          if (!p.hours4w && !p.hoursYTD) continue;
+          // i) PL-match: er personen prosjektleder?
+          const isMgr = p.projectManager && nameMatches(p.projectManager);
+          // ii) byEmp-match: har personen timer på dette prosjektet ifølge overview?
+          let empHours4w = 0, empHours3w = 0;
+          for (const [empName, h] of Object.entries(p.byEmp4w || {})) {
+            if (nameMatches(empName)) { empHours4w += h; break; }
+          }
+          for (const [empName, h] of Object.entries(p.byEmp3w || {})) {
+            if (nameMatches(empName)) { empHours3w += h; break; }
+          }
+          // Bare med på prosjekter der personen er PL ELLER har egne timer
+          if (!isMgr && empHours4w === 0 && empHours3w === 0) continue;
           const key = p.name;
           if (!projMap.has(key)) {
             projMap.set(key, {
               name: p.name, type: "prosjekt",
               number: p.number || "",
               customer: p.customer || "",
-              hours: p.hours4w || 0,  // team-timer 4 uker som proxy
+              hours: empHours4w || 0,
               teamHours: p.hoursYTD || 0,
               lastDate: p.lastActivity || "",
-              isManager: true,
+              isManager: !!isMgr,
             });
           } else {
             const cur = projMap.get(key);
-            cur.isManager = true;
+            if (isMgr) cur.isManager = true;
             cur.teamHours = p.hoursYTD || 0;
+            // Bruk overview-tall hvis våre egne entries90-tall er 0
+            if (cur.hours === 0 && empHours4w > 0) cur.hours = empHours4w;
           }
         }
-      } catch (e) { console.warn("Manager projects lookup:", e.message); }
+      } catch (e) { console.warn("Overview lookup:", e.message); }
       const projects = [...projMap.values()].sort((a, b) => (b.hours + (b.teamHours || 0)) - (a.hours + (a.teamHours || 0)));
 
       // Smart tool-discovery via tools/list
@@ -2712,6 +2737,7 @@ Bare JSON, ingen forklaringer.`;
         col4_generatedAt: automationGeneratedAt,
         col4_emailCount: automationEmailCount,
         col5_projectSummaries: projectSummaries,
+        _projDebug,
         // Diagnostikk
         hasOrionCalendar: !!orionCalendar,
         hasOrionEmails: !!automationSuggestions,
