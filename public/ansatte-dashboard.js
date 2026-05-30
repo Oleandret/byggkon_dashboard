@@ -139,6 +139,7 @@
         <button class="ans-subtab ${activeSub === "chat" ? "active" : ""}" data-asub="chat">💬 Chat${set.orion?.enabled ? "" : " <span class=\"subnote\">(av)</span>"}</button>
         <button class="ans-subtab ${activeSub === "timer" ? "active" : ""}" data-asub="timer">⏱ Timeoversikt</button>
         <button class="ans-subtab ${activeSub === "status" ? "active" : ""}" data-asub="status">🟢 Status${set.orion?.enabled ? "" : " <span class=\"subnote\">(av)</span>"}</button>
+        <button class="ans-subtab ${activeSub === "automasjoner" ? "active" : ""}" data-asub="automasjoner">⚡ Automasjoner</button>
         <button class="ans-subtab ${activeSub === "innstillinger" ? "active" : ""}" data-asub="innstillinger">⚙ Innstillinger</button>
       </div>`;
 
@@ -147,7 +148,118 @@
     else if (activeSub === "timer") renderTimer(emp);
     else if (activeSub === "chat") renderChat(emp);
     else if (activeSub === "status") renderStatus(emp);
+    else if (activeSub === "automasjoner") renderAutomasjoner(emp);
     else if (activeSub === "innstillinger") renderInnstillinger(emp);
+  }
+
+  /* ============ AUTOMASJONER (wishlist) ============ */
+  async function renderAutomasjoner(emp) {
+    ["ansDashKpis", "ansDashGrid"].forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = true; });
+    const allGrids = document.querySelectorAll("#ansDashCard > .grid-2"); allGrids.forEach((g) => g.hidden = true);
+    const content = document.getElementById("ansDashContent") || (() => { const d = document.createElement("div"); d.id = "ansDashContent"; document.getElementById("ansDashCard").appendChild(d); return d; })();
+    content.innerHTML = `<div class="subnote">Laster automasjoner …</div>`;
+
+    // Hent forslag (fra status-snapshotet) + wishlist (lagret)
+    let suggestions = "", wishlist = [];
+    try {
+      const sr = await fetch("/api/employee-status-rich?name=" + encodeURIComponent(emp.name));
+      const sd = await sr.json();
+      suggestions = sd.col4_automations || "";
+    } catch {}
+    try {
+      const wr = await fetch("/api/employee-automation-wishlist?name=" + encodeURIComponent(emp.name));
+      const wd = await wr.json();
+      wishlist = wd.list || [];
+    } catch {}
+
+    // Parse forslag-blokker fra Claude-output: hver starter med **Forslag:**
+    const suggList = [];
+    if (suggestions) {
+      const blocks = suggestions.split(/\*\*Forslag:\*\*/i).slice(1);
+      blocks.forEach((b, i) => {
+        const lines = b.split("\n").map((l) => l.trim()).filter(Boolean);
+        const title = (lines[0] || "Uten tittel").replace(/^[:\s—-]+/, "").slice(0, 200);
+        const rest = lines.slice(1).join("\n");
+        suggList.push({ id: "sug_" + i, title, description: rest });
+      });
+    }
+
+    const looksLikeError = suggestions && /beklager|teknisk feil|kunne ikke|mailFolderId|mcp error|invalid arguments/i.test(suggestions.slice(0, 300));
+
+    content.innerHTML = `
+      <div class="auto-2col-grid">
+        <div class="ans-dash-block">
+          <h3>💡 Forslag fra Claude</h3>
+          <p class="subnote">Klikk «+ Legg til» for å flytte forslag til implementeringslisten.</p>
+          ${suggList.length && !looksLikeError ? `
+            <div class="auto-sug-list">${suggList.map((s) => `
+              <div class="auto-sug-item" data-id="${esc(s.id)}">
+                <div class="auto-sug-title">${esc(s.title)}</div>
+                ${s.description ? `<div class="auto-sug-desc">${esc(s.description).replace(/\n/g, "<br>")}</div>` : ""}
+                <button class="btn-primary auto-sug-add" data-title="${esc(s.title)}" data-desc="${esc(s.description)}">+ Legg til</button>
+              </div>
+            `).join("")}</div>` : looksLikeError
+              ? `<div class="empty">Forrige henting feilet. Gå til <b>🟢 Status</b> og klikk «↻ Oppdater forslag».</div>`
+              : `<div class="empty">Ingen forslag tilgjengelig.<br>Gå til <b>🟢 Status</b>-fanen og klikk «↻ Oppdater forslag» for å generere.</div>`}
+        </div>
+
+        <div class="ans-dash-block">
+          <h3>✅ Mine automasjoner — skal implementeres</h3>
+          <p class="subnote">Liste over automasjoner du ønsker å bygge. Endre status og legg til notater.</p>
+          ${wishlist.length ? `<div class="auto-wish-list">${wishlist.map((w) => `
+            <div class="auto-wish-item" data-id="${esc(w.id)}">
+              <div class="aw-head">
+                <input type="text" class="aw-title" data-field="title" value="${esc(w.title)}" />
+                <select class="aw-status" data-field="status">
+                  ${["Foreslått", "Planlagt", "Pågår", "Ferdig", "Forkastet"].map((s) => `<option ${w.status === s ? "selected" : ""}>${s}</option>`).join("")}
+                </select>
+                <button class="btn-ghost aw-del" title="Fjern">🗑</button>
+              </div>
+              ${w.description ? `<div class="aw-desc">${esc(w.description).replace(/\n/g, "<br>")}</div>` : ""}
+              <textarea class="aw-note" data-field="note" rows="2" placeholder="Notat / fremdrift …">${esc(w.note || "")}</textarea>
+              <div class="subnote">Lagt til ${new Date(w.addedAt).toLocaleDateString("nb-NO")}</div>
+            </div>
+          `).join("")}</div>` : `<div class="empty">Ingen automasjoner lagt til ennå.<br>Klikk «+ Legg til» på et forslag til venstre.</div>`}
+        </div>
+      </div>
+    `;
+
+    // Event handlers
+    content.querySelectorAll(".auto-sug-add").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true; btn.textContent = "Lagrer …";
+        try {
+          await fetch("/api/employee-automation-wishlist/add", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: emp.name, title: btn.dataset.title, description: btn.dataset.desc, source: "Claude" }),
+          });
+          renderAutomasjoner(emp); // re-render
+        } catch (e) { btn.disabled = false; btn.textContent = "+ Legg til"; alert("Feil: " + e.message); }
+      });
+    });
+    content.querySelectorAll(".auto-wish-item").forEach((item) => {
+      const id = item.dataset.id;
+      const save = async (field, value) => {
+        try {
+          await fetch("/api/employee-automation-wishlist/update", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: emp.name, id, [field]: value }),
+          });
+        } catch {}
+      };
+      item.querySelectorAll(".aw-title, .aw-status, .aw-note").forEach((el) => {
+        el.addEventListener("change", () => save(el.dataset.field, el.value));
+        el.addEventListener("blur", () => save(el.dataset.field, el.value));
+      });
+      item.querySelector(".aw-del").addEventListener("click", async () => {
+        if (!confirm("Fjerne fra listen?")) return;
+        await fetch("/api/employee-automation-wishlist/remove", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: emp.name, id }),
+        });
+        renderAutomasjoner(emp);
+      });
+    });
   }
 
   function renderOversikt(emp, role, goals, bill) {

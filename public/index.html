@@ -87,6 +87,7 @@
           <button class="tab" data-tab="kvalitet">Kvalitetssikring</button>
           <button class="tab" data-tab="itsystem">IT-system</button>
           <button class="tab" data-tab="office365">Office 365</button>
+          <button class="tab" data-tab="logg">📋 Logg</button>
         </div>
       </div>
       <div class="nav-group">
@@ -1506,6 +1507,32 @@ cd ~/pitzDaily &amp;&amp; blockMesh &amp;&amp; simpleFoam &amp;&amp; paraFoam</p
   </section>
 
   <!-- ============ FANE: LEDELSE (kun leder) ============ -->
+  <!-- ============ FANE: LOGG (server-feilmeldinger) ============ -->
+  <section class="tab-panel" id="panel-logg">
+    <main class="container">
+      <div class="page-intro"><span class="pi-ico">📋</span><span class="pi-txt"><b>Hva siden gjør:</b> Viser de siste server-logghendelsene (info, warn, error) live fra Railway-instansen. <b>Hensikt:</b> Raskt finne og forstå feil uten å åpne Railway-konsollen.</span></div>
+      <div class="card">
+        <div class="proj-head">
+          <h2>📋 Server-logg</h2>
+          <div class="org-actions">
+            <select id="logLevelFilter" class="search" style="max-width:140px">
+              <option value="">Alle nivåer</option>
+              <option value="error">Bare feil</option>
+              <option value="warn">Bare advarsler</option>
+              <option value="info">Bare info</option>
+            </select>
+            <input id="logSearch" class="search" type="search" placeholder="Søk i meldinger …" />
+            <button id="logReload" class="btn-ghost">↻ Oppdater</button>
+            <button id="logAutoToggle" class="btn-ghost" title="Auto-oppdater hvert 5. sekund">⏱ Auto av</button>
+            <button id="logClear" class="btn-ghost" title="Tøm logg-buffer på server">🗑 Tøm</button>
+          </div>
+        </div>
+        <div id="logCounts" class="log-counts"></div>
+        <div id="logList" class="log-list">Laster …</div>
+      </div>
+    </main>
+  </section>
+
   <section class="tab-panel" id="panel-ledelse">
     <main class="container">
       <div class="page-intro"><span class="pi-ico">🔒</span><span class="pi-txt"><b>Hva siden gjør:</b> Passordbeskyttet område for ledelsesrapporter og referater fra ledermøter. <b>Hensikt:</b> Samle sensitiv ledelsesinformasjon ett sted, kun for de som skal ha tilgang.</span></div>
@@ -1799,6 +1826,7 @@ cd ~/pitzDaily &amp;&amp; blockMesh &amp;&amp; simpleFoam &amp;&amp; paraFoam</p
   <script src="/social.js"></script>
   <script src="/rib.js"></script>
   <script src="/ansatte-dashboard.js"></script>
+  <script src="/logg.js"></script>
   <script type="module" src="/bim.js"></script>
 </body>
 </html>

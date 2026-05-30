@@ -1,4 +1,5 @@
 import "dotenv/config"; // leser en lokal .env-fil hvis den finnes (ignoreres på Railway)
+import { getLogs, clearLogs, logCount } from "./src/logger.js"; // initialiserer console-interceptors
 import express from "express";
 import cookieSession from "cookie-session";
 import path from "path";
@@ -2513,6 +2514,77 @@ app.post("/api/employee-project-meta", requireAuth, (req, res) => {
     if (!all[name]) all[name] = {};
     all[name][project] = { role, description, updatedAt: new Date().toISOString() };
     saveConfig({ employeeProjectMeta: all });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Logg-fane: hent siste server-logghendelser ----
+app.get("/api/logs", requireAuth, (req, res) => {
+  const level = req.query.level || null;
+  const search = req.query.search || null;
+  const limit = Math.min(500, Math.max(10, Number(req.query.limit) || 200));
+  res.json({
+    logs: getLogs({ level, search, limit }),
+    total: logCount(),
+    counts: { info: logCount("info"), warn: logCount("warn"), error: logCount("error") },
+  });
+});
+app.post("/api/logs/clear", requireAuth, (req, res) => {
+  clearLogs();
+  res.json({ ok: true });
+});
+
+// ---- Automasjons-wishlist: hver ansatt har en liste av automasjoner de vil lage ----
+app.get("/api/employee-automation-wishlist", requireAuth, (req, res) => {
+  const name = String(req.query.name || "").trim();
+  if (!name) return res.status(400).json({ error: "Mangler navn" });
+  const list = (getConfig().employeeAutomationWishlist || {})[name] || [];
+  res.json({ list });
+});
+app.post("/api/employee-automation-wishlist/add", requireAuth, (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    if (!name) return res.status(400).json({ error: "Mangler navn" });
+    const all = { ...(getConfig().employeeAutomationWishlist || {}) };
+    if (!Array.isArray(all[name])) all[name] = [];
+    all[name].push({
+      id: "auto_" + Math.random().toString(36).slice(2, 10),
+      title: String(req.body?.title || "").slice(0, 200),
+      description: String(req.body?.description || "").slice(0, 1500),
+      source: String(req.body?.source || "").slice(0, 100),
+      status: "Foreslått",
+      note: "",
+      addedAt: new Date().toISOString(),
+    });
+    saveConfig({ employeeAutomationWishlist: all });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post("/api/employee-automation-wishlist/update", requireAuth, (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    const id = String(req.body?.id || "").trim();
+    if (!name || !id) return res.status(400).json({ error: "Mangler navn eller id" });
+    const all = { ...(getConfig().employeeAutomationWishlist || {}) };
+    const list = all[name] || [];
+    const item = list.find((x) => x.id === id);
+    if (!item) return res.status(404).json({ error: "Ikke funnet" });
+    if (req.body.status !== undefined) item.status = String(req.body.status).slice(0, 30);
+    if (req.body.note !== undefined) item.note = String(req.body.note).slice(0, 1000);
+    if (req.body.title !== undefined) item.title = String(req.body.title).slice(0, 200);
+    if (req.body.description !== undefined) item.description = String(req.body.description).slice(0, 1500);
+    saveConfig({ employeeAutomationWishlist: all });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post("/api/employee-automation-wishlist/remove", requireAuth, (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    const id = String(req.body?.id || "").trim();
+    if (!name || !id) return res.status(400).json({ error: "Mangler navn eller id" });
+    const all = { ...(getConfig().employeeAutomationWishlist || {}) };
+    if (Array.isArray(all[name])) all[name] = all[name].filter((x) => x.id !== id);
+    saveConfig({ employeeAutomationWishlist: all });
     res.json({ ok: true });
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
