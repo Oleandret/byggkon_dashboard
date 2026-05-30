@@ -2486,6 +2486,28 @@ async function smartOrionCall(orion, patterns, args) {
 }
 
 // ---- Rik status for en ansatt: 4 kolonner med LLM-analyse ----
+// ---- Per-ansatt prosjekt-meta: Rolle i prosjekt + Prosjektbeskrivelse ----
+app.get("/api/employee-project-meta", requireAuth, (req, res) => {
+  const name = String(req.query.name || "").trim();
+  const all = getConfig().employeeProjectMeta || {};
+  if (name) return res.json({ meta: all[name] || {} });
+  res.json({ meta: all });
+});
+app.post("/api/employee-project-meta", requireAuth, (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    const project = String(req.body?.project || "").trim();
+    if (!name || !project) return res.status(400).json({ error: "Mangler name eller project" });
+    const role = String(req.body?.role || "").slice(0, 300);
+    const description = String(req.body?.description || "").slice(0, 1500);
+    const all = { ...(getConfig().employeeProjectMeta || {}) };
+    if (!all[name]) all[name] = {};
+    all[name][project] = { role, description, updatedAt: new Date().toISOString() };
+    saveConfig({ employeeProjectMeta: all });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
 // ---- Manuell refresh av kolonne 4 (automasjoner) — kjører bare når brukeren ber om det ----
 // Henter siste 3 måneder med e-post fra Orion + sender til Claude. Lagrer i snapshot.
 app.post("/api/employee-automations/refresh", requireAuth, async (req, res) => {
@@ -2737,6 +2759,14 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
       const automationGeneratedAt = automationsCached?.generatedAt || null;
       const automationEmailCount = automationsCached?.emailCount || 0;
 
+      // Hent manuell prosjekt-meta for denne ansatte (rolle + beskrivelse per prosjekt)
+      const empProjMeta = (getConfig().employeeProjectMeta || {})[name] || {};
+      // Berik projects-listen med meta
+      for (const p of projects) {
+        const m = empProjMeta[p.name];
+        if (m) { p.role = m.role || ""; p.description = m.description || ""; }
+      }
+
       // Kolonne 5: Prosjekt-spesifikk oppsummering
       // Bruker kommentarer fra time entries der det finnes, ellers bare metadata fra overview
       let projectSummaries = [];
@@ -2751,7 +2781,10 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
             .slice(0, 12)
             .map((e) => `  ${e.date}: ${e.comment.slice(0, 120)}`)
             .join("\n");
-          return `### ${p.name}${p.customer ? ` (${p.customer})` : ""}\nDine timer: ${Math.round(p.hours)}t · Team total: ${Math.round(p.teamHours || 0)}t · Sist aktivitet: ${p.lastDate || "—"}${p.isManager ? " · DU ER PROSJEKTLEDER" : ""}\nKommentarer fra dine timeoppføringer:\n${recentComments || "  (du har ikke ført kommentarer på dette prosjektet)"}`;
+          const manualMeta = p.role || p.description
+            ? `Manuelt registrert:${p.role ? `\n  Rolle: ${p.role}` : ""}${p.description ? `\n  Beskrivelse: ${p.description}` : ""}\n`
+            : "";
+          return `### ${p.name}${p.customer ? ` (${p.customer})` : ""}\nDine timer: ${Math.round(p.hours)}t · Team total: ${Math.round(p.teamHours || 0)}t · Sist aktivitet: ${p.lastDate || "—"}${p.isManager ? " · DU ER PROSJEKTLEDER" : ""}\n${manualMeta}Kommentarer fra dine timeoppføringer:\n${recentComments || "  (du har ikke ført kommentarer på dette prosjektet)"}`;
         }).join("\n\n");
 
         const sys = `Du analyserer prosjekter og gir TO ting per prosjekt:

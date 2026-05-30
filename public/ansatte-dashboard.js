@@ -517,23 +517,59 @@
       }
       c4.innerHTML = c4.querySelector("h3").outerHTML + c4Body;
 
-      // Seksjon 5: Prosjekt-spesifikk oppsummering
+      // Seksjon 5: Prosjekt-spesifikk oppsummering + redigerbare felter (rolle + beskrivelse)
       const c5 = document.getElementById("statusProjects");
       if (c5) {
         const psums = d.col5_projectSummaries || [];
         c5.innerHTML = c5.querySelector("h3").outerHTML +
           (psums.length ? `<div class="proj-summaries-grid">${psums.map((p) => `
-            <div class="proj-summary-card">
+            <div class="proj-summary-card" data-project="${esc(p.name)}">
               <div class="psc-head">
                 <div class="psc-title"><b>${esc(p.name)}</b>${p.number ? `<span class="subnote"> · ${esc(p.number)}</span>` : ""}</div>
                 <div class="psc-hours">${num(Math.round(p.hours))} t</div>
               </div>
               ${p.customer ? `<div class="psc-customer">${esc(p.customer)}</div>` : ""}
-              <div class="psc-summary">${p.summary ? esc(p.summary).replace(/\n/g, "<br>") : `<span class="subnote">Ingen oppsummering tilgjengelig.</span>`}</div>
+              ${p.summary ? `<div class="psc-summary">${esc(p.summary).replace(/\n/g, "<br>")}</div>` : ""}
+              <div class="psc-meta-fields">
+                <label class="psc-field">
+                  <span class="psc-field-lbl">👤 Rolle i prosjekt</span>
+                  <input type="text" class="psc-role-input" data-field="role" value="${esc(p.role || "")}" placeholder="f.eks. Prosjektleder, RIB, ARK" />
+                </label>
+                <label class="psc-field">
+                  <span class="psc-field-lbl">📝 Prosjektbeskrivelse</span>
+                  <textarea class="psc-desc-input" data-field="description" rows="2" placeholder="Kort beskrivelse av prosjektet …">${esc(p.description || "")}</textarea>
+                </label>
+                <div class="psc-save-status subnote"></div>
+              </div>
               ${p.lastDate ? `<div class="subnote">Sist ført: ${esc(p.lastDate)}</div>` : ""}
             </div>
           `).join("")}</div>` : !d.claudeEnabled ? `<div class="empty">Krever ANTHROPIC_API_KEY for prosjekt-oppsummering.</div>`
            : `<div class="empty">Ingen prosjekter med timer siste 3 mnd.</div>`);
+
+        // Auto-save på blur
+        c5.querySelectorAll(".proj-summary-card").forEach((card) => {
+          const projectName = card.dataset.project;
+          const roleInp = card.querySelector(".psc-role-input");
+          const descInp = card.querySelector(".psc-desc-input");
+          const saveMsg = card.querySelector(".psc-save-status");
+          const save = async () => {
+            const role = roleInp.value.trim();
+            const description = descInp.value.trim();
+            saveMsg.textContent = "Lagrer …";
+            try {
+              const r = await fetch("/api/employee-project-meta", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: emp.name, project: projectName, role, description }),
+              });
+              if (!r.ok) throw new Error("Lagring feilet");
+              saveMsg.textContent = "✓ Lagret";
+              saveMsg.style.color = "#1d6a3b";
+              setTimeout(() => { saveMsg.textContent = ""; }, 2000);
+            } catch (e) { saveMsg.textContent = "✗ " + e.message; saveMsg.style.color = "var(--bad)"; }
+          };
+          roleInp.addEventListener("blur", save);
+          descInp.addEventListener("blur", save);
+        });
       }
 
       // Seksjon 6: Hva bør følges opp på hvert prosjekt

@@ -77,6 +77,7 @@ function defaults() {
     ledelseFiles: { likviditet: {}, rapport: {}, resultat: {}, budsjett: {} },
     ledelseAdjustments: { likviditet: [], resultat: [], budsjett: [] }, // { slot: [{month, label, amount, note}] }
     employeeSettings: {}, // { "Navn": { orion: { url, key, enabled }, visibility: { projects, role, komp, goals, status } } }
+    employeeProjectMeta: {}, // { "Ansatt-navn": { "Prosjektnavn": { role, description, updatedAt } } }
     ledelseLikviditet: {
       startBalance: 0,
       kassekreditt: 1000000,

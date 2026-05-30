@@ -1451,3 +1451,12 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .proj-followup-card { background: #fff; border: 1px solid #d18d3c; border-radius: 8px; padding: 12px 14px; transition: all .12s; }
 .proj-followup-card:hover { box-shadow: 0 2px 8px rgba(209,141,60,.18); }
 .psc-followup { font-size: 13px; line-height: 1.55; color: var(--ink); margin: 6px 0 0; padding: 8px 10px; background: #fff7e1; border-radius: 6px; border-left: 3px solid #d18d3c; }
+
+/* ============ PROSJEKT-META FELTER ============ */
+.psc-meta-fields { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
+.psc-field { display: flex; flex-direction: column; gap: 3px; }
+.psc-field-lbl { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+.psc-role-input, .psc-desc-input { padding: 6px 9px; border: 1px solid var(--border); border-radius: 5px; font-size: 12.5px; font-family: inherit; resize: vertical; min-width: 0; width: 100%; box-sizing: border-box; }
+.psc-role-input:focus, .psc-desc-input:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+.psc-desc-input { line-height: 1.4; }
+.psc-save-status { min-height: 16px; font-size: 11px; }
