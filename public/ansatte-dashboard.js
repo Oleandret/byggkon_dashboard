@@ -371,12 +371,16 @@
     input.focus();
   }
 
-  async function renderStatus(emp) {
+  async function renderStatus(emp, force = false) {
     ["ansDashKpis", "ansDashGrid"].forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = true; });
     const allGrids = document.querySelectorAll("#ansDashCard > .grid-2"); allGrids.forEach((g) => g.hidden = true);
     const content = document.getElementById("ansDashContent") || (() => { const d = document.createElement("div"); d.id = "ansDashContent"; document.getElementById("ansDashCard").appendChild(d); return d; })();
 
-    content.innerHTML = `<div class="status-grid-4">
+    content.innerHTML = `<div class="status-refresh-bar" id="statusRefreshBar">
+      <div class="srb-info"><span class="subnote" id="statusCachedAt">Henter …</span></div>
+      <button class="btn-primary status-refresh-btn" data-name="${esc(emp.name)}">↻ Oppdater status <span class="subnote">(bruker tokens)</span></button>
+    </div>
+    <div class="status-grid-4">
       <div class="ans-dash-block status-col" id="statusCol1">
         <h3>📌 Hva jobber ${esc(emp.name)} med <span class="subnote">(siste 4 uker)</span></h3>
         <div class="loading-dots"><span></span><span></span><span></span></div>
@@ -401,8 +405,30 @@
     <p class="subnote" style="margin-top:10px;text-align:center">Data caches i 15 min for å spare LLM-kall. Klikk «↻» øverst for å oppdatere.</p>`;
 
     try {
-      const r = await fetch("/api/employee-status-rich?name=" + encodeURIComponent(emp.name));
+      const r = await fetch("/api/employee-status-rich?name=" + encodeURIComponent(emp.name) + (force ? "&force=1" : ""));
       const d = await r.json();
+
+      // Oppdater cache-info i toolbar
+      const cachedAtEl = document.getElementById("statusCachedAt");
+      if (cachedAtEl) {
+        if (d._cached && d._cachedAt) {
+          const date = new Date(d._cachedAt);
+          const ageMin = Math.round((Date.now() - date.getTime()) / 60000);
+          cachedAtEl.innerHTML = `📦 Cached data — sist oppdatert <b>${date.toLocaleString("nb-NO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</b> (${ageMin} min siden)`;
+        } else if (d.updatedAt) {
+          cachedAtEl.innerHTML = `✨ Ferskt hentet <b>${new Date(d.updatedAt).toLocaleString("nb-NO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</b>`;
+        }
+      }
+
+      // Hook up refresh-knappen
+      const refBtn = document.querySelector(".status-refresh-btn");
+      if (refBtn) {
+        refBtn.addEventListener("click", async () => {
+          refBtn.disabled = true;
+          refBtn.innerHTML = `<span class="loading-dots" style="padding:0;display:inline-flex;gap:3px"><span></span><span></span><span></span></span> Henter friske data + kjører Claude …`;
+          renderStatus(emp, true);
+        });
+      }
       if (d.error) {
         document.querySelectorAll(".status-col").forEach((c) => {
           const h = c.querySelector("h3");

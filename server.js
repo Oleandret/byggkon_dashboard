@@ -2571,6 +2571,22 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
   try {
     const name = String(req.query.name || "").trim();
     if (!name) return res.status(400).json({ error: "Mangler navn" });
+    const force = req.query.force === "1" || req.query.force === "true";
+
+    // Hvis force=1: invalider eksisterende snapshot for å tvinge ferskt LLM-kall
+    if (force) {
+      const snap = getSnapshot("emp-status-rich:" + name);
+      if (snap) saveSnapshot("emp-status-rich:" + name, snap.data); // dummy save oppdaterer ikke ts, så vi må manuelt sette
+      // Enklere: gå rundt serveWithSnapshot helt når force=true
+    }
+
+    // Hvis vi har cached og IKKE er force, returner cached direkte (uten LLM-kall)
+    if (!force) {
+      const cached = getSnapshot("emp-status-rich:" + name);
+      if (cached?.data) {
+        return res.json({ ...cached.data, _cached: true, _cachedAt: new Date(cached.savedAt).toISOString() });
+      }
+    }
 
     res.json(await serveWithSnapshot("emp-status-rich:" + name, async () => {
       const cfg = (getConfig().employeeSettings || {})[name];
@@ -2783,7 +2799,7 @@ Bare JSON.`;
         m365LoginRequired: typeof _calLoginRequired !== "undefined" && _calLoginRequired || typeof _emailLoginRequired !== "undefined" && _emailLoginRequired,
         orionChatUrl: orion.url,
       };
-    }, 15 * 60 * 1000)); // 15 min cache for å spare LLM-kall
+    }, 24 * 60 * 60 * 1000)); // 24 t cache — frontend trigger manuell refresh ved behov
   } catch (err) { res.status(502).json({ error: err.message }); }
 });
 
