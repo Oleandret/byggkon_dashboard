@@ -2437,19 +2437,27 @@ app.post("/api/employee-automations/refresh", requireAuth, async (req, res) => {
     const tools = await orionListTools(orion);
     if (!tools.length) return res.status(502).json({ error: "Orion svarer ikke. Sjekk tilkobling i Innstillinger." });
 
-    // Hent 3 mnd e-post fra inbox + sent items via M365
-    const inboxResult = await orionToolCall(orion, "m365__list-mail-folder-messages", {
-      "mailFolder-id": "inbox", $top: 200,
-      $select: "subject,from,toRecipients,receivedDateTime,bodyPreview,isRead,hasAttachments",
+    // Hent 3 mnd e-post via M365. Bruker list-mail-messages som ikke trenger mailFolderId.
+    const inboxResult = await orionToolCall(orion, "m365__list-mail-messages", {
+      $top: 200,
+      $select: "subject,from,toRecipients,receivedDateTime,bodyPreview",
       $orderby: "receivedDateTime desc",
       $filter: `receivedDateTime ge ${from90}`,
     });
-    const sentResult = await orionToolCall(orion, "m365__list-mail-folder-messages", {
-      "mailFolder-id": "sentitems", $top: 150,
+    // For sent: bruk list-mail-folder-messages med ulike param-format-varianter (Orion-router er strikt)
+    let sentResult = await orionToolCall(orion, "m365__list-mail-folder-messages", {
+      mailFolderId: "sentitems", $top: 150,
       $select: "subject,toRecipients,sentDateTime,bodyPreview",
       $orderby: "sentDateTime desc",
       $filter: `sentDateTime ge ${from90}`,
     });
+    if (!sentResult) {
+      // Prøv alternativ feltnavn
+      sentResult = await orionToolCall(orion, "m365__list-mail-folder-messages", {
+        "mailFolder-id": "sentitems", $top: 150,
+        $orderby: "sentDateTime desc",
+      });
+    }
     // Sjekk login-required
     if ((inboxResult && typeof inboxResult === "object" && inboxResult._loginRequired) ||
         (sentResult && typeof sentResult === "object" && sentResult._loginRequired)) {
@@ -2521,11 +2529,11 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
       const from90 = ymd(new Date(today.getTime() - 90 * 86400000));
       const entries90 = await getTimeEntriesDetailed(from90, todayStr, empId).catch(() => []);
 
-      // Kolonne 2: BARE ekte Tripletex-prosjekter, sortert etter mest timer
+      // Kolonne 2: Prosjekter — kombinerer egne timer + prosjekter der personen er prosjektleder
       const projMap = new Map();
+      // a) Prosjekter med egne timer (siste 3 mnd)
       for (const e of entries90) {
         const projName = e.project?.name;
-        // Hopp over alt som ikke har et ekte prosjektnavn (interne/admin uten prosjekt)
         if (!projName || projName === "(uten prosjekt)" || !e.project?.id) continue;
         const key = projName;
         const cur = projMap.get(key) || {
@@ -2533,12 +2541,47 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
           number: e.project?.number || "",
           customer: e.project?.customer?.name || "",
           hours: 0, lastDate: "",
+          isManager: false,
         };
         cur.hours += Number(e.hours) || 0;
         if (e.date > cur.lastDate) cur.lastDate = e.date;
         projMap.set(key, cur);
       }
-      const projects = [...projMap.values()].sort((a, b) => b.hours - a.hours);
+      // b) Prosjekter der personen er prosjektleder (selv uten egne timer)
+      try {
+        const overviewSnap = getSnapshot("overview");
+        const ovProjects = overviewSnap?.data?.projectsDetailed || [];
+        const personNorm = String(name).toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").trim();
+        for (const p of ovProjects) {
+          const pmName = String(p.projectManager || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").trim();
+          if (!pmName) continue;
+          // Match på fullt navn eller fornavn+etternavn
+          const pmParts = pmName.split(" ").filter(Boolean);
+          const personParts = personNorm.split(" ").filter(Boolean);
+          const match = pmName === personNorm
+            || (pmParts.length >= 2 && personParts.length >= 2 && pmParts[0] === personParts[0] && pmParts[pmParts.length-1] === personParts[personParts.length-1]);
+          if (!match) continue;
+          // Bare med på siste 3 mnd-aktivitet
+          if (!p.hours4w && !p.hoursYTD) continue;
+          const key = p.name;
+          if (!projMap.has(key)) {
+            projMap.set(key, {
+              name: p.name, type: "prosjekt",
+              number: p.number || "",
+              customer: p.customer || "",
+              hours: p.hours4w || 0,  // team-timer 4 uker som proxy
+              teamHours: p.hoursYTD || 0,
+              lastDate: p.lastActivity || "",
+              isManager: true,
+            });
+          } else {
+            const cur = projMap.get(key);
+            cur.isManager = true;
+            cur.teamHours = p.hoursYTD || 0;
+          }
+        }
+      } catch (e) { console.warn("Manager projects lookup:", e.message); }
+      const projects = [...projMap.values()].sort((a, b) => (b.hours + (b.teamHours || 0)) - (a.hours + (a.teamHours || 0)));
 
       // Smart tool-discovery via tools/list
       let orionCalendar = null, orionEmails = null, calendarTool = null, emailTool = null, orionTools = [];
@@ -2581,7 +2624,8 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
         // Kolonne 1-data: hent sendte e-poster siste 28 dager for å vite "hva har han jobbet med"
         // (vi henter IKKE inn-boks her — det skjer kun ved manuell refresh av automasjoner i kolonne 4)
         const sentCandidates = [
-          { name: "m365__list-mail-folder-messages", args: { "mailFolder-id": "sentitems", $top: 60, $select: "subject,toRecipients,sentDateTime,bodyPreview", $orderby: "sentDateTime desc", $filter: `sentDateTime ge ${from28ISO}` } },
+          { name: "m365__list-mail-folder-messages", args: { mailFolderId: "sentitems", $top: 60, $orderby: "sentDateTime desc" } },
+          { name: "m365__list-mail-folder-messages", args: { "mailFolder-id": "sentitems", $top: 60 } },
         ];
         var _sentLoginRequired = false;
         var orionSent = null;

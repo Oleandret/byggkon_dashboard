@@ -419,15 +419,28 @@
          : !d.claudeEnabled ? `<div class="empty">Krever <code>ANTHROPIC_API_KEY</code> på Railway.</div>`
          : `<div class="empty">Kunne ikke generere sammendrag.</div>`);
 
-      // Kolonne 2: Prosjekter + aktiviteter (med type-badge)
+      // Kolonne 2: Prosjekter + Prosjektleder-prosjekter
       const c2 = document.getElementById("statusCol2");
       const projs = d.col2_projects || [];
-      const typeLabel = { prosjekt: "📁", aktivitet: "🏷", internt: "🏢" };
       c2.innerHTML = c2.querySelector("h3").outerHTML +
         (projs.length ? `<table class="ans-tbl">
-          <thead><tr><th>Hva</th><th class="num">Timer</th></tr></thead>
-          <tbody>${projs.map((p) => `<tr><td><span class="proj-type-ico" title="${esc(p.type)}">${typeLabel[p.type] || "·"}</span> <b>${esc(p.name)}</b>${p.lastDate ? `<br><span class="subnote">Sist: ${esc(p.lastDate)}</span>` : ""}${p.customer ? `<br><span class="subnote">${esc(p.customer)}</span>` : ""}</td><td class="num">${num(Math.round(p.hours))} t</td></tr>`).join("")}</tbody>
-        </table>` : `<div class="empty">Ingen timer registrert siste 4 uker.</div>`);
+          <thead><tr><th>Prosjekt</th><th class="num">Timer</th></tr></thead>
+          <tbody>${projs.map((p) => {
+            const isManagerOnly = p.isManager && !p.hours;
+            const hoursDisplay = isManagerOnly
+              ? `<span class="subnote">Team: ${num(Math.round(p.teamHours || 0))} t</span>`
+              : `${num(Math.round(p.hours))} t${p.isManager && p.teamHours ? `<br><span class="subnote">Team: ${num(Math.round(p.teamHours))} t</span>` : ""}`;
+            return `<tr>
+              <td>
+                <b>${esc(p.name)}</b>${p.number ? `<span class="subnote"> · ${esc(p.number)}</span>` : ""}
+                ${p.isManager ? ' <span class="proj-mgr-badge">PL</span>' : ""}
+                ${p.customer ? `<br><span class="subnote">${esc(p.customer)}</span>` : ""}
+                ${p.lastDate ? `<br><span class="subnote">Sist: ${esc(p.lastDate)}</span>` : ""}
+              </td>
+              <td class="num">${hoursDisplay}</td>
+            </tr>`;
+          }).join("")}</tbody>
+        </table>` : `<div class="empty">Ingen prosjekter siste 3 mnd.</div>`);
 
       // Hjelper: vis tilgjengelige Orion-verktøy hvis Orion er på men relevant tool mangler
       function orionToolsHint(d) {
