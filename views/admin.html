@@ -30,13 +30,49 @@
       <span id="savedMsg" class="saved-msg" hidden>✓ Lagret</span>
     </div>
 
-    <div class="set-tabs" id="setTabs">
-      <button type="button" class="set-tab active" data-set="generelt">Generelt</button>
-      <button type="button" class="set-tab" data-set="forside">Forside</button>
-      <button type="button" class="set-tab" data-set="mcp">MCP & datakilder</button>
-      <button type="button" class="set-tab" data-set="tilgang">Tilgang & drift</button>
-      <button type="button" class="set-tab" data-set="oauth">OAuth-innlogging</button>
-      <button type="button" class="set-tab" data-set="claude">🤖 Claude (kode-redigering)</button>
+    <div class="set-cards" id="setTabs">
+      <button type="button" class="set-card active" data-set="generelt">
+        <div class="sc-icon">⚙️</div>
+        <div class="sc-body">
+          <div class="sc-title">Generelt</div>
+          <div class="sc-desc">Firmainfo, logo, verdier og visning.</div>
+        </div>
+      </button>
+      <button type="button" class="set-card" data-set="forside">
+        <div class="sc-icon">🏠</div>
+        <div class="sc-body">
+          <div class="sc-title">Forside</div>
+          <div class="sc-desc">Bilde, nyheter og innstillinger for forsiden.</div>
+        </div>
+      </button>
+      <button type="button" class="set-card" data-set="mcp">
+        <div class="sc-icon">🔌</div>
+        <div class="sc-body">
+          <div class="sc-title">MCP & datakilder</div>
+          <div class="sc-desc">Tripletex, regnskapsagent og andre integrasjoner.</div>
+        </div>
+      </button>
+      <button type="button" class="set-card" data-set="tilgang">
+        <div class="sc-icon">🔐</div>
+        <div class="sc-body">
+          <div class="sc-title">Tilgang & drift</div>
+          <div class="sc-desc">Felles passord, kapasitet og oppdateringsintervall.</div>
+        </div>
+      </button>
+      <button type="button" class="set-card" data-set="oauth">
+        <div class="sc-icon">🪪</div>
+        <div class="sc-body">
+          <div class="sc-title">OAuth-innlogging</div>
+          <div class="sc-desc">Microsoft byggkon.no-pålogging. Veiledning for IT.</div>
+        </div>
+      </button>
+      <button type="button" class="set-card sc-claude" data-set="claude">
+        <div class="sc-icon">🤖</div>
+        <div class="sc-body">
+          <div class="sc-title">Claude — kode-redigering</div>
+          <div class="sc-desc">Endre dashbordets kode i samtale. Pusher rett til GitHub.</div>
+        </div>
+      </button>
     </div>
 
     <form id="settingsForm">
@@ -279,21 +315,63 @@
         </div>
 
         <p class="hint">
-          Skriv hva du vil endre på dashbordet — Claude leser relevante filer, foreslår eksakte endringer, og når du trykker «Bruk og push» blir det committet til GitHub. Railway redeployer automatisk.
+          Skriv hva du vil endre på dashbordet — Claude leser relevante filer, foreslår eksakte endringer, og når du trykker «Bruk og push» blir det committet til GitHub. Railway redeployer automatisk innen 30–60 sekunder.
         </p>
 
-        <div class="claude-chat" id="claudeChat">
-          <div class="empty">Eksempler: «Bytt fargen på headeren til mørkeblå», «Legg til en kolonne i kostnader-tabellen som viser MVA», «Fiks skrivefeil på Prosjekter-fanen».</div>
+        <div class="claude-toolbar">
+          <label class="claude-model-row">
+            <span>Claude-modell:</span>
+            <select id="claudeModel" class="kon-f">
+              <optgroup label="Claude 4.6 (siste)">
+                <option value="claude-opus-4-6">Opus 4.6 — kraftigst, tregest</option>
+                <option value="claude-sonnet-4-6" selected>Sonnet 4.6 — best balanse (anbefalt)</option>
+              </optgroup>
+              <optgroup label="Claude 4.5">
+                <option value="claude-haiku-4-5-20251001">Haiku 4.5 — raskest, billigst</option>
+                <option value="claude-sonnet-4-5">Sonnet 4.5</option>
+              </optgroup>
+            </select>
+          </label>
+          <div class="claude-quick">
+            <span class="hint">Quick prompt:</span>
+            <button type="button" class="btn-ghost claude-quick-btn" data-msg="Vis meg alle filene i prosjektet">📁 Filoversikt</button>
+            <button type="button" class="btn-ghost claude-quick-btn" data-msg="Sjekk hele dashbordet for skrivefeil på norsk og foreslå rettelser">📝 Skrivefeil</button>
+            <button type="button" class="btn-ghost claude-quick-btn" data-msg="Foreslå små UI-forbedringer som gir en penere brukeropplevelse">✨ UI-polish</button>
+          </div>
         </div>
 
-        <form class="claude-form" id="claudeForm">
-          <textarea id="claudeInput" placeholder="Skriv hva du vil endre …" rows="3"></textarea>
+        <div class="claude-chat claude-chat-big" id="claudeChat">
+          <div class="empty">
+            <div style="font-size:36px;margin-bottom:8px">🤖</div>
+            <div style="font-weight:700;margin-bottom:6px">Start en samtale</div>
+            <div style="font-size:13px">Eksempler:<br>
+              «Bytt fargen på headeren til mørkeblå»<br>
+              «Legg til en kolonne i kostnader-tabellen som viser MVA»<br>
+              «Fiks skrivefeilen 'pågende' til 'pågående'»<br>
+              «Endre teksten på Avdelinger-fanen til 'Fagavdelinger'»
+            </div>
+          </div>
+        </div>
+
+        <form class="claude-form claude-form-big" id="claudeForm">
+          <textarea id="claudeInput" placeholder="Skriv hva du vil endre på dashbordet …" rows="5"></textarea>
           <div class="claude-form-foot">
             <span class="hint">Cmd/Ctrl+Enter for å sende</span>
-            <button type="button" class="btn-ghost" id="claudeClear">Tøm</button>
-            <button type="submit" class="btn-primary" id="claudeSend">Send til Claude</button>
+            <button type="button" class="btn-ghost" id="claudeClear">Tøm samtale</button>
+            <button type="submit" class="btn-primary" id="claudeSend">↑ Send til Claude</button>
           </div>
         </form>
+
+        <details class="oauth-section" style="margin-top:18px" id="revisionsSection">
+          <summary>🕒 Revisjonslogg — siste endringer på GitHub <span class="hint">(klikk for å åpne)</span></summary>
+          <div class="rev-list-wrap">
+            <div class="rev-toolbar">
+              <button type="button" class="btn-ghost" id="revReload">↻ Oppdater</button>
+              <span class="hint">Klikk en rad for å gå tilbake til den versjonen. Reverten lager en ny commit — historikken bevares.</span>
+            </div>
+            <div id="revList" class="rev-list">Laster …</div>
+          </div>
+        </details>
 
         <details class="oauth-section" style="margin-top:16px">
           <summary>⚙ Oppsett (krever ANTHROPIC_API_KEY + GITHUB_TOKEN)</summary>
@@ -438,7 +516,8 @@
         chat.appendChild(typing); chat.scrollTop = chat.scrollHeight;
         sendBtn.disabled = true;
         try {
-          const r = await fetch("/api/admin/claude/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, history: history.slice(0, -1).slice(-12), includeFiles: files || [] }) });
+          const model = document.getElementById("claudeModel")?.value || "claude-sonnet-4-6";
+          const r = await fetch("/api/admin/claude/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, history: history.slice(0, -1).slice(-12), includeFiles: files || [], model }) });
           const d = await r.json();
           typing.remove();
           if (d.error) addMsg("assistant", "⚠ " + d.error);
@@ -446,6 +525,58 @@
         } catch (e) { typing.remove(); addMsg("assistant", "⚠ " + e.message); }
         sendBtn.disabled = false;
       }
+
+      // Quick-knapper
+      document.querySelectorAll(".claude-quick-btn").forEach((b) => {
+        b.addEventListener("click", () => { input.value = b.dataset.msg; input.focus(); });
+      });
+
+      /* ============ REVISJONSLOGG ============ */
+      async function loadRevisions() {
+        const box = document.getElementById("revList");
+        if (!box) return;
+        box.innerHTML = `<div class="hint">Henter siste commits …</div>`;
+        try {
+          const r = await fetch("/api/admin/git/commits?per_page=30");
+          const d = await r.json();
+          if (d.error) { box.innerHTML = `<div class="empty">${esc(d.error)}</div>`; return; }
+          const commits = d.commits || [];
+          if (!commits.length) { box.innerHTML = `<div class="empty">Ingen commits funnet.</div>`; return; }
+          box.innerHTML = commits.map((c, i) => {
+            const isCurrent = i === 0;
+            const date = c.date ? new Date(c.date).toLocaleString("nb-NO", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+            const summary = c.message.split("\n")[0];
+            const isClaude = (c.authorEmail || "").includes("ai@byggkon.no");
+            return `<div class="rev-item ${isCurrent ? "current" : ""}" data-sha="${esc(c.sha)}">
+              <div class="rev-meta">
+                <code class="rev-sha">${esc(c.shortSha)}</code>
+                <span class="rev-date">${esc(date)}</span>
+                <span class="rev-author">${isClaude ? "🤖 Claude" : "👤 " + esc(c.author)}</span>
+                ${isCurrent ? `<span class="rev-current-badge">NÅVÆRENDE</span>` : ""}
+              </div>
+              <div class="rev-msg">${esc(summary)}</div>
+              <div class="rev-actions">
+                <a href="${esc(c.url)}" target="_blank" rel="noopener" class="btn-ghost">Se på GitHub ↗</a>
+                ${!isCurrent ? `<button type="button" class="btn-ghost rev-btn" data-sha="${esc(c.sha)}" data-msg="${esc(summary)}">↩ Reverter til denne versjonen</button>` : ""}
+              </div>
+            </div>`;
+          }).join("");
+          box.querySelectorAll(".rev-btn").forEach((b) => b.addEventListener("click", async () => {
+            const sha = b.dataset.sha;
+            const msg = b.dataset.msg;
+            if (!confirm(`Reverter HELE prosjektet til:\n\n${msg}\n\nDette lager en ny commit som overstyrer alt siden den versjonen. Sikker?`)) return;
+            b.disabled = true; b.textContent = "Reverterer …";
+            try {
+              const r = await fetch("/api/admin/git/revert", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sha }) });
+              const d = await r.json();
+              if (d.ok) { b.textContent = "✓ Revertert — Railway redeployer"; setTimeout(loadRevisions, 2000); }
+              else { b.textContent = "✗ " + (d.error || "Feil"); b.disabled = false; }
+            } catch (e) { b.textContent = "✗ " + e.message; b.disabled = false; }
+          }));
+        } catch (e) { box.innerHTML = `<div class="empty">Kunne ikke hente: ${esc(e.message)}</div>`; }
+      }
+      document.getElementById("revReload")?.addEventListener("click", loadRevisions);
+      document.getElementById("revisionsSection")?.addEventListener("toggle", (e) => { if (e.target.open) loadRevisions(); });
 
       form.addEventListener("submit", (ev) => {
         ev.preventDefault();

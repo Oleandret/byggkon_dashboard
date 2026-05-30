@@ -144,12 +144,14 @@ if (upBtn) {
 }
 
 // ---- Faner i innstillinger ----
-document.querySelectorAll("#setTabs .set-tab").forEach((b) => {
+document.querySelectorAll("#setTabs .set-card, #setTabs .set-tab").forEach((b) => {
   b.addEventListener("click", () => {
-    document.querySelectorAll("#setTabs .set-tab").forEach((x) => x.classList.remove("active"));
+    document.querySelectorAll("#setTabs .set-card, #setTabs .set-tab").forEach((x) => x.classList.remove("active"));
     document.querySelectorAll(".set-panel").forEach((x) => x.classList.remove("active"));
     b.classList.add("active");
     document.getElementById("set-" + b.dataset.set)?.classList.add("active");
+    // Scroll inn til toppen av panelet for å se innholdet
+    document.getElementById("set-" + b.dataset.set)?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 });
 

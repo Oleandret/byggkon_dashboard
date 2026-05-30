@@ -280,7 +280,7 @@ VIKTIGE REGLER når brukeren ber om endringer:
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-5",
+        model: String(req.body?.model || "claude-sonnet-4-6").slice(0, 60),
         max_tokens: 8000,
         system: systemPrompt,
         messages,
@@ -362,6 +362,77 @@ app.post("/api/admin/claude/apply", requireAdmin, async (req, res) => {
       } catch (e) { errors.push({ file: rel, error: e.message }); }
     }
     res.json({ ok: errors.length === 0, applied, errors, commitMessage: commitMsg });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ---- Git-revisjoner: list siste commits + revert ----
+app.get("/api/admin/git/commits", requireAdmin, async (req, res) => {
+  try {
+    if (!GITHUB_TOKEN) return res.status(503).json({ error: "GITHUB_TOKEN ikke satt" });
+    const per_page = Math.min(50, Math.max(1, Number(req.query.per_page) || 30));
+    const r = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/commits?sha=${GITHUB_BRANCH}&per_page=${per_page}`, {
+      headers: { Authorization: "Bearer " + GITHUB_TOKEN, Accept: "application/vnd.github+json" },
+    });
+    if (!r.ok) return res.status(502).json({ error: "GitHub feilet: " + r.status });
+    const data = await r.json();
+    const commits = (data || []).map((c) => ({
+      sha: c.sha,
+      shortSha: (c.sha || "").slice(0, 7),
+      message: c.commit?.message || "",
+      author: c.commit?.author?.name || "",
+      authorEmail: c.commit?.author?.email || "",
+      date: c.commit?.author?.date || "",
+      url: c.html_url,
+    }));
+    res.json({ ok: true, commits, currentSha: commits[0]?.sha });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Revert: lag en ny commit som peker tilbake til target-commit sitt tree.
+// Bevarer hele historikken — vi sletter ikke noe, vi legger til en ny commit.
+app.post("/api/admin/git/revert", requireAdmin, async (req, res) => {
+  try {
+    if (!GITHUB_TOKEN) return res.status(503).json({ error: "GITHUB_TOKEN ikke satt" });
+    const targetSha = String(req.body?.sha || "").trim();
+    if (!/^[a-f0-9]{7,40}$/i.test(targetSha)) return res.status(400).json({ error: "Ugyldig commit-SHA" });
+    const ghHeaders = { Authorization: "Bearer " + GITHUB_TOKEN, Accept: "application/vnd.github+json", "Content-Type": "application/json" };
+
+    // 1) Hent målet-commit for å finne tree
+    const tgtRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/git/commits/${targetSha}`, { headers: ghHeaders });
+    if (!tgtRes.ok) return res.status(404).json({ error: "Fant ikke commit " + targetSha });
+    const tgt = await tgtRes.json();
+    const treeSha = tgt.tree?.sha;
+    if (!treeSha) return res.status(500).json({ error: "Target commit har ikke tree" });
+
+    // 2) Hent nåværende HEAD på branchen (skal være parent)
+    const refRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/git/refs/heads/${GITHUB_BRANCH}`, { headers: ghHeaders });
+    if (!refRes.ok) return res.status(500).json({ error: "Kunne ikke hente HEAD" });
+    const ref = await refRes.json();
+    const headSha = ref.object?.sha;
+
+    // 3) Lag en ny commit med target-tree, parent = HEAD
+    const shortTarget = targetSha.slice(0, 7);
+    const msg = `Revert til ${shortTarget}: ${tgt.message?.split("\n")[0] || ""}`.slice(0, 200);
+    const newCommitRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/git/commits`, {
+      method: "POST", headers: ghHeaders,
+      body: JSON.stringify({ message: msg, tree: treeSha, parents: [headSha] }),
+    });
+    if (!newCommitRes.ok) {
+      const t = await newCommitRes.text();
+      return res.status(500).json({ error: "Klarte ikke lage commit: " + t.slice(0, 200) });
+    }
+    const newCommit = await newCommitRes.json();
+
+    // 4) Oppdater branch-referansen til den nye commit-en
+    const updateRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/git/refs/heads/${GITHUB_BRANCH}`, {
+      method: "PATCH", headers: ghHeaders,
+      body: JSON.stringify({ sha: newCommit.sha, force: false }),
+    });
+    if (!updateRes.ok) {
+      const t = await updateRes.text();
+      return res.status(500).json({ error: "Klarte ikke oppdatere ref: " + t.slice(0, 200) });
+    }
+    res.json({ ok: true, newSha: newCommit.sha, revertedTo: targetSha, message: msg });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
