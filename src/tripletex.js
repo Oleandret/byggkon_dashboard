@@ -116,6 +116,27 @@ export async function getTimeEntries(fromDate, toDate) {
   });
 }
 
+// Detaljert variant — tar med aktivitet, kommentar og fakturerbar-status.
+// Brukes til per-ansatt timeoversikt der vi vil ha ALT (fravær, ferie, syk, intern m.m.).
+export async function getTimeEntriesDetailed(fromDate, toDate, employeeId) {
+  const params = {
+    dateFrom: fromDate,
+    dateTo: toDate,
+    fields: "id,date,hours,chargeableHours,chargeable,hourlyRate,comment,locked,approved,project(id,name,number),activity(id,name),employee(id,firstName,lastName)",
+  };
+  if (employeeId) params.employeeId = employeeId;
+  try {
+    return await fetchAll("search_time_entries", params);
+  } catch {
+    // Fallback hvis enkelte felter ikke støttes
+    return fetchAll("search_time_entries", {
+      dateFrom: fromDate, dateTo: toDate,
+      fields: "id,date,hours,chargeableHours,project(id,name),activity(id,name),employee(id,firstName,lastName),comment",
+      ...(employeeId ? { employeeId } : {}),
+    });
+  }
+}
+
 // Leverandørfakturaer (kostnader) i en periode.
 export async function getSupplierInvoices(fromDate, toDate) {
   return fetchAll("search_supplier_invoices", {

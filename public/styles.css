@@ -1249,3 +1249,25 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .ans-status-row { display: contents; }
 .ass-lbl { color: var(--muted); font-weight: 700; padding: 4px 0; border-bottom: 1px solid var(--border); }
 .ass-val { padding: 4px 0; border-bottom: 1px solid var(--border); }
+
+/* ============ KOMPAKTE ANSATT-CHIPS ============ */
+.ans-chip-mini { background: #fff; border: 1px solid var(--border); border-radius: 999px; padding: 5px 14px; font-size: 12.5px; font-weight: 600; color: var(--ink); cursor: pointer; transition: all .12s; font-family: inherit; }
+.ans-chip-mini:hover { border-color: var(--accent); background: #f0f5fa; }
+.ans-chip-mini.active { background: var(--accent); border-color: var(--accent-dark); color: #fff; }
+
+/* ============ CHAT (ORION MCP) ============ */
+.chat-box { background: #faf8f4; border: 1px solid var(--border); border-radius: 10px; padding: 12px; height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.chat-msg { display: flex; }
+.chat-user { justify-content: flex-end; }
+.chat-assistant { justify-content: flex-start; }
+.chat-bubble { max-width: 75%; padding: 9px 14px; border-radius: 14px; font-size: 13.5px; line-height: 1.45; word-wrap: break-word; }
+.chat-user .chat-bubble { background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+.chat-assistant .chat-bubble { background: #fff; border: 1px solid var(--border); color: var(--ink); border-bottom-left-radius: 4px; }
+.chat-typing .chat-bubble { display: flex; gap: 4px; padding: 12px 14px; }
+.chat-typing .dot { width: 6px; height: 6px; background: var(--muted); border-radius: 50%; animation: chatdot 1.2s infinite ease-in-out; }
+.chat-typing .dot:nth-child(2) { animation-delay: 0.2s; }
+.chat-typing .dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes chatdot { 0%,80%,100% { opacity:.3; transform: translateY(0); } 40% { opacity:1; transform: translateY(-3px); } }
+.chat-form { display: flex; gap: 8px; align-items: center; }
+.chat-form .kon-f { flex: 1; padding: 10px 14px; border: 1px solid var(--border); border-radius: 999px; font-size: 14px; }
+.chat-form .kon-f:focus { outline: 2px solid var(--accent); border-color: var(--accent); }

@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 import { buildOverview } from "./src/metrics.js";
 import { buildEconomy } from "./src/economy.js";
 import { getNewsFeed } from "./src/newsfeed.js";
-import { clearCache, resetClient, getInvoices, getCustomers, getSupplierInvoices, getSupplierInvoiceDetails, getSuppliers, getForwardableInvoices, getProjects, getProjectAddresses, getTimeEntries, getEmployees, getProjectsEconomyDetails, getAccounts, getBalanceSheet, ymd } from "./src/tripletex.js";
+import { clearCache, resetClient, getInvoices, getCustomers, getSupplierInvoices, getSupplierInvoiceDetails, getSuppliers, getForwardableInvoices, getProjects, getProjectAddresses, getTimeEntries, getTimeEntriesDetailed, getEmployees, getProjectsEconomyDetails, getAccounts, getBalanceSheet, ymd } from "./src/tripletex.js";
 import { geocodeOne, sleep } from "./src/geocode.js";
 import { serveWithSnapshot, expireSnapshots } from "./src/snapshot.js";
 const snapTtl = () => getConfig().cacheTtlMs || 300000;
@@ -1710,7 +1710,7 @@ app.get("/api/employee-status", requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ---- Per-ansatt timeoversikt (siste 2 + 4 uker) ----
+// ---- Per-ansatt timeoversikt (siste 2 + 4 uker, ALT fra Tripletex) ----
 app.get("/api/employee-time", requireAuth, async (req, res) => {
   try {
     const name = String(req.query.name || "").trim();
@@ -1719,7 +1719,6 @@ app.get("/api/employee-time", requireAuth, async (req, res) => {
       const today = new Date();
       const todayStr = ymd(today);
       const from = ymd(new Date(today.getTime() - 28 * 86400000));
-      const [timeEntries] = await Promise.all([getTimeEntries(from, todayStr).catch(() => [])]);
       const norm = (s) => String(s || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[.\-]/g, " ").replace(/\s+/g, " ").trim();
       const nameKeys = (n) => {
         const parts = norm(n).split(" ").filter(Boolean);
@@ -1729,44 +1728,119 @@ app.get("/api/employee-time", requireAuth, async (req, res) => {
       };
       const target = nameKeys(name);
       const matches = (full) => { const k = nameKeys(full); for (const x of k) if (target.has(x)) return true; return false; };
+
+      // Finn ansatt-ID (lar oss bruke employeeId-filter for raskere kall)
+      const employees = await getEmployees().catch(() => []);
+      const emp = employees.find((e) => matches(`${e.firstName || ""} ${e.lastName || ""}`.trim()));
+      const empId = emp?.id;
+
+      const timeEntries = await getTimeEntriesDetailed(from, todayStr, empId).catch(() => []);
       const d14 = ymd(new Date(today.getTime() - 14 * 86400000));
       const d28 = ymd(new Date(today.getTime() - 28 * 86400000));
-      const proj2 = new Map(), proj4 = new Map();
-      let tot2 = 0, billable2 = 0, tot4 = 0, billable4 = 0;
-      const days = {}; // YYYY-MM-DD -> { hours, billable }
-      for (const e of timeEntries) {
-        const empName = `${e.employee?.firstName || ""} ${e.employee?.lastName || ""}`.trim();
-        if (!matches(empName)) continue;
-        const h = e.hours || 0, b = e.chargeableHours || 0;
-        const pname = e.project?.name || "(intern)";
-        if (e.date >= d28) {
-          tot4 += h; billable4 += b;
-          proj4.set(pname, (proj4.get(pname) || 0) + h);
-        }
-        if (e.date >= d14) {
-          tot2 += h; billable2 += b;
-          proj2.set(pname, (proj2.get(pname) || 0) + h);
-        }
-        days[e.date] = days[e.date] || { hours: 0, billable: 0 };
-        days[e.date].hours += h; days[e.date].billable += b;
+
+      // Klassifiser hver linje: faktureringsbar prosjekt, intern, fravær (ferie/syk/avspasering)
+      const FRAVAER_RE = /\b(ferie|syk|sjuk|fravær|fraver|avspaser|permisjon|legebes|tannlege|barn syk|fri|helligdag|fridag|kurs|opplær|skolering)\b/i;
+      const INTERN_RE = /\b(intern|administr|admin|salg|markedsf|markedsforing|hr|møte|mote|sosialt|kontor)\b/i;
+      function classify(activityName, projectName) {
+        const txt = (activityName || "") + " " + (projectName || "");
+        if (FRAVAER_RE.test(txt)) return "fravær";
+        if (INTERN_RE.test(txt)) return "intern";
+        return "prosjekt";
       }
+
+      function aggregatePeriod(entries) {
+        let total = 0, billable = 0, intern = 0, fravar = 0, project = 0;
+        const byProject = new Map();
+        const byActivity = new Map();
+        const byCategory = { prosjekt: 0, intern: 0, fravær: 0 };
+        const sample = [];
+        for (const e of entries) {
+          const h = Number(e.hours) || 0;
+          const b = Number(e.chargeableHours) || 0;
+          const pname = e.project?.name || "(uten prosjekt)";
+          const aname = e.activity?.name || "(uten aktivitet)";
+          const cat = classify(aname, pname);
+          total += h; billable += b;
+          byCategory[cat] = (byCategory[cat] || 0) + h;
+          if (cat === "fravær") fravar += h;
+          else if (cat === "intern") intern += h;
+          else project += h;
+          byProject.set(pname, (byProject.get(pname) || 0) + h);
+          const akey = aname;
+          byActivity.set(akey, (byActivity.get(akey) || 0) + h);
+          if (sample.length < 200) sample.push({
+            date: e.date, hours: h, billable: b,
+            project: pname, projectNumber: e.project?.number || "",
+            activity: aname, comment: e.comment || "",
+          });
+        }
+        return {
+          totalHours: Math.round(total * 10) / 10,
+          billableHours: Math.round(billable * 10) / 10,
+          billingRate: total > 0 ? billable / total : 0,
+          internHours: Math.round(intern * 10) / 10,
+          fravarHours: Math.round(fravar * 10) / 10,
+          projectHours: Math.round(project * 10) / 10,
+          byCategory,
+          projects: [...byProject.entries()].map(([name, hours]) => ({ name, hours: Math.round(hours * 10) / 10 })).sort((a, b) => b.hours - a.hours),
+          activities: [...byActivity.entries()].map(([name, hours]) => ({ name, hours: Math.round(hours * 10) / 10 })).sort((a, b) => b.hours - a.hours),
+          entries: sample.sort((a, b) => b.date.localeCompare(a.date)),
+        };
+      }
+
+      const e2 = timeEntries.filter((e) => e.date >= d14);
+      const e4 = timeEntries.filter((e) => e.date >= d28);
       return {
-        last2w: {
-          totalHours: tot2,
-          billableHours: billable2,
-          billingRate: tot2 > 0 ? billable2 / tot2 : 0,
-          projects: [...proj2.entries()].map(([name, hours]) => ({ name, hours })).sort((a, b) => b.hours - a.hours),
-        },
-        last4w: {
-          totalHours: tot4,
-          billableHours: billable4,
-          billingRate: tot4 > 0 ? billable4 / tot4 : 0,
-          projects: [...proj4.entries()].map(([name, hours]) => ({ name, hours })).sort((a, b) => b.hours - a.hours),
-        },
-        days,
+        employeeId: empId,
+        last2w: aggregatePeriod(e2),
+        last4w: aggregatePeriod(e4),
       };
     }, 5 * 60 * 1000));
   } catch (err) { res.status(502).json({ error: err.message }); }
+});
+
+// ---- Orion MCP chat-proxy ----
+app.post("/api/employee-chat", requireAuth, async (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    const message = String(req.body?.message || "").trim();
+    const history = Array.isArray(req.body?.history) ? req.body.history.slice(-20) : [];
+    if (!name || !message) return res.status(400).json({ error: "Mangler navn eller melding" });
+    const cfg = (getConfig().employeeSettings || {})[name];
+    const orion = cfg?.orion;
+    if (!orion || !orion.enabled || !orion.url) {
+      return res.json({ ok: false, reason: "Orion MCP er ikke aktivert for denne ansatte" });
+    }
+    const url = orion.url.replace(/\/+$/, "");
+    // Prøv standard MCP tools/call mot et "chat" eller "ask" verktøy, så fallback til /chat endpoint
+    const tryEndpoints = [
+      { method: "POST", url: url, body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "chat", arguments: { employee: name, message, history } } } },
+      { method: "POST", url: url, body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "ask", arguments: { employee: name, question: message, history } } } },
+      { method: "POST", url: url + "/chat", body: { employee: name, message, history } },
+      { method: "POST", url: url + "/api/chat", body: { employee: name, message, history } },
+    ];
+    let lastErr = null;
+    for (const ep of tryEndpoints) {
+      try {
+        const r = await fetch(ep.url, {
+          method: ep.method,
+          headers: {
+            "Content-Type": "application/json",
+            ...(orion.key ? { Authorization: "Bearer " + orion.key, "X-Api-Key": orion.key } : {}),
+          },
+          body: JSON.stringify(ep.body),
+          signal: AbortSignal.timeout(30000),
+        });
+        if (!r.ok) { lastErr = "HTTP " + r.status; continue; }
+        const txt = await r.text();
+        let data; try { data = JSON.parse(txt); } catch { data = { reply: txt }; }
+        // Trekk ut svartekst fra vanlige formater
+        const reply = data.reply || data.message || data.text || data.result?.content?.[0]?.text || data.result?.text || data.choices?.[0]?.message?.content || (typeof data === "string" ? data : JSON.stringify(data));
+        return res.json({ ok: true, reply: String(reply), raw: data });
+      } catch (e) { lastErr = e.message; }
+    }
+    res.json({ ok: false, reason: "Orion svarte ikke: " + (lastErr || "ukjent feil") });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ---- KI-agent-bestillinger (egen avdeling: KI-agenter) ----

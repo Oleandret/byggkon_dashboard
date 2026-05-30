@@ -28,9 +28,10 @@
   let billing3m = [];     // [{name, hours, billable, billingRate}]
   let empSettings = {};   // { name: { orion: {url, enabled, hasKey}, visibility } }
   let activeName = null;
-  let activeSub = "oversikt"; // oversikt | timer | status | innstillinger
+  let activeSub = "oversikt"; // oversikt | timer | chat | status | innstillinger
   let timeData = null;        // cached for active employee
   let statusData = null;      // cached for active employee
+  let chatHistory = [];       // [{role:"user"|"assistant", text}]
   let loaded = false;
 
   async function loadAll() {
@@ -87,23 +88,17 @@
       bar.innerHTML = `<div class="empty">Ingen ansatte funnet.</div>`;
       return;
     }
+    // Kompakte navn-chips, alfabetisk
     bar.innerHTML = filtered.map((n) => {
-      const initials = n.name.split(" ").filter(Boolean).slice(0, 2).map((s) => s[0]).join("");
       const active = n.name === activeName ? "active" : "";
-      return `<button class="ans-chip ${active}" data-name="${esc(n.name)}">
-        <span class="ans-chip-avatar">${esc(initials)}</span>
-        <span class="ans-chip-body">
-          <span class="ans-chip-name">${esc(n.name)}</span>
-          <span class="ans-chip-title">${esc(n.title || "")}</span>
-        </span>
-      </button>`;
+      return `<button class="ans-chip-mini ${active}" data-name="${esc(n.name)}" title="${esc(n.title || "")}">${esc(n.name)}</button>`;
     }).join("");
   }
 
   function setActive(name) {
     activeName = name;
     activeSub = "oversikt";
-    timeData = null; statusData = null;
+    timeData = null; statusData = null; chatHistory = [];
     renderChips();
     renderDash();
   }
@@ -141,6 +136,7 @@
       </div>
       <div class="ans-subtabs" id="ansSubtabs">
         <button class="ans-subtab ${activeSub === "oversikt" ? "active" : ""}" data-asub="oversikt">📋 Oversikt</button>
+        <button class="ans-subtab ${activeSub === "chat" ? "active" : ""}" data-asub="chat">💬 Chat${set.orion?.enabled ? "" : " <span class=\"subnote\">(av)</span>"}</button>
         <button class="ans-subtab ${activeSub === "timer" ? "active" : ""}" data-asub="timer">⏱ Timeoversikt</button>
         <button class="ans-subtab ${activeSub === "status" ? "active" : ""}" data-asub="status">🟢 Status${set.orion?.enabled ? "" : " <span class=\"subnote\">(av)</span>"}</button>
         <button class="ans-subtab ${activeSub === "innstillinger" ? "active" : ""}" data-asub="innstillinger">⚙ Innstillinger</button>
@@ -149,6 +145,7 @@
     // Vis riktig sub-sub-tab innhold
     if (activeSub === "oversikt") renderOversikt(emp, role, goals, bill);
     else if (activeSub === "timer") renderTimer(emp);
+    else if (activeSub === "chat") renderChat(emp);
     else if (activeSub === "status") renderStatus(emp);
     else if (activeSub === "innstillinger") renderInnstillinger(emp);
   }
@@ -251,34 +248,121 @@
   }
 
   async function renderTimer(emp) {
-    // Skjul oversikts-innhold
     ["ansDashKpis", "ansDashGrid"].forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = true; });
     const allGrids = document.querySelectorAll("#ansDashCard > .grid-2"); allGrids.forEach((g) => g.hidden = true);
     const content = document.getElementById("ansDashContent") || (() => { const d = document.createElement("div"); d.id = "ansDashContent"; document.getElementById("ansDashCard").appendChild(d); return d; })();
-    content.innerHTML = `<div class="subnote">Henter timer fra Tripletex …</div>`;
+    content.innerHTML = `<div class="subnote">Henter alle timer fra Tripletex …</div>`;
     if (!timeData) {
       try {
         const r = await fetch("/api/employee-time?name=" + encodeURIComponent(emp.name));
         timeData = await r.json();
       } catch (e) { content.innerHTML = `<div class="empty">Kunne ikke hente: ${esc(e.message)}</div>`; return; }
     }
-    const renderPeriod = (title, p) => {
+    const fmt = (n) => Math.round(n * 10) / 10 + " t";
+    function renderPeriod(title, p) {
       const projHtml = p.projects.length ? `<table class="ans-tbl"><thead><tr><th>Prosjekt</th><th class="num">Timer</th></tr></thead>
-        <tbody>${p.projects.map((x) => `<tr><td>${esc(x.name)}</td><td class="num">${num(x.hours)} t</td></tr>`).join("")}</tbody></table>` : `<div class="empty">Ingen timer.</div>`;
+        <tbody>${p.projects.slice(0, 15).map((x) => `<tr><td>${esc(x.name)}</td><td class="num">${fmt(x.hours)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">Ingen prosjekttimer.</div>`;
+      const actHtml = p.activities.length ? `<table class="ans-tbl"><thead><tr><th>Aktivitet</th><th class="num">Timer</th></tr></thead>
+        <tbody>${p.activities.slice(0, 15).map((x) => `<tr><td>${esc(x.name)}</td><td class="num">${fmt(x.hours)}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">Ingen aktiviteter.</div>`;
       return `<div class="ans-dash-block">
         <h3>${esc(title)}</h3>
-        <div class="ans-kpis" style="grid-template-columns:repeat(3,1fr)">
-          <div class="ans-kpi"><div class="ak-lbl">Totalt</div><div class="ak-val">${num(p.totalHours)} t</div></div>
-          <div class="ans-kpi"><div class="ak-lbl">Fakturerbart</div><div class="ak-val">${num(p.billableHours)} t</div></div>
-          <div class="ans-kpi"><div class="ak-lbl">Faktureringsgrad</div><div class="ak-val">${pct(p.billingRate)}</div></div>
+        <div class="ans-kpis" style="grid-template-columns:repeat(2,1fr);margin-bottom:8px">
+          <div class="ans-kpi"><div class="ak-lbl">Totalt ført</div><div class="ak-val">${fmt(p.totalHours)}</div></div>
+          <div class="ans-kpi"><div class="ak-lbl">Fakturerbart</div><div class="ak-val">${fmt(p.billableHours)} <span class="subnote">(${pct(p.billingRate)})</span></div></div>
         </div>
-        ${projHtml}
+        <div class="ans-kpis" style="grid-template-columns:repeat(3,1fr);margin-bottom:10px">
+          <div class="ans-kpi"><div class="ak-lbl">Prosjekt</div><div class="ak-val" style="font-size:16px">${fmt(p.projectHours)}</div></div>
+          <div class="ans-kpi"><div class="ak-lbl">Intern</div><div class="ak-val" style="font-size:16px">${fmt(p.internHours)}</div></div>
+          <div class="ans-kpi"><div class="ak-lbl">Fravær / ferie / syk</div><div class="ak-val" style="font-size:16px">${fmt(p.fravarHours)}</div></div>
+        </div>
+        <div class="grid-2" style="gap:10px">
+          <div><h4 style="margin:4px 0 6px;font-size:12px;color:var(--muted)">PER PROSJEKT</h4>${projHtml}</div>
+          <div><h4 style="margin:4px 0 6px;font-size:12px;color:var(--muted)">PER AKTIVITET</h4>${actHtml}</div>
+        </div>
       </div>`;
-    };
+    }
+    // Detaljert linjeliste (siste 4 uker)
+    const entries = (timeData.last4w?.entries || []).slice(0, 50);
+    const detailHtml = entries.length ? `
+      <div class="ans-dash-block" style="margin-top:14px">
+        <h3>📋 Alle timeføringer — siste 4 uker</h3>
+        <table class="ans-tbl">
+          <thead><tr><th>Dato</th><th>Prosjekt</th><th>Aktivitet</th><th>Kommentar</th><th class="num">Timer</th><th class="num">Fakt.</th></tr></thead>
+          <tbody>${entries.map((e) => `<tr>
+            <td>${esc(e.date)}</td>
+            <td>${esc(e.project)}${e.projectNumber ? `<span class="subnote"> · ${esc(e.projectNumber)}</span>` : ""}</td>
+            <td>${esc(e.activity)}</td>
+            <td class="subnote">${esc(e.comment || "")}</td>
+            <td class="num">${fmt(e.hours)}</td>
+            <td class="num">${fmt(e.billable)}</td>
+          </tr>`).join("")}</tbody>
+        </table>
+        ${(timeData.last4w?.entries || []).length > 50 ? `<p class="subnote">Viser de 50 nyeste oppføringene.</p>` : ""}
+      </div>` : "";
     content.innerHTML = `<div class="grid-2" style="margin-top:14px">
       ${renderPeriod("⏱ Siste 2 uker", timeData.last2w)}
       ${renderPeriod("📅 Siste 4 uker", timeData.last4w)}
+    </div>${detailHtml}`;
+  }
+
+  /* ============ CHAT (Orion MCP) ============ */
+  function renderChat(emp) {
+    ["ansDashKpis", "ansDashGrid"].forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = true; });
+    const allGrids = document.querySelectorAll("#ansDashCard > .grid-2"); allGrids.forEach((g) => g.hidden = true);
+    const content = document.getElementById("ansDashContent") || (() => { const d = document.createElement("div"); d.id = "ansDashContent"; document.getElementById("ansDashCard").appendChild(d); return d; })();
+    const set = settingsFor(emp.name);
+    if (!set.orion?.enabled) {
+      content.innerHTML = `<div class="ans-dash-block">
+        <h3>💬 Chat med Orion</h3>
+        <div class="empty">Orion MCP er ikke aktivert for ${esc(emp.name)}. Gå til <b>⚙ Innstillinger</b> for å koble til Orion-serveren først.</div>
+      </div>`;
+      return;
+    }
+    content.innerHTML = `<div class="ans-dash-block">
+      <h3>💬 Chat med Orion <span class="subnote">— stiller spørsmål til ${esc(emp.name)} sin Orion-hub</span></h3>
+      <div class="chat-box" id="chatLog">
+        ${chatHistory.length ? chatHistory.map((m) => `<div class="chat-msg chat-${esc(m.role)}"><div class="chat-bubble">${esc(m.text).replace(/\n/g, "<br>")}</div></div>`).join("")
+                            : `<div class="empty">Still et spørsmål for å starte. Eksempler: «Hva jobber jeg med i dag?», «Vis siste e-poster», «Hvor mye har jeg ført i dag?», «Hva er status på X?»</div>`}
+      </div>
+      <form class="chat-form" id="chatForm">
+        <input id="chatInput" class="kon-f" type="text" placeholder="Skriv en melding til Orion …" autocomplete="off" />
+        <button class="btn-primary" id="chatSend" type="submit">Send</button>
+        <button class="btn-ghost" id="chatClear" type="button">Tøm</button>
+      </form>
     </div>`;
+    const input = document.getElementById("chatInput");
+    const log = document.getElementById("chatLog");
+    function scrollLog() { log.scrollTop = log.scrollHeight; }
+    function addMsg(role, text) {
+      chatHistory.push({ role, text });
+      // Re-render bare log-delen
+      const empty = log.querySelector(".empty"); if (empty) empty.remove();
+      const div = document.createElement("div");
+      div.className = "chat-msg chat-" + role;
+      div.innerHTML = `<div class="chat-bubble">${esc(text).replace(/\n/g, "<br>")}</div>`;
+      log.appendChild(div); scrollLog();
+    }
+    document.getElementById("chatForm").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const message = input.value.trim(); if (!message) return;
+      input.value = ""; addMsg("user", message);
+      const typing = document.createElement("div");
+      typing.className = "chat-msg chat-assistant chat-typing";
+      typing.innerHTML = `<div class="chat-bubble"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>`;
+      log.appendChild(typing); scrollLog();
+      try {
+        const r = await fetch("/api/employee-chat", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: emp.name, message, history: chatHistory.slice(-10) }),
+        });
+        const d = await r.json();
+        typing.remove();
+        if (!d.ok) addMsg("assistant", "⚠ " + (d.reason || "Ingen svar fra Orion."));
+        else addMsg("assistant", d.reply || "(tomt svar)");
+      } catch (e) { typing.remove(); addMsg("assistant", "⚠ Feil: " + e.message); }
+    });
+    document.getElementById("chatClear").addEventListener("click", () => { chatHistory = []; renderChat(emp); });
+    input.focus();
   }
 
   async function renderStatus(emp) {
