@@ -2379,12 +2379,21 @@ async function orionToolCall(orion, toolName, args) {
       if (!result?.ok) continue;
       const data = result.data;
       const errMsg = data?.error?.message || "";
-      if (errMsg && /ukjent\s+verktøy|unknown\s+tool/i.test(errMsg)) return null;
-      // Sjekk også content-blokken for login-feil (M365 returnerer dem i innholdet, ikke error)
+      // isError-flagget i content (MCP-standard for tool-feil)
+      const isError = data?.result?.isError === true;
+      // Tekst-innholdet (kan inneholde feilmelding selv om JSON-RPC error mangler)
       const txt = data?.result?.content?.[0]?.text || data?.result?.text || data?.result?.message;
       const combined = errMsg + " " + (txt || "");
+
+      if (errMsg && /ukjent\s+verktøy|unknown\s+tool/i.test(errMsg)) return null;
       if (isLoginError(combined)) return { _loginRequired: true, source: toolName, message: errMsg || txt };
+      // Generelle JSON-RPC- og MCP-feil → prøv neste variant
       if (errMsg) continue;
+      if (isError) continue;
+      // Hvis teksten ser ut som en feilmelding (på norsk eller engelsk), prøv neste
+      if (typeof txt === "string" && /^(\s*)(error|feil|ugyldig|invalid|exception|failed|kunne ikke|fant ikke)/i.test(txt.trim())) continue;
+      if (typeof txt === "string" && /\bMCP[- ]feil\b|\b-?32\d{3}\b/.test(txt)) continue;
+
       if (txt) return String(txt);
       if (data?.result) return JSON.stringify(data.result);
     }
@@ -2512,29 +2521,24 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
       const from90 = ymd(new Date(today.getTime() - 90 * 86400000));
       const entries90 = await getTimeEntriesDetailed(from90, todayStr, empId).catch(() => []);
 
-      // Kolonne 2: Prosjekter + Aktiviteter + grupper-fra-kommentar når ingenting annet finnes
-      // Trekker ut første nøkkelord/setning fra kommentar slik at intern-arbeid får meningsfull gruppering
-      function commentBucket(comment) {
-        const c = String(comment || "").trim();
-        if (!c) return "Internt (uten beskrivelse)";
-        // Ta første del før vanlige skilletegn, opp til 40 tegn
-        const first = c.split(/[.,;:\-—|]/)[0].trim();
-        return first.slice(0, 40) || "Internt arbeid";
-      }
+      // Kolonne 2: BARE ekte Tripletex-prosjekter, sortert etter mest timer
       const projMap = new Map();
       for (const e of entries90) {
         const projName = e.project?.name;
-        const actName = e.activity?.name;
-        let label, type;
-        if (projName && projName !== "(uten prosjekt)") { label = projName; type = "prosjekt"; }
-        else if (actName) { label = actName; type = "aktivitet"; }
-        else { label = commentBucket(e.comment); type = "internt"; }
-        const cur = projMap.get(label) || { name: label, type, hours: 0, customer: e.project?.customer?.name || "", lastDate: "", lastComment: "" };
+        // Hopp over alt som ikke har et ekte prosjektnavn (interne/admin uten prosjekt)
+        if (!projName || projName === "(uten prosjekt)" || !e.project?.id) continue;
+        const key = projName;
+        const cur = projMap.get(key) || {
+          name: projName, type: "prosjekt",
+          number: e.project?.number || "",
+          customer: e.project?.customer?.name || "",
+          hours: 0, lastDate: "",
+        };
         cur.hours += Number(e.hours) || 0;
-        if (e.date > cur.lastDate) { cur.lastDate = e.date; cur.lastComment = e.comment || cur.lastComment; }
-        projMap.set(label, cur);
+        if (e.date > cur.lastDate) cur.lastDate = e.date;
+        projMap.set(key, cur);
       }
-      const projects = [...projMap.values()].sort((a, b) => b.hours - a.hours).slice(0, 20);
+      const projects = [...projMap.values()].sort((a, b) => b.hours - a.hours);
 
       // Smart tool-discovery via tools/list
       let orionCalendar = null, orionEmails = null, calendarTool = null, emailTool = null, orionTools = [];
@@ -2547,11 +2551,13 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
         const endISO = new Date(today.getTime() + 5 * 86400000).toISOString(); // 5 dager fram for kalender
         const from28ISO = new Date(today.getTime() - 28 * 86400000).toISOString();
 
-        // Kalender — prioriter M365 Graph-tools, så fyxer, så generiske
+        // Kalender — prioriter M365 Graph-tools, så fyxer
+        // VIKTIG: m365__get-calendar-view tar BARE startDateTime og endDateTime — andre OData-params (top/select) gir 32602
         const calCandidates = [
-          { name: "m365__get-calendar-view", args: { startDateTime: startISO, endDateTime: endISO, $top: 30, $select: "subject,start,end,location,organizer,attendees,bodyPreview,isOnlineMeeting" } },
-          { name: "m365__list-calendar-events", args: { $top: 30, $orderby: "start/dateTime asc", $select: "subject,start,end,location,attendees" } },
-          { name: "m365__list-online-meetings", args: { $top: 20 } },
+          { name: "m365__get-calendar-view", args: { startDateTime: startISO, endDateTime: endISO } },
+          { name: "m365__get-specific-calendar-view", args: { startDateTime: startISO, endDateTime: endISO } },
+          { name: "m365__list-calendar-events", args: {} },
+          { name: "m365__list-online-meetings", args: {} },
           { name: "fyxer__search_meetings", args: { from: startISO, to: endISO } },
         ];
         let calLoginRequired = false;
@@ -2611,10 +2617,45 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
       }
 
       // Kolonne 4: Forslag til automasjoner — IKKE auto-generert. Bruker cached versjon.
-      // Kjør POST /api/employee-automations/refresh manuelt for å oppdatere.
       const automationSuggestions = automationsCached?.suggestions || null;
       const automationGeneratedAt = automationsCached?.generatedAt || null;
       const automationEmailCount = automationsCached?.emailCount || 0;
+
+      // Kolonne 5: Prosjekt-spesifikk oppsummering — ett Claude-kall som dekker alle topp-prosjekter
+      let projectSummaries = [];
+      if (ANTHROPIC_API_KEY && projects.length) {
+        const topProjects = projects.slice(0, 6);
+        const perProjectComments = topProjects.map((p) => {
+          const projEntries = entries90.filter((e) => e.project?.name === p.name);
+          const recentComments = projEntries
+            .filter((e) => e.comment && e.comment.trim())
+            .sort((a, b) => b.date.localeCompare(a.date))
+            .slice(0, 15)
+            .map((e) => `  ${e.date}: ${e.comment.slice(0, 120)}`)
+            .join("\n");
+          return `### ${p.name}${p.customer ? ` (${p.customer})` : ""}\nTimer: ${Math.round(p.hours)}t · Sist: ${p.lastDate}\nKommentarer:\n${recentComments || "  (ingen kommentarer)"}\n`;
+        }).join("\n");
+
+        const sys = `Du oppsummerer hva som skjer på hvert prosjekt basert på timeoppføringer og kommentarer. For hvert prosjekt: skriv 1-2 setninger om hva som har skjedd / blir gjort. Vær konkret om faglig innhold. Svar i JSON-format:
+{"summaries":[{"name":"PROSJEKTNAVN","summary":"1-2 setninger om hva som skjer"}]}
+Bare JSON, ingen forklaringer.`;
+        const usr = `Prosjekter ${name} har jobbet med siste 3 måneder:\n\n${perProjectComments}\n\nLag korte oppsummeringer per prosjekt.`;
+        const claudeReply = await callClaude(sys, usr);
+        if (claudeReply) {
+          try {
+            const match = claudeReply.match(/\{[\s\S]*\}/);
+            if (match) {
+              const parsed = JSON.parse(match[0]);
+              if (Array.isArray(parsed.summaries)) {
+                projectSummaries = topProjects.map((p) => {
+                  const sum = parsed.summaries.find((s) => s.name === p.name);
+                  return { ...p, summary: sum?.summary || "" };
+                });
+              }
+            }
+          } catch { /* fallback til prosjekter uten summary */ }
+        }
+      }
 
       return {
         name, updatedAt: new Date().toISOString(),
@@ -2626,6 +2667,7 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
         col4_automations: automationSuggestions,
         col4_generatedAt: automationGeneratedAt,
         col4_emailCount: automationEmailCount,
+        col5_projectSummaries: projectSummaries,
         // Diagnostikk
         hasOrionCalendar: !!orionCalendar,
         hasOrionEmails: !!automationSuggestions,

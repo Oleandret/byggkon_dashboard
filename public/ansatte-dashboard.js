@@ -394,6 +394,10 @@
         <div class="loading-dots"><span></span><span></span><span></span></div>
       </div>
     </div>
+    <div class="ans-dash-block status-projects-block" id="statusProjects">
+      <h3>📊 Prosjektoversikt — hva skjer på hvert prosjekt</h3>
+      <div class="loading-dots"><span></span><span></span><span></span></div>
+    </div>
     <p class="subnote" style="margin-top:10px;text-align:center">Data caches i 15 min for å spare LLM-kall. Klikk «↻» øverst for å oppdatere.</p>`;
 
     try {
@@ -474,6 +478,25 @@
         c4Body = `<div class="empty">Ingen forslag generert ennå.<br>Klikk knappen under for å analysere siste 3 måneder med e-post.</div>${refreshBtn}`;
       }
       c4.innerHTML = c4.querySelector("h3").outerHTML + c4Body;
+
+      // Seksjon 5: Prosjekt-spesifikk oppsummering
+      const c5 = document.getElementById("statusProjects");
+      if (c5) {
+        const psums = d.col5_projectSummaries || [];
+        c5.innerHTML = c5.querySelector("h3").outerHTML +
+          (psums.length ? `<div class="proj-summaries-grid">${psums.map((p) => `
+            <div class="proj-summary-card">
+              <div class="psc-head">
+                <div class="psc-title"><b>${esc(p.name)}</b>${p.number ? `<span class="subnote"> · ${esc(p.number)}</span>` : ""}</div>
+                <div class="psc-hours">${num(Math.round(p.hours))} t</div>
+              </div>
+              ${p.customer ? `<div class="psc-customer">${esc(p.customer)}</div>` : ""}
+              <div class="psc-summary">${p.summary ? esc(p.summary).replace(/\n/g, "<br>") : `<span class="subnote">Ingen oppsummering tilgjengelig.</span>`}</div>
+              ${p.lastDate ? `<div class="subnote">Sist ført: ${esc(p.lastDate)}</div>` : ""}
+            </div>
+          `).join("")}</div>` : !d.claudeEnabled ? `<div class="empty">Krever ANTHROPIC_API_KEY for prosjekt-oppsummering.</div>`
+           : `<div class="empty">Ingen prosjekter med timer siste 3 mnd.</div>`);
+      }
 
       // Hook up refresh button
       const refreshBtnEl = c4.querySelector(".auto-refresh-btn");
