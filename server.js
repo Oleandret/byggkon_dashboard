@@ -2290,6 +2290,138 @@ app.get("/api/employee-time", requireAuth, async (req, res) => {
   } catch (err) { res.status(502).json({ error: err.message }); }
 });
 
+// Hjelper: ring Claude med en gitt prompt og system. Returnerer streng eller null.
+async function callClaude(systemPrompt, userMessage, model = "claude-sonnet-4-6") {
+  if (!ANTHROPIC_API_KEY) return null;
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({ model, max_tokens: 1500, system: systemPrompt, messages: [{ role: "user", content: userMessage }] }),
+      signal: AbortSignal.timeout(45000),
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    return data.content?.[0]?.text || null;
+  } catch { return null; }
+}
+
+// Hjelper: prøv et MCP-verktøy via Orion. Returnerer raw resultat eller null.
+async function orionToolCall(orion, toolName, args) {
+  if (!orion?.url || !orion.enabled) return null;
+  const url = orion.url.replace(/\/+$/, "").replace(/([^:])\/{2,}/g, "$1/");
+  for (const target of [url + "/mcp", url, url + "/rpc"]) {
+    const result = await mcpCall(target, orion.key, { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: toolName, arguments: args || {} } }).catch(() => null);
+    if (result?.ok && !result.data?.error) {
+      const txt = result.data?.result?.content?.[0]?.text || result.data?.result?.text;
+      return txt || JSON.stringify(result.data?.result || {});
+    }
+  }
+  return null;
+}
+
+// ---- Rik status for en ansatt: 4 kolonner med LLM-analyse ----
+app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
+  try {
+    const name = String(req.query.name || "").trim();
+    if (!name) return res.status(400).json({ error: "Mangler navn" });
+
+    res.json(await serveWithSnapshot("emp-status-rich:" + name, async () => {
+      const cfg = (getConfig().employeeSettings || {})[name];
+      const orion = cfg?.orion;
+      const orionEnabled = !!(orion?.enabled && orion?.url);
+
+      // Hent timer fra Tripletex (siste 4 uker)
+      const today = new Date();
+      const todayStr = ymd(today);
+      const from = ymd(new Date(today.getTime() - 28 * 86400000));
+      const norm = (s) => String(s || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[.\-]/g, " ").replace(/\s+/g, " ").trim();
+      const nameKeys = (n) => { const p = norm(n).split(" ").filter(Boolean); const k = new Set([p.join(" ")]); if (p.length >= 2) k.add(p[0] + " " + p[p.length - 1]); return k; };
+      const target = nameKeys(name);
+      const matches = (full) => { const k = nameKeys(full); for (const x of k) if (target.has(x)) return true; return false; };
+      const employees = await getEmployees().catch(() => []);
+      const emp = employees.find((e) => matches(`${e.firstName || ""} ${e.lastName || ""}`.trim()));
+      const empId = emp?.id;
+      const entries = await getTimeEntriesDetailed(from, todayStr, empId).catch(() => []);
+
+      // Kolonne 2: Prosjekter
+      const projMap = new Map();
+      for (const e of entries) {
+        const pname = e.project?.name || "(uten prosjekt)";
+        const cur = projMap.get(pname) || { name: pname, hours: 0, customer: "", lastDate: "" };
+        cur.hours += Number(e.hours) || 0;
+        if (e.date > cur.lastDate) cur.lastDate = e.date;
+        projMap.set(pname, cur);
+      }
+      const projects = [...projMap.values()].sort((a, b) => b.hours - a.hours).slice(0, 12);
+
+      // Hent rådata fra Orion (kalender + e-post) — best effort
+      let orionCalendar = null, orionEmails = null;
+      if (orionEnabled) {
+        orionCalendar = await Promise.race([
+          orionToolCall(orion, "get_calendar", { employee: name }),
+          orionToolCall(orion, "calendar", { employee: name }),
+          orionToolCall(orion, "get_upcoming_meetings", { employee: name }),
+        ].map((p) => p.then((v) => v).catch(() => null))).catch(() => null);
+        orionEmails = await Promise.race([
+          orionToolCall(orion, "get_emails", { employee: name, days: 28 }),
+          orionToolCall(orion, "emails", { employee: name, days: 28 }),
+          orionToolCall(orion, "list_emails", { employee: name }),
+          orionToolCall(orion, "get_recent_emails", { employee: name }),
+        ].map((p) => p.then((v) => v).catch(() => null))).catch(() => null);
+      }
+
+      // Kolonne 1: Hva jobber X med (LLM-sammendrag av timer)
+      let workSummary = null;
+      if (ANTHROPIC_API_KEY && entries.length) {
+        const top = projects.slice(0, 8);
+        const recentSample = entries.slice(-30).map((e) => `${e.date}: ${e.hours}t på ${e.project?.name || "—"}${e.activity?.name ? " (" + e.activity.name + ")" : ""}${e.comment ? " — " + e.comment.slice(0, 80) : ""}`).join("\n");
+        const sys = "Du er en kort, presis assistent. Du skriver et sammendrag på norsk i 2-4 setninger basert på timeregistreringer. Ingen overskrifter. Ikke gjenta navnet. Beskriv hvilke faglige områder og hvilke kunder/prosjekter personen har brukt tid på, og hvor mye.";
+        const usr = `${name} har ført timer siste 4 uker. Topp prosjekter etter timer:\n${top.map((p) => "- " + p.name + ": " + Math.round(p.hours) + "t").join("\n")}\n\nUtdrag av siste linjer:\n${recentSample}\n\nSkriv et kort sammendrag av hva ${name} jobber med.`;
+        workSummary = await callClaude(sys, usr);
+      }
+
+      // Kolonne 3: Kalender — kommende møter (formatert av Claude hvis tilgjengelig)
+      let calendarPretty = null;
+      if (orionCalendar && ANTHROPIC_API_KEY) {
+        const sys = "Du formatterer kalender-data til en lett-leselig liste på norsk. Skriv maks 6-10 punkter, ett per linje. Format: 'dato kl tid — tittel (deltakere hvis viktig)'. Sorter etter dato. Ikke kommenter — bare listen.";
+        calendarPretty = await callClaude(sys, `Kalender-data for ${name}:\n\n${String(orionCalendar).slice(0, 4000)}\n\nLag en oversikt over kommende møter neste 2 uker.`);
+      } else if (orionCalendar) {
+        calendarPretty = String(orionCalendar).slice(0, 2000);
+      }
+
+      // Kolonne 4: Forslag til automasjoner (LLM analyserer e-postmønstre)
+      let automationSuggestions = null;
+      if (ANTHROPIC_API_KEY && orionEmails) {
+        const sys = `Du analyserer e-poster og finner mønstre som kan automatiseres. Du leter etter:
+- Tilbakevendende e-poster (ukentlige rapporter, månedlige fakturaer, faste statusoppdateringer)
+- Rutinemessige svar som kunne vært ferdig-tekster
+- Innkommende e-poster som krever samme handling hver gang
+- Møteinnkallinger med faste mønstre
+- Data-uthenting som kunne vært en rapport
+
+Svar på norsk. Lag 3-5 konkrete forslag som punktliste. Hvert punkt skal være kort og praktisk. Format: "**Forslag:** [kort tittel]\\nHva: [hva som kan automatiseres]\\nMønster: [hva som tyder på at det er automatiserbart]"`;
+        const usr = `E-postdata for ${name} siste 28 dager:\n\n${String(orionEmails).slice(0, 6000)}\n\nFinn mønstre som kan automatiseres.`;
+        automationSuggestions = await callClaude(sys, usr);
+      }
+
+      return {
+        name, updatedAt: new Date().toISOString(),
+        orionEnabled,
+        claudeEnabled: !!ANTHROPIC_API_KEY,
+        col1_workSummary: workSummary,
+        col2_projects: projects,
+        col3_calendar: calendarPretty,
+        col4_automations: automationSuggestions,
+        // Råresursdata for feilsøking
+        hasOrionCalendar: !!orionCalendar,
+        hasOrionEmails: !!orionEmails,
+        entryCount: entries.length,
+      };
+    }, 15 * 60 * 1000)); // 15 min cache for å spare LLM-kall
+  } catch (err) { res.status(502).json({ error: err.message }); }
+});
+
 // ---- Orion MCP chat-proxy ----
 app.post("/api/employee-chat", requireAuth, async (req, res) => {
   try {

@@ -375,39 +375,79 @@
     ["ansDashKpis", "ansDashGrid"].forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = true; });
     const allGrids = document.querySelectorAll("#ansDashCard > .grid-2"); allGrids.forEach((g) => g.hidden = true);
     const content = document.getElementById("ansDashContent") || (() => { const d = document.createElement("div"); d.id = "ansDashContent"; document.getElementById("ansDashCard").appendChild(d); return d; })();
-    const set = settingsFor(emp.name);
-    if (!set.orion?.enabled) {
-      content.innerHTML = `<div class="ans-dash-block">
-        <h3>🟢 Status</h3>
-        <div class="empty">Orion MCP er ikke aktivert for ${esc(emp.name)}. Gå til <b>⚙ Innstillinger</b> for å koble til Orion-serveren og slå på status-henting.</div>
-      </div>`;
-      return;
-    }
-    content.innerHTML = `<div class="subnote">Henter status fra Orion …</div>`;
+
+    content.innerHTML = `<div class="status-grid-4">
+      <div class="ans-dash-block status-col" id="statusCol1">
+        <h3>📌 Hva jobber ${esc(emp.name)} med <span class="subnote">(siste 4 uker)</span></h3>
+        <div class="loading-dots"><span></span><span></span><span></span></div>
+      </div>
+      <div class="ans-dash-block status-col" id="statusCol2">
+        <h3>📁 Prosjekter <span class="subnote">(siste 4 uker)</span></h3>
+        <div class="loading-dots"><span></span><span></span><span></span></div>
+      </div>
+      <div class="ans-dash-block status-col" id="statusCol3">
+        <h3>📅 Kommende møter <span class="subnote">(neste 2 uker)</span></h3>
+        <div class="loading-dots"><span></span><span></span><span></span></div>
+      </div>
+      <div class="ans-dash-block status-col status-col-automation" id="statusCol4">
+        <h3>⚡ Forslag til automasjoner</h3>
+        <div class="loading-dots"><span></span><span></span><span></span></div>
+      </div>
+    </div>
+    <p class="subnote" style="margin-top:10px;text-align:center">Data caches i 15 min for å spare LLM-kall. Klikk «↻» øverst for å oppdatere.</p>`;
+
     try {
-      const r = await fetch("/api/employee-status?name=" + encodeURIComponent(emp.name));
-      statusData = await r.json();
-    } catch (e) { content.innerHTML = `<div class="empty">Kunne ikke hente: ${esc(e.message)}</div>`; return; }
-    if (!statusData.ok) {
-      content.innerHTML = `<div class="ans-dash-block"><h3>🟢 Status</h3><div class="empty">${esc(statusData.reason || "Ingen data")}</div></div>`;
-      return;
+      const r = await fetch("/api/employee-status-rich?name=" + encodeURIComponent(emp.name));
+      const d = await r.json();
+      if (d.error) {
+        document.querySelectorAll(".status-col").forEach((c) => {
+          const h = c.querySelector("h3");
+          c.innerHTML = h.outerHTML + `<div class="empty">Feil: ${esc(d.error)}</div>`;
+        });
+        return;
+      }
+
+      // Kolonne 1: Hva jobber han med
+      const c1 = document.getElementById("statusCol1");
+      c1.innerHTML = c1.querySelector("h3").outerHTML +
+        (d.col1_workSummary ? `<div class="ans-role-text">${esc(d.col1_workSummary).replace(/\n/g, "<br>")}</div>`
+         : d.entryCount === 0 ? `<div class="empty">Ingen timer ført siste 4 uker.</div>`
+         : !d.claudeEnabled ? `<div class="empty">Krever <code>ANTHROPIC_API_KEY</code> på Railway.</div>`
+         : `<div class="empty">Kunne ikke generere sammendrag.</div>`);
+
+      // Kolonne 2: Prosjekter
+      const c2 = document.getElementById("statusCol2");
+      const projs = d.col2_projects || [];
+      c2.innerHTML = c2.querySelector("h3").outerHTML +
+        (projs.length ? `<table class="ans-tbl">
+          <thead><tr><th>Prosjekt</th><th class="num">Timer</th></tr></thead>
+          <tbody>${projs.map((p) => `<tr><td><b>${esc(p.name)}</b>${p.lastDate ? `<br><span class="subnote">Sist: ${esc(p.lastDate)}</span>` : ""}</td><td class="num">${num(Math.round(p.hours))} t</td></tr>`).join("")}</tbody>
+        </table>` : `<div class="empty">Ingen prosjekter siste 4 uker.</div>`);
+
+      // Kolonne 3: Kalender
+      const c3 = document.getElementById("statusCol3");
+      c3.innerHTML = c3.querySelector("h3").outerHTML +
+        (d.col3_calendar ? `<div class="status-cal-text">${esc(d.col3_calendar).replace(/\n/g, "<br>")}</div>`
+         : !d.orionEnabled ? `<div class="empty">Orion MCP ikke aktivert. Gå til <b>⚙ Innstillinger</b>.</div>`
+         : !d.hasOrionCalendar ? `<div class="empty">Orion har ikke et kalender-verktøy ennå. Sjekk «🔧 Vis verktøy» under Innstillinger.</div>`
+         : `<div class="empty">Ingen kommende møter.</div>`);
+
+      // Kolonne 4: Automasjoner
+      const c4 = document.getElementById("statusCol4");
+      c4.innerHTML = c4.querySelector("h3").outerHTML +
+        (d.col4_automations ? `<div class="automation-list">${esc(d.col4_automations)
+          .replace(/\*\*Forslag:\*\*\s*([^\n]+)/g, '<div class="auto-sug"><div class="auto-sug-h">⚡ $1</div>')
+          .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+          .replace(/\n\n/g, "</div><div class=\"auto-sug-spacer\"></div>")
+          .replace(/\n/g, "<br>")}</div>`
+         : !d.claudeEnabled ? `<div class="empty">Krever <code>ANTHROPIC_API_KEY</code> på Railway.</div>`
+         : !d.orionEnabled ? `<div class="empty">Krever Orion MCP for å lese e-poster.</div>`
+         : !d.hasOrionEmails ? `<div class="empty">Orion har ikke et e-post-verktøy tilgjengelig. Sjekk «🔧 Vis verktøy».</div>`
+         : `<div class="empty">Ingen mønstre funnet.</div>`);
+
+    } catch (e) {
+      content.innerHTML = `<div class="empty">Kunne ikke hente: ${esc(e.message)}</div>`;
     }
-    // Render data — prøver å plukke ut vanlige felter, ellers vis rådata
-    const d = statusData.data || {};
-    const items = [];
-    function push(label, val) { if (val != null && val !== "") items.push({ label, val: String(val) }); }
-    push("Nåværende oppgave", d.currentTask || d.now || d.activity);
-    push("Status", d.status || d.state);
-    push("Lokasjon", d.location || d.where);
-    push("Tilgjengelig", d.available);
-    push("Sist oppdatert", d.updatedAt || d.timestamp || d.lastSeen);
-    const summary = d.summary || d.message || d.text;
-    content.innerHTML = `<div class="ans-dash-block">
-      <h3>🟢 Status fra Orion</h3>
-      ${items.length ? `<div class="ans-status-grid">${items.map((x) => `<div class="ans-status-row"><span class="ass-lbl">${esc(x.label)}</span><span class="ass-val">${esc(x.val)}</span></div>`).join("")}</div>` : ""}
-      ${summary ? `<div class="ans-role-text" style="margin-top:10px">${esc(summary).replace(/\n/g, "<br>")}</div>` : ""}
-      ${!items.length && !summary ? `<pre class="code-snip" style="max-height:300px;overflow:auto">${esc(JSON.stringify(d, null, 2))}</pre>` : ""}
-    </div>`;
   }
 
   function renderInnstillinger(emp) {
