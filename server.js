@@ -2103,34 +2103,58 @@ app.get("/api/employee-status", requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Normaliser en chat-/status-sti: trimm whitespace, default til /mcp hvis tom eller bare slash
+function normalizePath(p, fallback = "/mcp") {
+  const s = String(p || "").trim();
+  if (!s || s === "/" || s === "//") return fallback;
+  return s;
+}
+
+// Bygg en mål-URL fra base + sti — håndterer hele URL-er, doble slasher, manglende slash.
+function buildOrionUrl(baseUrl, pathOrUrl) {
+  if (!baseUrl) return "";
+  if (pathOrUrl && pathOrUrl.startsWith("http")) return pathOrUrl;
+  const base = String(baseUrl).replace(/\/+$/, "").replace(/([^:])\/{2,}/g, "$1/");
+  const p = pathOrUrl ? (pathOrUrl.startsWith("/") ? pathOrUrl : "/" + pathOrUrl) : "";
+  return base + p;
+}
+
 // MCP streamable HTTP-helper. Sender JSON-RPC og parser både rene JSON-svar
 // og SSE-strømmer (text/event-stream). Returnerer { ok, status, data, raw }.
+// Behandler HTML-responser som feil (det er nesten alltid en feilside).
 async function mcpCall(url, key, jsonrpcBody) {
-  const r = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "application/json, text/event-stream",
-      "MCP-Protocol-Version": "2024-11-05",
-      ...(key ? { Authorization: "Bearer " + key, "X-Api-Key": key } : {}),
-    },
-    body: JSON.stringify(jsonrpcBody),
-    signal: AbortSignal.timeout(30000),
-  });
-  const ct = r.headers.get("content-type") || "";
-  const txt = await r.text();
-  if (!r.ok) return { ok: false, status: r.status, raw: txt.slice(0, 400) };
-  // SSE: linjer som "data: {...}"
-  if (ct.includes("text/event-stream")) {
-    const lines = txt.split("\n").filter((l) => l.startsWith("data:"));
-    for (const line of lines) {
-      const payload = line.slice(5).trim();
-      try { const data = JSON.parse(payload); return { ok: true, status: r.status, data, raw: txt.slice(0, 400) }; } catch {}
+  try {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
+        "MCP-Protocol-Version": "2024-11-05",
+        ...(key ? { Authorization: "Bearer " + key, "X-Api-Key": key } : {}),
+      },
+      body: JSON.stringify(jsonrpcBody),
+      signal: AbortSignal.timeout(30000),
+    });
+    const ct = r.headers.get("content-type") || "";
+    const txt = await r.text();
+    // HTML-respons = feil URL/rute. Ikke aksepter denne som "ok".
+    const isHtml = ct.includes("text/html") || txt.trim().startsWith("<");
+    if (!r.ok || isHtml) {
+      return { ok: false, status: r.status, contentType: ct, raw: txt.slice(0, 400) };
     }
-    return { ok: true, status: r.status, data: { raw: txt.slice(0, 800) }, raw: txt.slice(0, 400) };
+    if (ct.includes("text/event-stream")) {
+      const lines = txt.split("\n").filter((l) => l.startsWith("data:"));
+      for (const line of lines) {
+        const payload = line.slice(5).trim();
+        try { const data = JSON.parse(payload); return { ok: true, status: r.status, data, raw: txt.slice(0, 400) }; } catch {}
+      }
+      return { ok: true, status: r.status, data: { raw: txt.slice(0, 800) }, raw: txt.slice(0, 400) };
+    }
+    try { return { ok: true, status: r.status, data: JSON.parse(txt), raw: txt.slice(0, 400) }; }
+    catch { return { ok: false, status: r.status, contentType: ct, raw: txt.slice(0, 400) }; }
+  } catch (e) {
+    return { ok: false, status: 0, error: e.message };
   }
-  try { return { ok: true, status: r.status, data: JSON.parse(txt), raw: txt.slice(0, 400) }; }
-  catch { return { ok: true, status: r.status, data: { raw: txt }, raw: txt.slice(0, 400) }; }
 }
 
 // ---- Orion tools/list: oppdager hvilke verktøy som finnes ----
@@ -2141,11 +2165,10 @@ app.get("/api/employee-orion-tools", requireAuth, async (req, res) => {
     const cfg = (getConfig().employeeSettings || {})[name];
     const orion = cfg?.orion;
     if (!orion?.url) return res.json({ ok: false, reason: "Mangler Orion-URL" });
-    const url = orion.url.replace(/\/+$/, "").replace(/([^:])\/{2,}/g, "$1/");
-    const chatPath = orion.chatPath || "/mcp";
-    const target = chatPath.startsWith("http") ? chatPath : url + (chatPath.startsWith("/") ? chatPath : "/" + chatPath);
+    const chatPath = normalizePath(orion.chatPath, "/mcp");
+    const target = buildOrionUrl(orion.url, chatPath);
     const result = await mcpCall(target, orion.key, { jsonrpc: "2.0", id: 1, method: "tools/list" });
-    if (!result.ok) return res.json({ ok: false, reason: "HTTP " + result.status, snippet: result.raw });
+    if (!result.ok) return res.json({ ok: false, reason: `URL: ${target} → ${result.status ? "HTTP " + result.status : result.error || "feil"}${result.contentType ? " (" + result.contentType + ")" : ""}`, snippet: result.raw, target });
     const tools = result.data?.result?.tools || result.data?.tools || [];
     res.json({ ok: true, tools, raw: result.data });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -2313,7 +2336,15 @@ async function orionListTools(orion) {
   const url = orion.url.replace(/\/+$/, "").replace(/([^:])\/{2,}/g, "$1/");
   const cached = _orionToolsCache.get(url);
   if (cached && Date.now() - cached.ts < 5 * 60 * 1000) return cached.tools;
-  for (const target of [url + "/mcp", url, url + "/rpc"]) {
+  // Bygg liste av targets: prioriter konfigurert chatPath, så vanlige stier
+  const chatPath = normalizePath(orion.chatPath, "/mcp");
+  const candidates = new Set([
+    buildOrionUrl(orion.url, chatPath),
+    buildOrionUrl(orion.url, "/mcp"),
+    buildOrionUrl(orion.url, "/api/mcp"),
+    buildOrionUrl(orion.url, "/rpc"),
+  ]);
+  for (const target of candidates) {
     const r = await mcpCall(target, orion.key, { jsonrpc: "2.0", id: 0, method: "tools/list" }).catch(() => null);
     if (r?.ok) {
       const tools = r.data?.result?.tools || r.data?.tools || [];
@@ -2329,10 +2360,15 @@ async function orionListTools(orion) {
 // Hjelper: prøv et MCP-verktøy via Orion. Returnerer raw resultat eller null.
 async function orionToolCall(orion, toolName, args) {
   if (!orion?.url || !orion.enabled) return null;
-  const url = orion.url.replace(/\/+$/, "").replace(/([^:])\/{2,}/g, "$1/");
+  const chatPath = normalizePath(orion.chatPath, "/mcp");
   // Prøv ulike argumentvarianter
   const argVariants = [args || {}, { ...args }, {}, { input: JSON.stringify(args || {}) }];
-  for (const target of [url + "/mcp", url, url + "/rpc"]) {
+  const candidates = new Set([
+    buildOrionUrl(orion.url, chatPath),
+    buildOrionUrl(orion.url, "/mcp"),
+    buildOrionUrl(orion.url, "/api/mcp"),
+  ]);
+  for (const target of candidates) {
     for (const a of argVariants) {
       const result = await mcpCall(target, orion.key, { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: toolName, arguments: a } }).catch(() => null);
       if (!result?.ok) continue;
@@ -2508,19 +2544,25 @@ app.post("/api/employee-chat", requireAuth, async (req, res) => {
     const url = orion.url.replace(/\/+$/, "").replace(/([^:])\/{2,}/g, "$1/");
     const tool = orion.toolName || "chat";
     const proto = orion.protocol || "auto";
+    const normChatPath = normalizePath(orion.chatPath, "/mcp");
 
     // Bygg listen av endepunkter å prøve, basert på protokoll-valg
     const tryEndpoints = [];
-    if (orion.chatPath) {
+    if (normChatPath && normChatPath !== "/mcp") {
       // Brukerdefinert sti — prøv først
-      const customUrl = orion.chatPath.startsWith("http") ? orion.chatPath : url + (orion.chatPath.startsWith("/") ? orion.chatPath : "/" + orion.chatPath);
+      const customUrl = buildOrionUrl(orion.url, normChatPath);
       tryEndpoints.push({ method: "POST", url: customUrl, body: { employee: name, message, history }, label: "custom" });
       tryEndpoints.push({ method: "POST", url: customUrl, body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: tool, arguments: { employee: name, message, history } } }, label: "custom-mcp" });
       tryEndpoints.push({ method: "POST", url: customUrl, body: { messages: [...history.map((h) => ({ role: h.role, content: h.text })), { role: "user", content: message }] }, label: "custom-openai" });
     }
     if (proto === "auto" || proto === "mcp") {
       // MCP streamable HTTP — bruk mcpCall med riktige headers
-      const mcpTargets = [url + "/mcp", url, url + "/rpc"];
+      // Bruk faktiske MCP-stier, ikke rot-URL (rot gir nesten alltid 404)
+      const mcpTargets = [...new Set([
+        buildOrionUrl(orion.url, normChatPath),
+        buildOrionUrl(orion.url, "/mcp"),
+        buildOrionUrl(orion.url, "/api/mcp"),
+      ])];
       // Hvis tool feiler med "Ukjent verktøy", auto-discover via tools/list og prøv på nytt
       const triedTools = new Set([tool]);
       const toolsToTry = [tool];
