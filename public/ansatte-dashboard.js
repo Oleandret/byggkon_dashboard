@@ -440,7 +440,7 @@
               <td class="num">${hoursDisplay}</td>
             </tr>`;
           }).join("")}</tbody>
-        </table>` : `<div class="empty">Ingen prosjekter siste 3 mnd.${d._projDebug ? `<br><span class="subnote">Diagnostikk: ${d._projDebug.totalEntries} timeoppføringer fra Tripletex, ${d._projDebug.withProject} har project-felt, ${d._projDebug.withProjectName} har project.name, ${d._projDebug.withProjectId} har project.id.</span>` : ""}</div>`);
+        </table>` : `<div class="empty">Ingen prosjekter siste 3 mnd.${d._projDebug ? `<br><span class="subnote">Kilde: overview-snapshot (${esc(d._projDebug.overviewAge)}, ${d._projDebug.sourceProjects} prosjekter${d._projDebug.has12wData ? ", 12-ukers data tilgjengelig" : ", ingen 12-ukers data ennå — kjør snapshot-warm"})</span>` : ""}</div>`);
 
       // Hjelper: vis tilgjengelige Orion-verktøy hvis Orion er på men relevant tool mangler
       function orionToolsHint(d) {

@@ -199,11 +199,12 @@ export async function buildOverview() {
 
   const twoWeeksAgoStr = ymd(daysAgo(14, today));
   const threeWeeksAgoStr = ymd(daysAgo(21, today));
+  const twelveWeeksAgoStr = ymd(daysAgo(84, today)); // ≈ 3 måneder for byEmp-aggregat
   const projAgg = new Map(); // id -> aggregat
   for (const e of timeEntries) {
     if (!e.project) continue;
     const id = e.project.id;
-    const cur = projAgg.get(id) || { id, name: e.project.name || "", ytd: 0, ytdBillable: 0, last4w: 0, last3w: 0, last2w: 0, last8w: 0, lastActivity: "", emp4wById: {}, emp3wById: {}, emp2wById: {} };
+    const cur = projAgg.get(id) || { id, name: e.project.name || "", ytd: 0, ytdBillable: 0, last4w: 0, last3w: 0, last2w: 0, last12w: 0, last8w: 0, lastActivity: "", emp4wById: {}, emp3wById: {}, emp2wById: {}, emp12wById: {} };
     if (!cur.name && e.project.name) cur.name = e.project.name;
     cur.ytd += e.hours || 0;
     cur.ytdBillable += e.chargeableHours || 0;
@@ -221,6 +222,11 @@ export async function buildOverview() {
       cur.last2w += e.hours || 0;
       const eid = e.employee?.id ?? "?";
       cur.emp2wById[eid] = (cur.emp2wById[eid] || 0) + (e.hours || 0);
+    }
+    if (e.date >= twelveWeeksAgoStr) {
+      cur.last12w += e.hours || 0;
+      const eid = e.employee?.id ?? "?";
+      cur.emp12wById[eid] = (cur.emp12wById[eid] || 0) + (e.hours || 0);
     }
     if (e.date >= activeCutoff) cur.last8w += e.hours || 0;
     if (e.date > cur.lastActivity) cur.lastActivity = e.date;
@@ -244,6 +250,11 @@ export async function buildOverview() {
       const nm = employeesById.get(Number(eid)) || "Ukjent";
       byEmp2w[nm] = (byEmp2w[nm] || 0) + h;
     }
+    const byEmp12w = {};
+    for (const [eid, h] of Object.entries(a.emp12wById || {})) {
+      const nm = employeesById.get(Number(eid)) || "Ukjent";
+      byEmp12w[nm] = (byEmp12w[nm] || 0) + h;
+    }
     return {
       number: p?.number || "",
       name: a.name || p?.name || `Prosjekt ${a.id}`,
@@ -252,12 +263,14 @@ export async function buildOverview() {
       hours4w: a.last4w,
       hours3w: a.last3w,
       hours2w: a.last2w,
+      hours12w: a.last12w,
       hoursYTD: a.ytd,
       billableYTD: a.ytdBillable,
       lastActivity: a.lastActivity || null,
       byEmp4w,
       byEmp3w,
       byEmp2w,
+      byEmp12w,
     };
   };
 
