@@ -2455,15 +2455,17 @@ async function orionToolCall(orion, toolName, args) {
       // Generelle JSON-RPC- og MCP-feil → prøv neste variant
       if (errMsg) continue;
       if (isError) continue;
-      // Aggressiv error-deteksjon i innhold (start eller midt i tekst):
-      // - Norske/engelske feilord (start)
-      // - MCP-feilkoder hvor som helst
-      // - "Invalid arguments" eller "undefined" hvor som helst
+      // Error-deteksjon — ikke for aggressiv (ekte e-postinnhold kan inneholde "invalid" osv.)
+      // Filtrer kun hvis SVARET I SIN HELHET ser ut som en feilmelding (kort + starter med feilord)
       if (typeof txt === "string") {
         const trimmed = txt.trim();
-        if (/^(\s*)(error|feil|ugyldig|invalid|exception|failed|kunne ikke|fant ikke|beklager)/i.test(trimmed)) continue;
-        if (/MCP[\s\-_]?(error|feil)|jsonrpc.*error|-?32\d{3}/i.test(trimmed)) continue;
-        if (/invalid\s+arguments|missing\s+(required|argument)|is\s+undefined/i.test(trimmed)) continue;
+        const isShort = trimmed.length < 500;
+        // Korte svar som starter med feilord = sannsynligvis feil
+        if (isShort && /^(error|feil|ugyldig|invalid|exception|failed|kunne ikke|fant ikke|beklager)/i.test(trimmed)) continue;
+        // MCP-feilkoder hvor som helst = alltid feil
+        if (/MCP[\s\-_]?(error|feil).*-?32\d{3}|jsonrpc.*-?32\d{3}/i.test(trimmed)) continue;
+        // Korte svar med "Invalid arguments" eller "is undefined" = feil
+        if (isShort && /invalid\s+arguments|missing\s+(required|argument)|is\s+undefined/i.test(trimmed)) continue;
       }
 
       if (txt) return String(txt);
@@ -2587,7 +2589,15 @@ app.post("/api/employee-automations/refresh", requireAuth, async (req, res) => {
           needsLogin: true, orionChatUrl: orion.url,
         });
       }
-      return res.status(502).json({ error: "Klarte ikke å hente e-post (verken via Fyxer eller M365)." });
+      // Logg detaljert info så vi kan debugge i Railway-loggene
+      const toolNames = tools.map((t) => t.name).filter((n) => /mail|email|fyxer|m365/i.test(n));
+      console.warn("[automations] Ingen e-postdata for " + name + ". Tilgjengelige relevante tools:", toolNames.slice(0, 10));
+      return res.status(502).json({
+        error: "Klarte ikke å hente e-post (verken via Fyxer eller M365). Sjekk at minst ett av verktøyene fungerer i Orion.",
+        availableTools: toolNames.slice(0, 20),
+        triedFyxer: !!tools.find((t) => t.name === "fyxer__search_context"),
+        triedM365: !!tools.find((t) => t.name === "m365__list-mail-messages"),
+      });
     }
 
     // Send til Claude for analyse

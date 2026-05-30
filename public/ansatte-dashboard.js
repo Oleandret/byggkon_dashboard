@@ -668,18 +668,28 @@
             });
             const d2 = await r.json();
             if (!r.ok) {
-              if (d2.needsLogin) {
-                refreshBtnEl.outerHTML = `<div class="m365-login-notice"><h4>🔐 Microsoft-pålogging trengs</h4><p>${esc(d2.error)}</p><p><a href="${esc(d2.orionChatUrl)}" target="_blank" rel="noopener">Åpne Orion-chatten →</a></p></div>`;
-              } else {
-                refreshBtnEl.outerHTML = `<div class="empty">Feil: ${esc(d2.error || "ukjent")}</div>`;
+              // Vis tydelig feilmelding i kolonne 4 og re-render rest av status
+              const c4 = document.getElementById("statusCol4");
+              if (c4) {
+                const h3 = c4.querySelector("h3").outerHTML;
+                if (d2.needsLogin) {
+                  c4.innerHTML = h3 + `<div class="m365-login-notice"><h4>🔐 ${esc(d2.error || "Innlogging trengs")}</h4>${d2.orionChatUrl ? `<p><a href="${esc(d2.orionChatUrl)}" target="_blank" rel="noopener">Åpne Orion-chatten →</a></p>` : ""}<button class="btn-primary auto-refresh-btn" data-name="${esc(emp.name)}" style="margin-top:10px">↻ Prøv igjen</button></div>`;
+                } else {
+                  c4.innerHTML = h3 + `<div class="empty"><b>Feil:</b> ${esc(d2.error || "ukjent")}<br><br>HTTP ${r.status}</div><button class="btn-primary auto-refresh-btn" data-name="${esc(emp.name)}" style="margin-top:10px">↻ Prøv igjen</button>`;
+                }
+                // Re-bind retry-knappen
+                c4.querySelector(".auto-refresh-btn")?.addEventListener("click", () => { statusData = null; renderStatus(emp); });
               }
               return;
             }
-            // Last status-fanen på nytt så vi viser de nye forslagene
+            // Suksess — re-render hele status med ny data
             statusData = null; renderStatus(emp);
           } catch (e) {
-            refreshBtnEl.disabled = false;
-            refreshBtnEl.textContent = "↻ Prøv igjen";
+            const c4 = document.getElementById("statusCol4");
+            if (c4) {
+              const h3 = c4.querySelector("h3").outerHTML;
+              c4.innerHTML = h3 + `<div class="empty"><b>Nettverksfeil:</b> ${esc(e.message)}</div><button class="btn-primary auto-refresh-btn" data-name="${esc(emp.name)}" style="margin-top:10px">↻ Prøv igjen</button>`;
+            }
           }
         });
       }
