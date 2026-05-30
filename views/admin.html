@@ -35,6 +35,7 @@
       <button type="button" class="set-tab" data-set="forside">Forside</button>
       <button type="button" class="set-tab" data-set="mcp">MCP & datakilder</button>
       <button type="button" class="set-tab" data-set="tilgang">Tilgang & drift</button>
+      <button type="button" class="set-tab" data-set="oauth">OAuth-innlogging</button>
     </div>
 
     <form id="settingsForm">
@@ -121,6 +122,153 @@
         </div>
       </div>
 
+      <div class="set-panel" id="set-oauth">
+        <div class="section-title">Microsoft Entra ID-innlogging (SSO med byggkon.no)</div>
+
+        <div class="oauth-status" id="oauthStatus">
+          <span class="oauth-dot" id="oauthDot"></span>
+          <span id="oauthStatusText">Henter status …</span>
+        </div>
+
+        <p class="hint" style="margin-top:14px">
+          <b>Mål:</b> Ansatte logger seg inn med byggkon.no-kontoen sin (samme som Office 365 / Teams) — uten å skrive passord. Dashbordet vet hvem som er innlogget, og kan vise personlig dashboard automatisk.
+        </p>
+
+        <details class="oauth-section" open>
+          <summary>📋 Sjekkliste for IT-ansvarlig</summary>
+          <ol class="oauth-list">
+            <li>Registrer app i <a href="https://portal.azure.com" target="_blank" rel="noopener">Azure-portalen</a></li>
+            <li>Hent Client ID, Tenant ID og Client Secret</li>
+            <li>Legg til Microsoft Graph-tilganger (User.Read m.fl.)</li>
+            <li>Legg inn 4 env-variabler på Railway</li>
+            <li>Test innlogging</li>
+          </ol>
+          <p class="hint">Tar ca. 15 minutter når man har admin-tilgang i Azure.</p>
+        </details>
+
+        <details class="oauth-section">
+          <summary>1️⃣ Registrer dashbordet i Azure</summary>
+          <ol class="oauth-list">
+            <li>Logg inn i <a href="https://portal.azure.com" target="_blank" rel="noopener">portal.azure.com</a> som global admin for <code>byggkon.no</code></li>
+            <li>Gå til <b>Microsoft Entra ID</b> (eller «Azure Active Directory»)</li>
+            <li>Velg <b>App registrations</b> → <b>+ New registration</b></li>
+            <li>Fyll inn:
+              <ul>
+                <li><b>Name:</b> <code>Bygg-Kon Dashboard</code></li>
+                <li><b>Supported account types:</b> <b>Accounts in this organizational directory only (byggkon.no only - Single tenant)</b> ← VIKTIG. Dette låser innlogging til kun byggkon.no-kontoer.</li>
+                <li><b>Redirect URI:</b> Plattform = <code>Web</code>, URL = <code id="redirectUri">https://&lt;din-railway-url&gt;/auth/microsoft/callback</code></li>
+              </ul>
+            </li>
+            <li>Klikk <b>Register</b></li>
+          </ol>
+          <p class="hint"><b>Hva er Railway-URL-en?</b> Det er URL-en dashbordet ditt kjører på i Railway, f.eks. <code>https://byggkon-dashboard.up.railway.app</code>. Du finner den øverst på Railway-prosjektsiden. Endre dette tilbake til <code>&lt;Application URL&gt;/auth/microsoft/callback</code> hvis dashbordet flytter.</p>
+        </details>
+
+        <details class="oauth-section">
+          <summary>2️⃣ Kopier ID-ene fra «Overview»</summary>
+          <p>Etter at app-en er opprettet, åpne den. Under <b>Overview</b> finner du to verdier som dashbordet trenger:</p>
+          <ul class="oauth-vars">
+            <li><b>Application (client) ID</b> → går i env-variabelen <code>MICROSOFT_CLIENT_ID</code></li>
+            <li><b>Directory (tenant) ID</b> → går i env-variabelen <code>MICROSOFT_TENANT_ID</code></li>
+          </ul>
+          <p class="hint">Disse er ikke hemmelige — kan limes inn hvor som helst.</p>
+        </details>
+
+        <details class="oauth-section">
+          <summary>3️⃣ Lag en client secret</summary>
+          <ol class="oauth-list">
+            <li>I app-en, gå til <b>Certificates &amp; secrets</b></li>
+            <li>Under <b>Client secrets</b> → klikk <b>+ New client secret</b></li>
+            <li><b>Description:</b> <code>Bygg-Kon dashboard</code></li>
+            <li><b>Expires:</b> <code>24 months</code> (eller velg «Custom» for lengre)</li>
+            <li>Klikk <b>Add</b></li>
+            <li><b>VIKTIG:</b> Kopier <b>Value</b>-feltet straks — Azure viser det kun én gang.<br>Dette går i env-variabelen <code>MICROSOFT_CLIENT_SECRET</code>.</li>
+          </ol>
+          <p class="warn">⚠️ Hvis du mister verdien må du lage en ny secret. Du kan ikke hente den frem igjen.</p>
+        </details>
+
+        <details class="oauth-section">
+          <summary>4️⃣ Sett opp API-tilganger</summary>
+          <ol class="oauth-list">
+            <li>I app-en, gå til <b>API permissions</b></li>
+            <li>De fleste av disse skal være forhåndsvalgt — om ikke: klikk <b>+ Add a permission</b> → <b>Microsoft Graph</b> → <b>Delegated permissions</b> og legg til:
+              <ul>
+                <li><code>openid</code></li>
+                <li><code>email</code></li>
+                <li><code>profile</code></li>
+                <li><code>User.Read</code></li>
+              </ul>
+            </li>
+            <li>Klikk <b>Grant admin consent for byggkon.no</b> (krever global admin) — det er en blå knapp etter at permissions er lagt inn</li>
+          </ol>
+          <p class="hint">User.Read gir oss bare lov til å lese brukerens eget profilbilde, navn og e-post — ingenting annet.</p>
+        </details>
+
+        <details class="oauth-section">
+          <summary>5️⃣ Legg inn 4 env-variabler på Railway</summary>
+          <ol class="oauth-list">
+            <li>Logg inn på <a href="https://railway.app" target="_blank" rel="noopener">Railway.app</a></li>
+            <li>Velg <b>byggkon-dashboard</b>-tjenesten</li>
+            <li>Åpne <b>Variables</b>-fanen</li>
+            <li>Klikk <b>+ New Variable</b> for hver av disse:</li>
+          </ol>
+          <table class="oauth-vars-tbl">
+            <thead><tr><th>Variabel</th><th>Verdi</th></tr></thead>
+            <tbody>
+              <tr><td><code>MICROSOFT_CLIENT_ID</code></td><td>Application (client) ID fra steg 2</td></tr>
+              <tr><td><code>MICROSOFT_TENANT_ID</code></td><td>Directory (tenant) ID fra steg 2</td></tr>
+              <tr><td><code>MICROSOFT_CLIENT_SECRET</code></td><td>Value fra client secret (steg 3)</td></tr>
+              <tr><td><code>MICROSOFT_REDIRECT_URI</code></td><td>Din Railway-URL + <code>/auth/microsoft/callback</code></td></tr>
+              <tr><td><code>OAUTH_ALLOWED_DOMAIN</code> <span class="hint">(valgfri)</span></td><td>Standard er <code>byggkon.no</code> — endre hvis det skal være annet</td></tr>
+            </tbody>
+          </table>
+          <p class="hint">Railway redeployer automatisk når variabler endres. Vent 30–60 sekunder etter siste lagring før du tester.</p>
+        </details>
+
+        <details class="oauth-section">
+          <summary>6️⃣ Test innloggingen</summary>
+          <ol class="oauth-list">
+            <li>Gå til dashbordets login-side (logg ut først hvis du er innlogget)</li>
+            <li>Du skal nå se en <b>«Logg inn med Microsoft»</b>-knapp øverst på siden</li>
+            <li>Klikk den. Du blir sendt til Microsoft. Hvis du allerede er innlogget i Office 365, blir du sendt rett tilbake. Ellers velger du byggkon.no-kontoen.</li>
+            <li>Du skal lande på dashbordets forside som innlogget</li>
+            <li>I toppmenyen vises navnet ditt (og at du er innlogget med Microsoft)</li>
+          </ol>
+          <p class="hint"><b>Hvis det ikke virker</b>, sjekk vanlige feil:</p>
+          <ul class="oauth-list">
+            <li><b>«state-mismatch»</b> → Cookies kan ha utløpt. Last login-siden på nytt og prøv.</li>
+            <li><b>«wrong-domain»</b> → Brukeren prøvde med en konto som ikke er @byggkon.no</li>
+            <li><b>«token-exchange»</b> → Client secret er feil, eller utløpt. Lag en ny.</li>
+            <li><b>«oauth-disabled»</b> → Env-variabler ikke satt. Sjekk Railway → Variables.</li>
+            <li><b>Knappen vises ikke</b> → Railway har ikke redeployet, eller en av de 4 variablene mangler.</li>
+          </ul>
+        </details>
+
+        <details class="oauth-section">
+          <summary>🔐 Hva slags tilgang gir vi Azure-appen?</summary>
+          <p>Appen får kun lov til å lese identiteten til den som logger inn (navn, e-post, jobbtittel og profilbilde). Den får IKKE tilgang til:</p>
+          <ul>
+            <li>Brukerens e-post eller kalender</li>
+            <li>SharePoint-filer eller Teams-meldinger</li>
+            <li>Andre brukeres data</li>
+            <li>Endring av noe som helst i Entra ID</li>
+          </ul>
+          <p class="hint">Det er ren autentisering — «hvem er du?» — ikke datatilgang. All data om jobben (timer, prosjekter, regnskap) hentes fortsatt fra Tripletex og lagres i Bygg-Kons egne systemer.</p>
+        </details>
+
+        <details class="oauth-section">
+          <summary>📞 Trenger hjelp?</summary>
+          <p>Hvis IT-ansvarlig står fast, send følgende info til Ole-André:</p>
+          <ul>
+            <li>Skjermbilde av <b>Overview</b>-siden i Azure (uten Client Secret synlig)</li>
+            <li>Skjermbilde av <b>API permissions</b>-siden</li>
+            <li>Skjermbilde av Railway <b>Variables</b>-siden (sladd ut SECRET)</li>
+            <li>Feilmeldingen du får når du klikker «Logg inn med Microsoft»</li>
+          </ul>
+          <p class="hint">Ikke send Client Secret eller andre hemmeligheter på e-post / chat. Bruk 1Password til å dele.</p>
+        </details>
+      </div>
+
       <button type="submit" class="btn-primary">Lagre innstillinger</button>
     </form>
     <p class="hint" id="settingsPath" style="margin-top:18px"></p>
@@ -128,5 +276,24 @@
 
   <div id="errorBanner" class="error-banner" hidden></div>
   <script src="/admin.js"></script>
+  <script>
+    // Auto-fyll redirect URI med nåværende origin
+    (function () {
+      const el = document.getElementById("redirectUri");
+      if (el) el.textContent = location.origin + "/auth/microsoft/callback";
+    })();
+    // Vis status på OAuth-konfig
+    fetch("/api/auth/config").then((r) => r.json()).then((d) => {
+      const dot = document.getElementById("oauthDot");
+      const txt = document.getElementById("oauthStatusText");
+      if (d.oauthEnabled) {
+        dot.classList.add("on");
+        txt.innerHTML = "<b>OAuth er aktivert</b> — Microsoft-innlogging fungerer. Tillatt domene: <code>" + (d.allowedDomain || "byggkon.no") + "</code>";
+      } else {
+        dot.classList.add("off");
+        txt.innerHTML = "<b>OAuth er ikke aktivert ennå</b> — følg veiledningen nedenfor for å sette opp.";
+      }
+    }).catch(() => {});
+  </script>
 </body>
 </html>
