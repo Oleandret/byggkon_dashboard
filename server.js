@@ -166,6 +166,205 @@ app.get("/auth/microsoft/callback", async (req, res) => {
   }
 });
 
+// ---- Claude-redigering av kodebasen (kun admin) ----
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || "";
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "";
+const GITHUB_REPO = process.env.GITHUB_REPO || "Oleandret/byggkon_dashboard";
+const GITHUB_BRANCH = process.env.GITHUB_BRANCH || "main";
+const CLAUDE_ENABLED = !!ANTHROPIC_API_KEY;
+
+app.get("/api/admin/claude/config", requireAdmin, (req, res) => res.json({
+  claudeEnabled: CLAUDE_ENABLED,
+  githubEnabled: !!GITHUB_TOKEN,
+  repo: GITHUB_REPO,
+  branch: GITHUB_BRANCH,
+}));
+
+// Filer/mapper Claude får lov å hente kontekst fra (sikkerhetsgjerde)
+const ALLOWED_PATHS_RE = /^(public|src|views|server\.js|package\.json|README\.md)/;
+async function listProjectFiles() {
+  const root = path.join(__dirname);
+  const result = [];
+  function walk(rel) {
+    const abs = path.join(root, rel);
+    const entries = fs.readdirSync(abs, { withFileTypes: true });
+    for (const e of entries) {
+      const childRel = rel ? rel + "/" + e.name : e.name;
+      if (e.name.startsWith(".") || e.name === "node_modules" || e.name === "data") continue;
+      if (e.isDirectory()) walk(childRel);
+      else if (ALLOWED_PATHS_RE.test(childRel)) {
+        const stat = fs.statSync(abs + "/" + e.name);
+        result.push({ path: childRel, size: stat.size });
+      }
+    }
+  }
+  walk("");
+  return result;
+}
+
+// Hent fil-innhold (admin-only)
+app.get("/api/admin/claude/file", requireAdmin, (req, res) => {
+  try {
+    const rel = String(req.query.path || "");
+    if (!ALLOWED_PATHS_RE.test(rel)) return res.status(400).json({ error: "Ikke tillatt sti" });
+    const abs = path.join(__dirname, rel);
+    if (!fs.existsSync(abs)) return res.status(404).json({ error: "Ikke funnet" });
+    const content = fs.readFileSync(abs, "utf8");
+    res.json({ path: rel, content });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Send melding til Claude (Anthropic API)
+app.post("/api/admin/claude/chat", requireAdmin, async (req, res) => {
+  try {
+    if (!CLAUDE_ENABLED) return res.status(503).json({ error: "ANTHROPIC_API_KEY ikke satt på Railway" });
+    const message = String(req.body?.message || "").trim();
+    const history = Array.isArray(req.body?.history) ? req.body.history.slice(-20) : [];
+    const includeFiles = Array.isArray(req.body?.includeFiles) ? req.body.includeFiles : [];
+    if (!message) return res.status(400).json({ error: "Tom melding" });
+
+    // Bygg system-prompt med prosjektkontekst
+    const projectFiles = await listProjectFiles();
+    let systemPrompt = `Du hjelper Ole-André med å redigere kodebasen til Bygg-Kon sitt interne dashboard.
+Prosjektet er et Node.js + Express-prosjekt deployet på Railway, med vanlig JS/HTML/CSS-frontend.
+
+Prosjekt-strukturen:
+${projectFiles.map((f) => "- " + f.path + " (" + Math.round(f.size / 1024) + " kB)").join("\n")}
+
+VIKTIGE REGLER når brukeren ber om endringer:
+1. Foreslå nøyaktige edits ved å bruke dette formatet — som JSON i en kodeblokk:
+\`\`\`changes
+{
+  "commit_message": "Kort beskrivelse av endringen",
+  "edits": [
+    {
+      "file": "public/index.html",
+      "find": "eksakt tekst som finnes i fila nå",
+      "replace": "ny tekst som erstatter den"
+    }
+  ]
+}
+\`\`\`
+2. "find" må være EKSAKT tekst som finnes i fila — inkludert innrykk og whitespace
+3. For større endringer, lag flere edits i samme "edits"-array
+4. Hvis du trenger å se innholdet i en fil før du foreslår endringer, svar med: "Jeg trenger å se innholdet i [filsti]" så henter brukeren det
+5. Forklar kort hva endringen gjør på norsk før kodeblokken
+6. Hvis brukeren ber om noe som krever ny fil, bruk "find": "" og legg hele innholdet i "replace"`;
+
+    // Inkluder fil-innhold som ble bedt om
+    if (includeFiles.length) {
+      systemPrompt += "\n\nInnholdet i relevante filer:\n";
+      for (const f of includeFiles.slice(0, 5)) {
+        if (!ALLOWED_PATHS_RE.test(f)) continue;
+        try {
+          const content = fs.readFileSync(path.join(__dirname, f), "utf8");
+          if (content.length > 50000) {
+            systemPrompt += `\n=== ${f} (forkortet, ${content.length} tegn totalt) ===\n${content.slice(0, 50000)}\n[...kuttet]\n`;
+          } else {
+            systemPrompt += `\n=== ${f} ===\n${content}\n`;
+          }
+        } catch {}
+      }
+    }
+
+    const messages = [
+      ...history.map((h) => ({ role: h.role, content: h.text })),
+      { role: "user", content: message },
+    ];
+
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5",
+        max_tokens: 8000,
+        system: systemPrompt,
+        messages,
+      }),
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!r.ok) {
+      const txt = await r.text();
+      return res.status(502).json({ error: "Anthropic feilet: " + txt.slice(0, 300) });
+    }
+    const data = await r.json();
+    const reply = data.content?.[0]?.text || "";
+    // Parse ut endringsblokken hvis Claude la inn en
+    let proposedChanges = null;
+    const match = reply.match(/```changes\s*\n([\s\S]*?)\n```/);
+    if (match) {
+      try { proposedChanges = JSON.parse(match[1]); } catch {}
+    }
+    res.json({ ok: true, reply, proposedChanges });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Bruk endringer og push til GitHub
+app.post("/api/admin/claude/apply", requireAdmin, async (req, res) => {
+  try {
+    if (!GITHUB_TOKEN) return res.status(503).json({ error: "GITHUB_TOKEN ikke satt på Railway" });
+    const changes = req.body?.changes;
+    if (!changes?.edits || !Array.isArray(changes.edits)) return res.status(400).json({ error: "Mangler edits" });
+    const commitMsg = String(changes.commit_message || "Claude: oppdater dashbordet").slice(0, 200);
+
+    const applied = [];
+    const errors = [];
+    for (const edit of changes.edits) {
+      const rel = String(edit.file || "");
+      if (!ALLOWED_PATHS_RE.test(rel)) { errors.push({ file: rel, error: "Ikke tillatt sti" }); continue; }
+      // Hent eksisterende fil-SHA via GitHub Contents API
+      try {
+        const getRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${encodeURIComponent(rel)}?ref=${GITHUB_BRANCH}`, {
+          headers: { Authorization: "Bearer " + GITHUB_TOKEN, Accept: "application/vnd.github+json" },
+        });
+        let existingContent = ""; let sha = undefined;
+        if (getRes.ok) {
+          const meta = await getRes.json();
+          sha = meta.sha;
+          existingContent = Buffer.from(meta.content || "", "base64").toString("utf8");
+        } else if (getRes.status !== 404) {
+          throw new Error("GitHub GET " + getRes.status);
+        }
+        // Anvend endringen
+        let newContent;
+        if (!edit.find || edit.find === "") {
+          newContent = String(edit.replace || "");
+        } else {
+          if (!existingContent.includes(edit.find)) {
+            errors.push({ file: rel, error: "Kunne ikke finne 'find'-tekst i fila" });
+            continue;
+          }
+          newContent = existingContent.replace(edit.find, edit.replace);
+        }
+        if (newContent === existingContent) { errors.push({ file: rel, error: "Ingen endring" }); continue; }
+        // PUT ny versjon
+        const putRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${encodeURIComponent(rel)}`, {
+          method: "PUT",
+          headers: { Authorization: "Bearer " + GITHUB_TOKEN, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: commitMsg + " · " + rel,
+            content: Buffer.from(newContent, "utf8").toString("base64"),
+            sha,
+            branch: GITHUB_BRANCH,
+            committer: { name: "Claude (Bygg-Kon)", email: "ai@byggkon.no" },
+          }),
+        });
+        if (!putRes.ok) {
+          const t = await putRes.text();
+          errors.push({ file: rel, error: "GitHub PUT " + putRes.status + ": " + t.slice(0, 200) });
+        } else {
+          applied.push(rel);
+        }
+      } catch (e) { errors.push({ file: rel, error: e.message }); }
+    }
+    res.json({ ok: errors.length === 0, applied, errors, commitMessage: commitMsg });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // "Hvem er jeg innlogget som?" — brukes av frontend til å vise navn i header
 app.get("/api/me", requireAuth, (req, res) => {
   res.json({

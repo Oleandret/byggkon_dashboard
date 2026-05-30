@@ -36,6 +36,7 @@
       <button type="button" class="set-tab" data-set="mcp">MCP & datakilder</button>
       <button type="button" class="set-tab" data-set="tilgang">Tilgang & drift</button>
       <button type="button" class="set-tab" data-set="oauth">OAuth-innlogging</button>
+      <button type="button" class="set-tab" data-set="claude">🤖 Claude (kode-redigering)</button>
     </div>
 
     <form id="settingsForm">
@@ -269,6 +270,48 @@
         </details>
       </div>
 
+      <div class="set-panel" id="set-claude">
+        <div class="section-title">🤖 Claude — chat med kodebasen din</div>
+
+        <div class="oauth-status" id="claudeStatus">
+          <span class="oauth-dot" id="claudeDot"></span>
+          <span id="claudeStatusText">Henter status …</span>
+        </div>
+
+        <p class="hint">
+          Skriv hva du vil endre på dashbordet — Claude leser relevante filer, foreslår eksakte endringer, og når du trykker «Bruk og push» blir det committet til GitHub. Railway redeployer automatisk.
+        </p>
+
+        <div class="claude-chat" id="claudeChat">
+          <div class="empty">Eksempler: «Bytt fargen på headeren til mørkeblå», «Legg til en kolonne i kostnader-tabellen som viser MVA», «Fiks skrivefeil på Prosjekter-fanen».</div>
+        </div>
+
+        <form class="claude-form" id="claudeForm">
+          <textarea id="claudeInput" placeholder="Skriv hva du vil endre …" rows="3"></textarea>
+          <div class="claude-form-foot">
+            <span class="hint">Cmd/Ctrl+Enter for å sende</span>
+            <button type="button" class="btn-ghost" id="claudeClear">Tøm</button>
+            <button type="submit" class="btn-primary" id="claudeSend">Send til Claude</button>
+          </div>
+        </form>
+
+        <details class="oauth-section" style="margin-top:16px">
+          <summary>⚙ Oppsett (krever ANTHROPIC_API_KEY + GITHUB_TOKEN)</summary>
+          <ol class="oauth-list">
+            <li>Hent en Anthropic API-nøkkel på <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a></li>
+            <li>Hent et GitHub Personal Access Token på <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a> med <code>repo</code>-scope</li>
+            <li>På Railway → Variables, legg inn:
+              <ul>
+                <li><code>ANTHROPIC_API_KEY</code> = sk-ant-...</li>
+                <li><code>GITHUB_TOKEN</code> = ghp_...</li>
+                <li><code>GITHUB_REPO</code> = <code>Oleandret/byggkon_dashboard</code> (valgfri, standard)</li>
+              </ul>
+            </li>
+          </ol>
+          <p class="warn">⚠️ Claude har skrivetilgang til hele kodebasen. Bruk kun fra admin-konto, og se alltid på diff-en før du klikker «Bruk og push».</p>
+        </details>
+      </div>
+
       <button type="submit" class="btn-primary">Lagre innstillinger</button>
     </form>
     <p class="hint" id="settingsPath" style="margin-top:18px"></p>
@@ -294,6 +337,129 @@
         txt.innerHTML = "<b>OAuth er ikke aktivert ennå</b> — følg veiledningen nedenfor for å sette opp.";
       }
     }).catch(() => {});
+
+    /* ============ CLAUDE-FANE ============ */
+    (function () {
+      const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+      const chat = document.getElementById("claudeChat");
+      const form = document.getElementById("claudeForm");
+      const input = document.getElementById("claudeInput");
+      const sendBtn = document.getElementById("claudeSend");
+      const clearBtn = document.getElementById("claudeClear");
+      let history = [];
+      let pendingFiles = []; // filer Claude har bedt om å se
+
+      fetch("/api/admin/claude/config").then((r) => r.json()).then((d) => {
+        const dot = document.getElementById("claudeDot");
+        const txt = document.getElementById("claudeStatusText");
+        if (d.claudeEnabled && d.githubEnabled) {
+          dot.classList.add("on");
+          txt.innerHTML = "<b>Aktivert</b> — Claude er koblet til GitHub-repoet <code>" + esc(d.repo) + "</code> (branch: <code>" + esc(d.branch) + "</code>). Endringer kan committes direkte.";
+        } else if (d.claudeEnabled && !d.githubEnabled) {
+          dot.classList.add("off");
+          txt.innerHTML = "<b>Delvis aktivert</b> — Claude svarer, men <code>GITHUB_TOKEN</code> mangler så vi kan ikke pushe. Sett den i Railway → Variables.";
+        } else {
+          dot.classList.add("off");
+          txt.innerHTML = "<b>Ikke aktivert</b> — sett <code>ANTHROPIC_API_KEY</code> og <code>GITHUB_TOKEN</code> på Railway. Se oppsett-seksjonen under.";
+        }
+      }).catch(() => {});
+
+      function addMsg(role, text, proposedChanges) {
+        history.push({ role, text });
+        const empty = chat.querySelector(".empty"); if (empty) empty.remove();
+        const div = document.createElement("div");
+        div.className = "claude-msg claude-" + role;
+        // Formater Claude-svar med kodeblokker
+        let html = `<div class="claude-bubble">${esc(text).replace(/```changes[\s\S]*?```/g, "[se foreslåtte endringer under]").replace(/```([a-z]*)\n([\s\S]*?)```/g, (m, lang, code) => `<pre class="code-snip">${esc(code)}</pre>`).replace(/\n/g, "<br>")}</div>`;
+        if (proposedChanges && proposedChanges.edits) {
+          html += `<div class="claude-proposal">
+            <div class="cp-head"><b>📝 Foreslåtte endringer:</b> ${esc(proposedChanges.commit_message || "Oppdater dashboard")}</div>
+            ${proposedChanges.edits.map((e, i) => `
+              <div class="cp-edit">
+                <div class="cp-edit-h"><code>${esc(e.file)}</code></div>
+                ${e.find ? `<div class="cp-find"><span class="cp-lbl">Erstatt:</span><pre>${esc(e.find.slice(0, 400))}${e.find.length > 400 ? "..." : ""}</pre></div>` : `<div class="cp-find"><span class="cp-lbl">Ny fil</span></div>`}
+                <div class="cp-replace"><span class="cp-lbl">Med:</span><pre>${esc((e.replace || "").slice(0, 400))}${(e.replace || "").length > 400 ? "..." : ""}</pre></div>
+              </div>
+            `).join("")}
+            <div class="cp-actions">
+              <button class="btn-primary cp-apply">✓ Bruk og push til GitHub</button>
+              <button class="btn-ghost cp-reject">Avvis</button>
+              <span class="cp-msg subnote"></span>
+            </div>
+          </div>`;
+        }
+        div.innerHTML = html;
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
+        if (proposedChanges) {
+          div.querySelector(".cp-apply").addEventListener("click", async (ev) => {
+            const btn = ev.target;
+            const msg = div.querySelector(".cp-msg");
+            btn.disabled = true; msg.textContent = "Committer til GitHub …";
+            try {
+              const r = await fetch("/api/admin/claude/apply", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ changes: proposedChanges }) });
+              const d = await r.json();
+              if (d.ok) {
+                msg.textContent = "✓ Pushet til GitHub (" + d.applied.length + " fil(er)). Railway redeployer nå.";
+                msg.style.color = "#1d6a3b";
+              } else {
+                msg.innerHTML = "✗ Feil:<br>" + (d.errors || []).map((e) => esc(e.file) + ": " + esc(e.error)).join("<br>");
+                msg.style.color = "var(--bad)";
+                btn.disabled = false;
+              }
+            } catch (e) { msg.textContent = "✗ " + e.message; btn.disabled = false; }
+          });
+          div.querySelector(".cp-reject").addEventListener("click", () => {
+            div.querySelector(".claude-proposal").remove();
+          });
+        }
+        // Hvis Claude ber om å se en fil, vis "send fil"-knapp
+        const fileRequest = text.match(/(?:trenger\s+(?:å\s+)?se|vise meg|innholdet i|se på|åpne)\s+(?:innholdet\s+i\s+)?[`"]?([a-zA-Z0-9_./-]+\.[a-z]+)[`"]?/i);
+        if (fileRequest && fileRequest[1]) {
+          const fp = fileRequest[1];
+          if (!pendingFiles.includes(fp)) pendingFiles.push(fp);
+          const btn = document.createElement("button");
+          btn.className = "btn-ghost"; btn.textContent = "📎 Send " + fp + " til Claude";
+          btn.style.marginTop = "8px";
+          btn.onclick = async () => {
+            btn.disabled = true; btn.textContent = "Henter ...";
+            sendToClaud(`Her er innholdet i ${fp} (vedlagt som kontekst).`, [fp]);
+            btn.remove();
+          };
+          div.appendChild(btn);
+        }
+      }
+
+      async function sendToClaud(message, files) {
+        addMsg("user", message);
+        const typing = document.createElement("div");
+        typing.className = "claude-msg claude-assistant claude-typing";
+        typing.innerHTML = `<div class="claude-bubble"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>`;
+        chat.appendChild(typing); chat.scrollTop = chat.scrollHeight;
+        sendBtn.disabled = true;
+        try {
+          const r = await fetch("/api/admin/claude/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message, history: history.slice(0, -1).slice(-12), includeFiles: files || [] }) });
+          const d = await r.json();
+          typing.remove();
+          if (d.error) addMsg("assistant", "⚠ " + d.error);
+          else addMsg("assistant", d.reply || "(tomt svar)", d.proposedChanges);
+        } catch (e) { typing.remove(); addMsg("assistant", "⚠ " + e.message); }
+        sendBtn.disabled = false;
+      }
+
+      form.addEventListener("submit", (ev) => {
+        ev.preventDefault();
+        const msg = input.value.trim(); if (!msg) return;
+        input.value = ""; sendToClaud(msg);
+      });
+      input.addEventListener("keydown", (ev) => {
+        if ((ev.metaKey || ev.ctrlKey) && ev.key === "Enter") form.requestSubmit();
+      });
+      clearBtn.addEventListener("click", () => {
+        history = []; pendingFiles = [];
+        chat.innerHTML = `<div class="empty">Eksempler: «Bytt fargen på headeren til mørkeblå», «Legg til en kolonne i kostnader-tabellen som viser MVA», «Fiks skrivefeil på Prosjekter-fanen».</div>`;
+      });
+    })();
   </script>
 </body>
 </html>
