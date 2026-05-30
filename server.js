@@ -9,7 +9,7 @@ import { buildEconomy } from "./src/economy.js";
 import { getNewsFeed } from "./src/newsfeed.js";
 import { clearCache, resetClient, getInvoices, getCustomers, getSupplierInvoices, getSupplierInvoiceDetails, getSuppliers, getForwardableInvoices, getProjects, getProjectAddresses, getTimeEntries, getTimeEntriesDetailed, getEmployees, getProjectsEconomyDetails, getAccounts, getBalanceSheet, ymd } from "./src/tripletex.js";
 import { geocodeOne, sleep } from "./src/geocode.js";
-import { serveWithSnapshot, expireSnapshots, startBackgroundWarmer } from "./src/snapshot.js";
+import { serveWithSnapshot, expireSnapshots, startBackgroundWarmer, getSnapshot, saveSnapshot } from "./src/snapshot.js";
 const snapTtl = () => getConfig().cacheTtlMs || 300000;
 import { getConfig, saveConfig, getConfigForAdmin, SETTINGS_PATH } from "./src/settings.js";
 
@@ -2412,6 +2412,79 @@ async function smartOrionCall(orion, patterns, args) {
 }
 
 // ---- Rik status for en ansatt: 4 kolonner med LLM-analyse ----
+// ---- Manuell refresh av kolonne 4 (automasjoner) — kjører bare når brukeren ber om det ----
+// Henter siste 3 måneder med e-post fra Orion + sender til Claude. Lagrer i snapshot.
+app.post("/api/employee-automations/refresh", requireAuth, async (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    if (!name) return res.status(400).json({ error: "Mangler navn" });
+    const cfg = (getConfig().employeeSettings || {})[name];
+    const orion = cfg?.orion;
+    if (!orion?.enabled || !orion?.url) return res.status(400).json({ error: "Orion MCP ikke aktivert for denne ansatte" });
+    if (!ANTHROPIC_API_KEY) return res.status(400).json({ error: "ANTHROPIC_API_KEY ikke satt" });
+
+    const today = new Date();
+    const from90 = new Date(today.getTime() - 90 * 86400000).toISOString();
+    const tools = await orionListTools(orion);
+    if (!tools.length) return res.status(502).json({ error: "Orion svarer ikke. Sjekk tilkobling i Innstillinger." });
+
+    // Hent 3 mnd e-post fra inbox + sent items via M365
+    const inboxResult = await orionToolCall(orion, "m365__list-mail-folder-messages", {
+      "mailFolder-id": "inbox", $top: 200,
+      $select: "subject,from,toRecipients,receivedDateTime,bodyPreview,isRead,hasAttachments",
+      $orderby: "receivedDateTime desc",
+      $filter: `receivedDateTime ge ${from90}`,
+    });
+    const sentResult = await orionToolCall(orion, "m365__list-mail-folder-messages", {
+      "mailFolder-id": "sentitems", $top: 150,
+      $select: "subject,toRecipients,sentDateTime,bodyPreview",
+      $orderby: "sentDateTime desc",
+      $filter: `sentDateTime ge ${from90}`,
+    });
+    // Sjekk login-required
+    if ((inboxResult && typeof inboxResult === "object" && inboxResult._loginRequired) ||
+        (sentResult && typeof sentResult === "object" && sentResult._loginRequired)) {
+      return res.status(401).json({ error: "Microsoft-pålogging trengs i Orion. Åpne Orion-chatten og logg inn først.", needsLogin: true, orionChatUrl: orion.url });
+    }
+    if (!inboxResult && !sentResult) {
+      return res.status(502).json({ error: "Klarte ikke å hente e-post fra Orion." });
+    }
+
+    // Send til Claude for analyse
+    const sys = `Du er en ekspert på arbeidsflyt-automasjon. Analyser e-postene fra de siste 3 månedene og finn mønstre som kan automatiseres.
+
+Du leter etter:
+- Tilbakevendende e-poster (ukentlige rapporter, månedlige fakturaer, faste statusoppdateringer)
+- Rutinemessige svar som kunne vært ferdig-tekster eller automatiske svar
+- Innkommende e-poster som krever samme handling hver gang
+- Møteinnkallinger med faste mønstre
+- Data-uthenting som kunne vært en rapport
+- Notifikasjoner fra systemer som kunne vært filtrert/oppsummert
+- Manuell videresending som kunne vært en regel
+
+Svar på norsk. Lag 4-6 konkrete forslag som punktliste. Hvert punkt skal være praktisk og tydelig. Format:
+
+**Forslag:** Kort tittel
+Hva: Hva som kan automatiseres
+Mønster: Hva i e-postdataene som tyder på at det er automatiserbart (gi konkrete eksempler)
+Verktøy: Hvilket verktøy som passer (f.eks. Outlook-regel, n8n-workflow, Fyxer AI, Power Automate)`;
+    const usr = `E-postdata for ${name} siste 3 måneder:\n\nINNBOKS:\n${String(inboxResult || "").slice(0, 8000)}\n\nSENDT:\n${String(sentResult || "").slice(0, 6000)}\n\nFinn 4-6 konkrete automatiseringsmuligheter.`;
+    const suggestions = await callClaude(sys, usr, "claude-sonnet-4-6");
+    if (!suggestions) return res.status(502).json({ error: "Claude svarte ikke" });
+
+    const result = {
+      suggestions,
+      generatedAt: new Date().toISOString(),
+      emailCount: { inbox: typeof inboxResult === "string" ? (inboxResult.match(/subject/gi) || []).length : 0, sent: typeof sentResult === "string" ? (sentResult.match(/subject/gi) || []).length : 0 },
+    };
+    saveSnapshot("emp-automations:" + name, result);
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    console.error("Automations refresh:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
   try {
     const name = String(req.query.name || "").trim();
@@ -2471,7 +2544,7 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
         orionTools = tools.map((t) => t.name);
         // ISO-datoer
         const startISO = new Date().toISOString();
-        const endISO = new Date(today.getTime() + 14 * 86400000).toISOString();
+        const endISO = new Date(today.getTime() + 5 * 86400000).toISOString(); // 5 dager fram for kalender
         const from28ISO = new Date(today.getTime() - 28 * 86400000).toISOString();
 
         // Kalender — prioriter M365 Graph-tools, så fyxer, så generiske
@@ -2499,57 +2572,32 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
           }
         }
 
-        // E-post — prioriter M365 list-mail-messages, så fyxer search_context
-        const emailCandidates = [
-          {
-            name: "m365__list-mail-messages",
-            args: {
-              $top: 100,
-              $select: "subject,from,toRecipients,receivedDateTime,bodyPreview,isRead,hasAttachments",
-              $orderby: "receivedDateTime desc",
-              $filter: `receivedDateTime ge ${from28ISO}`,
-            },
-          },
-          {
-            name: "m365__list-mail-folder-messages",
-            args: {
-              "mailFolder-id": "inbox",
-              $top: 100,
-              $select: "subject,from,receivedDateTime,bodyPreview",
-              $orderby: "receivedDateTime desc",
-            },
-          },
-          {
-            name: "fyxer__search_context",
-            args: { from: from28ISO, to: new Date().toISOString(), limit: 50 },
-          },
+        // Kolonne 1-data: hent sendte e-poster siste 28 dager for å vite "hva har han jobbet med"
+        // (vi henter IKKE inn-boks her — det skjer kun ved manuell refresh av automasjoner i kolonne 4)
+        const sentCandidates = [
+          { name: "m365__list-mail-folder-messages", args: { "mailFolder-id": "sentitems", $top: 60, $select: "subject,toRecipients,sentDateTime,bodyPreview", $orderby: "sentDateTime desc", $filter: `sentDateTime ge ${from28ISO}` } },
         ];
-        let emailLoginRequired = false;
-        for (const c of emailCandidates) {
+        var _sentLoginRequired = false;
+        var orionSent = null;
+        for (const c of sentCandidates) {
           if (!tools.find((t) => t.name === c.name)) continue;
           const r = await orionToolCall(orion, c.name, c.args);
-          if (r && typeof r === "object" && r._loginRequired) { emailLoginRequired = true; emailTool = c.name; continue; }
-          if (r) { orionEmails = r; emailTool = c.name; break; }
+          if (r && typeof r === "object" && r._loginRequired) { _sentLoginRequired = true; continue; }
+          if (r) { orionSent = r; break; }
         }
-        var _emailLoginRequired = emailLoginRequired;
-        // Fallback til keyword-matching
-        if (!orionEmails) {
-          const emailPatterns = [/list[_-]?mail/i, /^(get_|list_)?(email|mail)s?$/i, /innboks|inbox/i, /mail|email/i];
-          const en = findOrionTool(tools, emailPatterns);
-          if (en) {
-            emailTool = en;
-            orionEmails = await orionToolCall(orion, en, { $top: 50, $orderby: "receivedDateTime desc" });
-          }
-        }
+        var _emailLoginRequired = _sentLoginRequired;
       }
+      // Kolonne 4: hentes IKKE automatisk. Les fra cache.
+      const cachedAuto = getSnapshot("emp-automations:" + name);
+      const automationsCached = cachedAuto?.data || null;
 
-      // Kolonne 1: Hva jobber X med (LLM-sammendrag av timer)
+      // Kolonne 1: Hva jobber X med — kombinerer Tripletex-timer + Orion sendte e-poster
       let workSummary = null;
-      if (ANTHROPIC_API_KEY && entries.length) {
+      if (ANTHROPIC_API_KEY && (entries.length || orionSent)) {
         const top = projects.slice(0, 8);
         const recentSample = entries.slice(-30).map((e) => `${e.date}: ${e.hours}t på ${e.project?.name || "—"}${e.activity?.name ? " (" + e.activity.name + ")" : ""}${e.comment ? " — " + e.comment.slice(0, 80) : ""}`).join("\n");
-        const sys = "Du er en kort, presis assistent. Du skriver et sammendrag på norsk i 2-4 setninger basert på timeregistreringer. Ingen overskrifter. Ikke gjenta navnet. Beskriv hvilke faglige områder og hvilke kunder/prosjekter personen har brukt tid på, og hvor mye.";
-        const usr = `${name} har ført timer siste 4 uker. Topp prosjekter etter timer:\n${top.map((p) => "- " + p.name + ": " + Math.round(p.hours) + "t").join("\n")}\n\nUtdrag av siste linjer:\n${recentSample}\n\nSkriv et kort sammendrag av hva ${name} jobber med.`;
+        const sys = "Du er en kort, presis assistent. Du skriver et sammendrag på norsk i 3-5 setninger basert på timeregistreringer fra Tripletex og sendte e-poster fra Outlook. Ingen overskrifter. Ikke gjenta navnet. Beskriv hva personen faktisk jobber med — kombiner det de har ført timer på med hva de har sendt e-poster om. Nevn konkrete prosjekter, kunder og temaer.";
+        const usr = `${name} har ført timer siste 4 uker. Topp aktiviteter etter timer:\n${top.map((p) => "- " + p.name + ": " + Math.round(p.hours) + "t").join("\n")}\n\nUtdrag av siste timeoppføringer:\n${recentSample}\n\n${orionSent ? "Sendte e-poster siste 28 dager (fra Outlook):\n" + String(orionSent).slice(0, 4000) : "(Ingen Outlook-data tilgjengelig)"}\n\nSkriv et sammendrag av hva ${name} jobber med basert på begge kilder.`;
         workSummary = await callClaude(sys, usr);
       }
 
@@ -2562,20 +2610,11 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
         calendarPretty = String(orionCalendar).slice(0, 2000);
       }
 
-      // Kolonne 4: Forslag til automasjoner (LLM analyserer e-postmønstre)
-      let automationSuggestions = null;
-      if (ANTHROPIC_API_KEY && orionEmails) {
-        const sys = `Du analyserer e-poster og finner mønstre som kan automatiseres. Du leter etter:
-- Tilbakevendende e-poster (ukentlige rapporter, månedlige fakturaer, faste statusoppdateringer)
-- Rutinemessige svar som kunne vært ferdig-tekster
-- Innkommende e-poster som krever samme handling hver gang
-- Møteinnkallinger med faste mønstre
-- Data-uthenting som kunne vært en rapport
-
-Svar på norsk. Lag 3-5 konkrete forslag som punktliste. Hvert punkt skal være kort og praktisk. Format: "**Forslag:** [kort tittel]\\nHva: [hva som kan automatiseres]\\nMønster: [hva som tyder på at det er automatiserbart]"`;
-        const usr = `E-postdata for ${name} siste 28 dager:\n\n${String(orionEmails).slice(0, 6000)}\n\nFinn mønstre som kan automatiseres.`;
-        automationSuggestions = await callClaude(sys, usr);
-      }
+      // Kolonne 4: Forslag til automasjoner — IKKE auto-generert. Bruker cached versjon.
+      // Kjør POST /api/employee-automations/refresh manuelt for å oppdatere.
+      const automationSuggestions = automationsCached?.suggestions || null;
+      const automationGeneratedAt = automationsCached?.generatedAt || null;
+      const automationEmailCount = automationsCached?.emailCount || 0;
 
       return {
         name, updatedAt: new Date().toISOString(),
@@ -2585,9 +2624,11 @@ Svar på norsk. Lag 3-5 konkrete forslag som punktliste. Hvert punkt skal være 
         col2_projects: projects,
         col3_calendar: calendarPretty,
         col4_automations: automationSuggestions,
+        col4_generatedAt: automationGeneratedAt,
+        col4_emailCount: automationEmailCount,
         // Diagnostikk
         hasOrionCalendar: !!orionCalendar,
-        hasOrionEmails: !!orionEmails,
+        hasOrionEmails: !!automationSuggestions,
         calendarTool, emailTool,
         availableOrionTools: orionTools,
         entryCount: entries.length,

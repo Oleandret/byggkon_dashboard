@@ -386,11 +386,11 @@
         <div class="loading-dots"><span></span><span></span><span></span></div>
       </div>
       <div class="ans-dash-block status-col" id="statusCol3">
-        <h3>📅 Kommende møter <span class="subnote">(neste 2 uker)</span></h3>
+        <h3>📅 Kommende møter <span class="subnote">(neste 5 dager)</span></h3>
         <div class="loading-dots"><span></span><span></span><span></span></div>
       </div>
       <div class="ans-dash-block status-col status-col-automation" id="statusCol4">
-        <h3>⚡ Forslag til automasjoner</h3>
+        <h3>⚡ Forslag til automasjoner <span class="subnote">(manuell oppdatering)</span></h3>
         <div class="loading-dots"><span></span><span></span><span></span></div>
       </div>
     </div>
@@ -454,19 +454,55 @@
          : !d.hasOrionCalendar ? `<div class="empty">Fant ikke et kalender-verktøy i Orion.${orionToolsHint(d)}</div>`
          : `<div class="empty">Ingen kommende møter.</div>`);
 
-      // Kolonne 4: Automasjoner
+      // Kolonne 4: Automasjoner — manuell refresh
       const c4 = document.getElementById("statusCol4");
-      c4.innerHTML = c4.querySelector("h3").outerHTML +
-        (d.col4_automations ? `<div class="automation-list">${esc(d.col4_automations)
-          .replace(/\*\*Forslag:\*\*\s*([^\n]+)/g, '<div class="auto-sug"><div class="auto-sug-h">⚡ $1</div>')
-          .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
-          .replace(/\n\n/g, "</div><div class=\"auto-sug-spacer\"></div>")
-          .replace(/\n/g, "<br>")}</div>`
-         : !d.claudeEnabled ? `<div class="empty">Krever <code>ANTHROPIC_API_KEY</code> på Railway.</div>`
-         : !d.orionEnabled ? `<div class="empty">Krever Orion MCP for å lese e-poster.</div>`
-         : d.m365LoginRequired ? loginNotice
-         : !d.hasOrionEmails ? `<div class="empty">Fant ikke et e-post-verktøy i Orion.${orionToolsHint(d)}</div>`
-         : `<div class="empty">Ingen mønstre funnet.</div>`);
+      const refreshBtn = `<button class="btn-primary auto-refresh-btn" data-name="${esc(emp.name)}">↻ Oppdater forslag <span class="subnote">(bruker tokens)</span></button>`;
+      let c4Body;
+      if (d.col4_automations) {
+        const generated = d.col4_generatedAt ? new Date(d.col4_generatedAt).toLocaleString("nb-NO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+        c4Body = `<div class="auto-meta"><span class="subnote">Sist oppdatert: ${esc(generated)}</span> ${refreshBtn}</div>
+          <div class="automation-list">${esc(d.col4_automations)
+            .replace(/\*\*Forslag:\*\*\s*([^\n]+)/g, '<div class="auto-sug"><div class="auto-sug-h">⚡ $1</div>')
+            .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+            .replace(/\n\n/g, "</div><div class=\"auto-sug-spacer\"></div>")
+            .replace(/\n/g, "<br>")}</div>`;
+      } else if (!d.claudeEnabled) {
+        c4Body = `<div class="empty">Krever <code>ANTHROPIC_API_KEY</code> på Railway.</div>`;
+      } else if (!d.orionEnabled) {
+        c4Body = `<div class="empty">Krever Orion MCP for å lese e-poster.</div>`;
+      } else {
+        c4Body = `<div class="empty">Ingen forslag generert ennå.<br>Klikk knappen under for å analysere siste 3 måneder med e-post.</div>${refreshBtn}`;
+      }
+      c4.innerHTML = c4.querySelector("h3").outerHTML + c4Body;
+
+      // Hook up refresh button
+      const refreshBtnEl = c4.querySelector(".auto-refresh-btn");
+      if (refreshBtnEl) {
+        refreshBtnEl.addEventListener("click", async () => {
+          refreshBtnEl.disabled = true;
+          refreshBtnEl.innerHTML = `<span class="loading-dots" style="padding:0;display:inline-flex;gap:3px"><span></span><span></span><span></span></span> Henter 3 mnd e-post + analyserer …`;
+          try {
+            const r = await fetch("/api/employee-automations/refresh", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name: emp.name }),
+            });
+            const d2 = await r.json();
+            if (!r.ok) {
+              if (d2.needsLogin) {
+                refreshBtnEl.outerHTML = `<div class="m365-login-notice"><h4>🔐 Microsoft-pålogging trengs</h4><p>${esc(d2.error)}</p><p><a href="${esc(d2.orionChatUrl)}" target="_blank" rel="noopener">Åpne Orion-chatten →</a></p></div>`;
+              } else {
+                refreshBtnEl.outerHTML = `<div class="empty">Feil: ${esc(d2.error || "ukjent")}</div>`;
+              }
+              return;
+            }
+            // Last status-fanen på nytt så vi viser de nye forslagene
+            statusData = null; renderStatus(emp);
+          } catch (e) {
+            refreshBtnEl.disabled = false;
+            refreshBtnEl.textContent = "↻ Prøv igjen";
+          }
+        });
+      }
 
     } catch (e) {
       content.innerHTML = `<div class="empty">Kunne ikke hente: ${esc(e.message)}</div>`;
