@@ -1632,6 +1632,143 @@ app.post("/api/dept-tilbud", requireAuth, (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
+// ---- Ansatt-innstillinger (Orion MCP + visibility per ansatt) ----
+app.get("/api/employee-settings", requireAuth, (req, res) => {
+  const all = getConfig().employeeSettings || {};
+  // Maskér MCP-keys
+  const out = {};
+  for (const [name, s] of Object.entries(all)) {
+    out[name] = {
+      orion: { url: s.orion?.url || "", enabled: !!s.orion?.enabled, hasKey: !!s.orion?.key },
+      visibility: s.visibility || {},
+    };
+  }
+  res.json({ settings: out });
+});
+app.post("/api/employee-settings", requireAuth, (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    if (!name) return res.status(400).json({ error: "Mangler ansattnavn" });
+    const all = { ...(getConfig().employeeSettings || {}) };
+    const prev = all[name] || {};
+    const body = req.body || {};
+    const orionPrev = prev.orion || {};
+    const orion = {
+      url: body.orion?.url !== undefined ? String(body.orion.url).slice(0, 500) : (orionPrev.url || ""),
+      // Hold på eksisterende key hvis den ikke sendes inn på nytt (tom streng = behold)
+      key: (body.orion && typeof body.orion.key === "string" && body.orion.key)
+        ? String(body.orion.key).slice(0, 500)
+        : (orionPrev.key || ""),
+      enabled: typeof body.orion?.enabled === "boolean" ? body.orion.enabled : !!orionPrev.enabled,
+    };
+    const visibility = body.visibility && typeof body.visibility === "object"
+      ? Object.fromEntries(Object.entries(body.visibility).map(([k, v]) => [String(k).slice(0, 40), !!v]))
+      : (prev.visibility || {});
+    all[name] = { orion, visibility };
+    saveConfig({ employeeSettings: all });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ---- Orion MCP-proxy: henter status fra ansattes Orion-server ----
+app.get("/api/employee-status", requireAuth, async (req, res) => {
+  try {
+    const name = String(req.query.name || "").trim();
+    if (!name) return res.status(400).json({ error: "Mangler navn" });
+    const cfg = (getConfig().employeeSettings || {})[name];
+    const orion = cfg?.orion;
+    if (!orion || !orion.enabled || !orion.url) {
+      return res.json({ ok: false, reason: "Orion MCP er ikke aktivert for denne ansatte" });
+    }
+    // Best-effort JSON-RPC kall til Orion MCP. Vi forventer enten /status-endpoint,
+    // eller en standard MCP tools/call mot et "get_status"-verktøy.
+    const url = orion.url.replace(/\/+$/, "");
+    const tryEndpoints = [
+      { method: "GET", url: url + "/status?employee=" + encodeURIComponent(name) },
+      { method: "GET", url: url + "/api/status?employee=" + encodeURIComponent(name) },
+      { method: "POST", url: url, body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "get_status", arguments: { employee: name } } } },
+    ];
+    let lastErr = null;
+    for (const ep of tryEndpoints) {
+      try {
+        const r = await fetch(ep.url, {
+          method: ep.method,
+          headers: {
+            "Content-Type": "application/json",
+            ...(orion.key ? { Authorization: "Bearer " + orion.key, "X-Api-Key": orion.key } : {}),
+          },
+          body: ep.body ? JSON.stringify(ep.body) : undefined,
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!r.ok) { lastErr = "HTTP " + r.status; continue; }
+        const txt = await r.text();
+        let data; try { data = JSON.parse(txt); } catch { data = { raw: txt }; }
+        return res.json({ ok: true, source: ep.url, data });
+      } catch (e) { lastErr = e.message; }
+    }
+    res.json({ ok: false, reason: "Orion svarte ikke: " + (lastErr || "ukjent feil") });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ---- Per-ansatt timeoversikt (siste 2 + 4 uker) ----
+app.get("/api/employee-time", requireAuth, async (req, res) => {
+  try {
+    const name = String(req.query.name || "").trim();
+    if (!name) return res.status(400).json({ error: "Mangler navn" });
+    res.json(await serveWithSnapshot("emp-time:" + name, async () => {
+      const today = new Date();
+      const todayStr = ymd(today);
+      const from = ymd(new Date(today.getTime() - 28 * 86400000));
+      const [timeEntries] = await Promise.all([getTimeEntries(from, todayStr).catch(() => [])]);
+      const norm = (s) => String(s || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[.\-]/g, " ").replace(/\s+/g, " ").trim();
+      const nameKeys = (n) => {
+        const parts = norm(n).split(" ").filter(Boolean);
+        const k = new Set([parts.join(" ")]);
+        if (parts.length >= 2) k.add(parts[0] + " " + parts[parts.length - 1]);
+        return k;
+      };
+      const target = nameKeys(name);
+      const matches = (full) => { const k = nameKeys(full); for (const x of k) if (target.has(x)) return true; return false; };
+      const d14 = ymd(new Date(today.getTime() - 14 * 86400000));
+      const d28 = ymd(new Date(today.getTime() - 28 * 86400000));
+      const proj2 = new Map(), proj4 = new Map();
+      let tot2 = 0, billable2 = 0, tot4 = 0, billable4 = 0;
+      const days = {}; // YYYY-MM-DD -> { hours, billable }
+      for (const e of timeEntries) {
+        const empName = `${e.employee?.firstName || ""} ${e.employee?.lastName || ""}`.trim();
+        if (!matches(empName)) continue;
+        const h = e.hours || 0, b = e.chargeableHours || 0;
+        const pname = e.project?.name || "(intern)";
+        if (e.date >= d28) {
+          tot4 += h; billable4 += b;
+          proj4.set(pname, (proj4.get(pname) || 0) + h);
+        }
+        if (e.date >= d14) {
+          tot2 += h; billable2 += b;
+          proj2.set(pname, (proj2.get(pname) || 0) + h);
+        }
+        days[e.date] = days[e.date] || { hours: 0, billable: 0 };
+        days[e.date].hours += h; days[e.date].billable += b;
+      }
+      return {
+        last2w: {
+          totalHours: tot2,
+          billableHours: billable2,
+          billingRate: tot2 > 0 ? billable2 / tot2 : 0,
+          projects: [...proj2.entries()].map(([name, hours]) => ({ name, hours })).sort((a, b) => b.hours - a.hours),
+        },
+        last4w: {
+          totalHours: tot4,
+          billableHours: billable4,
+          billingRate: tot4 > 0 ? billable4 / tot4 : 0,
+          projects: [...proj4.entries()].map(([name, hours]) => ({ name, hours })).sort((a, b) => b.hours - a.hours),
+        },
+        days,
+      };
+    }, 5 * 60 * 1000));
+  } catch (err) { res.status(502).json({ error: err.message }); }
+});
+
 // ---- KI-agent-bestillinger (egen avdeling: KI-agenter) ----
 app.get("/api/ki-orders", requireAuth, (req, res) => res.json({ orders: getConfig().kiAgentOrders || [] }));
 app.post("/api/ki-orders", requireAuth, (req, res) => {
