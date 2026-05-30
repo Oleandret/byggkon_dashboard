@@ -2318,12 +2318,50 @@ app.post("/api/employee-chat", requireAuth, async (req, res) => {
     if (proto === "auto" || proto === "mcp") {
       // MCP streamable HTTP — bruk mcpCall med riktige headers
       const mcpTargets = [url + "/mcp", url, url + "/rpc"];
+      // Hvis tool feiler med "Ukjent verktøy", auto-discover via tools/list og prøv på nytt
+      const triedTools = new Set([tool]);
+      const toolsToTry = [tool];
       for (const target of mcpTargets) {
-        const mcpResult = await mcpCall(target, orion.key, { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: tool, arguments: { employee: name, message, history } } }).catch(() => null);
-        if (mcpResult && mcpResult.ok) {
-          const data = mcpResult.data;
-          const reply = data?.result?.content?.[0]?.text || data?.result?.text || data?.reply || data?.message;
-          if (reply) return res.json({ ok: true, reply: String(reply), raw: data, source: "mcp " + target });
+        // Først: hent verktøy-listen (best effort)
+        if (toolsToTry.length === 1) {
+          const listRes = await mcpCall(target, orion.key, { jsonrpc: "2.0", id: 0, method: "tools/list" }).catch(() => null);
+          if (listRes?.ok) {
+            const tools = listRes.data?.result?.tools || listRes.data?.tools || [];
+            for (const t of tools) {
+              const tn = t.name || t;
+              if (typeof tn === "string" && !triedTools.has(tn)) { triedTools.add(tn); toolsToTry.push(tn); }
+            }
+          }
+        }
+        for (const toolName of toolsToTry) {
+          // Tilpass argumenter etter vanlige mønstre
+          const argVariants = [
+            { employee: name, message, history },
+            { employee: name, question: message, history },
+            { employee: name, query: message },
+            { message },
+            { question: message },
+            { input: message },
+          ];
+          for (const args of argVariants) {
+            const mcpResult = await mcpCall(target, orion.key, { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: toolName, arguments: args } }).catch(() => null);
+            if (mcpResult && mcpResult.ok) {
+              const data = mcpResult.data;
+              const errMsg = data?.error?.message || "";
+              if (errMsg && /ukjent\s+verktøy|unknown\s+tool|not\s+found/i.test(errMsg)) {
+                // Prøv neste tool
+                break;
+              }
+              if (errMsg && /invalid\s+param|missing|required/i.test(errMsg)) {
+                // Prøv neste argumentvariant
+                continue;
+              }
+              const reply = data?.result?.content?.[0]?.text || data?.result?.text || data?.result?.reply || data?.result?.message || data?.reply || data?.message;
+              if (reply) return res.json({ ok: true, reply: String(reply), raw: data, source: `mcp ${target} → ${toolName}` });
+              // Hvis ingen reply men heller ikke feil, returner rådata
+              if (data?.result && !errMsg) return res.json({ ok: true, reply: JSON.stringify(data.result, null, 2), raw: data, source: `mcp ${target} → ${toolName}` });
+            }
+          }
         }
       }
     }

@@ -477,10 +477,9 @@ function renderHero(d) {
   }
   const chips = [
     { label: "Omsetning i år", value: nok(k.revenueYTD) },
-    { label: "Utestående", value: nok(k.outstandingTotal), cls: k.overdueTotal > 0 ? "warn" : "" },
+    { label: "Utestående", value: nok(k.outstandingTotal) },
     { label: "Forfalt", value: nok(k.overdueTotal), cls: k.overdueTotal > 0 ? "bad" : "" },
     { label: "Aktive prosjekter", value: k.activeProjects },
-    { label: "Åpne ordre", value: k.openOrders },
     { label: "Timer denne mnd.", value: num(k.hoursThisMonth) },
     { label: "Snitt faktureringsgrad", value: pct(k.avgBillingRate) },
     { label: "Ledig kapasitet", value: `${k.freeCapacityCount} ansatte` },

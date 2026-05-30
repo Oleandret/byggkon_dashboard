@@ -34,8 +34,11 @@ export async function buildOverview() {
   const monthStart = ymd(startOfMonth(today));
   const fourWeeksAgoStr = ymd(daysAgo(28, today));
 
-  // Tidligste dato vi trenger timer fra (året, eller 4 uker tilbake om det er tidligere).
-  const timeFrom = ymd(daysAgo(28, today) < yearStart ? daysAgo(28, today) : yearStart);
+  // Tidligste dato vi trenger timer fra: 12 måneder tilbake (for å telle aktive
+  // prosjekter siste 12 mnd korrekt). Andre kalkulasjoner filtrerer på sin egen
+  // dato, så ekstra data gjør ingen skade — bare litt mer å hente.
+  const twelveMonthsAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+  const timeFrom = ymd(twelveMonthsAgo);
 
   // Månedene hittil i år (for omsetning per måned)
   const monthsYTD = [];
@@ -336,7 +339,8 @@ export async function buildOverview() {
       revenueYTD,
       outstandingTotal,
       overdueTotal,
-      activeProjects: recentlyActive.length,
+      // Aktive prosjekter = antall unike prosjekter med timer ført siste 12 mnd
+      activeProjects: projAgg.size,
       openOrders: orders.length,
       employees: employees.length,
       hoursThisMonth,
