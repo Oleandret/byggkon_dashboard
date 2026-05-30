@@ -482,8 +482,9 @@
     <main class="container">
       <div class="page-intro"><span class="pi-ico">👥</span><span class="pi-txt"><b>Hva siden gjør:</b> Samler alt rundt folk — kontorplassering, kompetansematrise, organisasjonskart, onboarding, verneombud og rekruttering. <b>Hensikt:</b> Ett sted for HR-arbeidet og for å bygge et godt arbeidsmiljø i tråd med verdiene våre.</span></div>
       <div class="subtabs" id="hrSubtabs">
-        <button class="subtab active" data-sub="plassering">Kontorplassering</button>
-        <button class="subtab" data-sub="ansatte">Ansatte / kompetanse</button>
+        <button class="subtab active" data-sub="ansatte-dash">Ansatte</button>
+        <button class="subtab" data-sub="plassering">Kontorplassering</button>
+        <button class="subtab" data-sub="ansatte">Kompetanse</button>
         <button class="subtab" data-sub="roller">Rollebeskrivelser</button>
         <button class="subtab" data-sub="parorende">Pårørende</button>
         <button class="subtab" data-sub="organisasjon">Organisasjon</button>
@@ -497,6 +498,33 @@
         <button class="subtab" data-sub="parkering">Parkering</button>
         <button class="subtab" data-sub="oilers">Oilers-losj</button>
         <button class="subtab" data-sub="foresporsler">Forespørsler</button>
+      </div>
+
+      <div class="hr-sub active" id="hrsub-ansatte-dash">
+        <div class="card">
+          <div class="proj-head">
+            <h2>Ansatte — personlige dashboards</h2>
+            <div class="org-actions">
+              <input id="ansSearch" class="search" type="search" placeholder="Søk ansatt …" />
+              <button id="ansReload" class="btn-ghost" title="Oppdater">↻</button>
+            </div>
+          </div>
+          <p class="subnote">Klikk på en ansatt for å åpne dashbordet til personen — rolle, timer, prosjekter, faktureringsgrad, kompetanse og faglige mål.</p>
+          <div id="ansChipBar" class="ans-chip-bar"></div>
+        </div>
+
+        <div class="card ans-dash-card" id="ansDashCard" hidden>
+          <div id="ansDashHeader"></div>
+          <div id="ansDashKpis" class="ans-kpis"></div>
+          <div class="grid-2" id="ansDashGrid">
+            <div class="ans-dash-block" id="ansDashProjects"></div>
+            <div class="ans-dash-block" id="ansDashRole"></div>
+          </div>
+          <div class="grid-2" style="margin-top:14px">
+            <div class="ans-dash-block" id="ansDashKomp"></div>
+            <div class="ans-dash-block" id="ansDashGoals"></div>
+          </div>
+        </div>
       </div>
 
       <div class="hr-sub" id="hrsub-ansatte">
@@ -533,7 +561,7 @@
         </div>
       </div>
 
-      <div class="hr-sub active" id="hrsub-plassering">
+      <div class="hr-sub" id="hrsub-plassering">
         <div class="card">
           <div class="proj-head">
             <h2>Kontorplassering</h2>
@@ -1770,6 +1798,7 @@ cd ~/pitzDaily &amp;&amp; blockMesh &amp;&amp; simpleFoam &amp;&amp; paraFoam</p
   <script src="/mktcontacts.js"></script>
   <script src="/social.js"></script>
   <script src="/rib.js"></script>
+  <script src="/ansatte-dashboard.js"></script>
   <script type="module" src="/bim.js"></script>
 </body>
 </html>

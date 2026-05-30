@@ -1189,3 +1189,48 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .rapport-tbl th { background: #faf8f4; font-weight: 700; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; text-align: left; }
 .rapport-tbl td.num, .rapport-tbl th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .rapport-tbl tr.grp td { background: #eef4ff; font-weight: 700; }
+
+/* ============ HR: ANSATTE-DASHBOARDS ============ */
+.ans-chip-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.ans-chip { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px 6px 6px; cursor: pointer; transition: all .15s; font-family: inherit; }
+.ans-chip:hover { border-color: var(--accent); background: #fafafa; }
+.ans-chip.active { background: var(--accent); border-color: var(--accent-dark); color: #fff; }
+.ans-chip.active .ans-chip-title { color: rgba(255,255,255,.85); }
+.ans-chip-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #2b6eb8, #1d4f8a); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px; flex-shrink: 0; }
+.ans-chip.active .ans-chip-avatar { background: rgba(255,255,255,.25); }
+.ans-chip-body { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.2; }
+.ans-chip-name { font-weight: 700; font-size: 13px; }
+.ans-chip-title { font-size: 11px; color: var(--muted); }
+
+.ans-dash-card { padding: 22px 24px; }
+.ans-dash-head { display: flex; gap: 18px; align-items: center; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 2px solid var(--border); }
+.ans-dash-avatar { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; box-shadow: 0 2px 6px rgba(0,0,0,.12); flex-shrink: 0; }
+.ans-dash-avatar-init { background: linear-gradient(135deg, #2b6eb8, #1d4f8a); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 26px; }
+.ans-dash-meta h2 { color: var(--accent-dark); }
+.ans-dash-title { font-size: 14px; color: var(--muted); font-weight: 600; margin-top: 2px; }
+.ans-dash-contacts { display: flex; gap: 14px; margin-top: 6px; font-size: 13px; }
+.ans-dash-contacts a { color: var(--accent); text-decoration: none; }
+.ans-dash-contacts a:hover { text-decoration: underline; }
+
+.ans-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+.ans-kpi { background: #faf8f4; border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.ak-lbl { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+.ak-val { font-size: 22px; font-weight: 800; margin-top: 3px; font-variant-numeric: tabular-nums; color: var(--ink); }
+@media (max-width: 800px) { .ans-kpis { grid-template-columns: repeat(2, 1fr); } }
+
+.ans-dash-block { background: #faf8f4; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.ans-dash-block h3 { margin: 0 0 8px; font-size: 14px; color: var(--accent-dark); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.ans-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.ans-tbl th, .ans-tbl td { padding: 7px 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+.ans-tbl th { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; }
+.ans-tbl td.num, .ans-tbl th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.ans-role-text { font-size: 13px; line-height: 1.55; }
+.goal-list { margin: 4px 0 0; padding-left: 20px; font-size: 13px; line-height: 1.6; }
+.komp-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.komp-pill { display: inline-flex; flex-direction: column; padding: 5px 10px; border-radius: 8px; font-size: 11.5px; line-height: 1.2; }
+.komp-pill.level-1 { background: #fff7e1; color: #6b5a1a; }
+.komp-pill.level-2 { background: #fdecd9; color: #8a4d1a; }
+.komp-pill.level-3 { background: #d9ecff; color: #1c4f8a; }
+.komp-pill.level-4 { background: #d9f2dd; color: #1d6a3b; }
+.kp-skill { font-weight: 700; }
+.kp-lvl { font-size: 10px; opacity: .8; }
