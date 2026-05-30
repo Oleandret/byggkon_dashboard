@@ -2754,27 +2754,33 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
           return `### ${p.name}${p.customer ? ` (${p.customer})` : ""}\nDine timer: ${Math.round(p.hours)}t · Team total: ${Math.round(p.teamHours || 0)}t · Sist aktivitet: ${p.lastDate || "—"}${p.isManager ? " · DU ER PROSJEKTLEDER" : ""}\nKommentarer fra dine timeoppføringer:\n${recentComments || "  (du har ikke ført kommentarer på dette prosjektet)"}`;
         }).join("\n\n");
 
-        const sys = `Du oppsummerer hva som skjer på hvert prosjekt basert på tilgjengelig info. For hvert prosjekt: 1-2 setninger om hva som pågår eller hva personens rolle er. Vær konkret. Hvis det er lite info, beskriv kort hvilken kunde og at personen er involvert / er PL. Svar i JSON:
-{"summaries":[{"name":"PROSJEKTNAVN","summary":"1-2 setninger"}]}
+        const sys = `Du analyserer prosjekter og gir TO ting per prosjekt:
+1. summary: 1-2 setninger om hva som skjer / pågår
+2. followup: 1-2 konkrete punkter om hva som bør følges opp (avklare, sende, ringe, sjekke, levere)
+
+For oppfølging: vær konkret og handlingsbasert. Ikke generelle ting som "fortsette arbeidet". Hvis det er lite info: foreslå sjekk-inn med PL eller kunde.
+
+Svar i JSON:
+{"projects":[{"name":"PROSJEKTNAVN","summary":"1-2 setninger om status","followup":"1-2 konkrete handlinger"}]}
 Bare JSON.`;
-        const usr = `Prosjekter ${name} er involvert i siste 3 måneder:\n\n${perProjectInfo}\n\nLag korte oppsummeringer.`;
+        const usr = `Prosjekter ${name} er involvert i siste 3 måneder:\n\n${perProjectInfo}\n\nLag summary + followup per prosjekt.`;
         const claudeReply = await callClaude(sys, usr);
         if (claudeReply) {
           try {
             const match = claudeReply.match(/\{[\s\S]*\}/);
             if (match) {
               const parsed = JSON.parse(match[0]);
-              if (Array.isArray(parsed.summaries)) {
+              const projList = parsed.projects || parsed.summaries || [];
+              if (Array.isArray(projList)) {
                 projectSummaries = topProjects.map((p) => {
-                  const sum = parsed.summaries.find((s) => s.name === p.name);
-                  return { ...p, summary: sum?.summary || "" };
+                  const item = projList.find((s) => s.name === p.name);
+                  return { ...p, summary: item?.summary || "", followup: item?.followup || "" };
                 });
               }
             }
           } catch { /* fallback */ }
         }
-        // Hvis Claude ikke svarte, vis i hvert fall prosjektene uten summary
-        if (!projectSummaries.length) projectSummaries = topProjects.map((p) => ({ ...p, summary: "" }));
+        if (!projectSummaries.length) projectSummaries = topProjects.map((p) => ({ ...p, summary: "", followup: "" }));
       }
 
       return {

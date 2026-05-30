@@ -1444,3 +1444,10 @@ td.cell { width: 26px; min-width: 26px; text-align: center; padding: 0; height: 
 .status-refresh-btn { padding: 8px 16px; font-size: 13px; white-space: nowrap; }
 .status-refresh-btn:disabled { opacity: .7; cursor: not-allowed; }
 .status-refresh-btn .subnote { color: rgba(255,255,255,.8); font-size: 11px; margin-left: 4px; }
+
+/* ============ STATUS: OPPFØLGING (SEKSJON 6) ============ */
+.status-followup-block { margin-top: 14px; background: #fff9f0; border-color: #d18d3c; }
+.status-followup-block h3 { color: #6b5a1a; margin-top: 0; }
+.proj-followup-card { background: #fff; border: 1px solid #d18d3c; border-radius: 8px; padding: 12px 14px; transition: all .12s; }
+.proj-followup-card:hover { box-shadow: 0 2px 8px rgba(209,141,60,.18); }
+.psc-followup { font-size: 13px; line-height: 1.55; color: var(--ink); margin: 6px 0 0; padding: 8px 10px; background: #fff7e1; border-radius: 6px; border-left: 3px solid #d18d3c; }

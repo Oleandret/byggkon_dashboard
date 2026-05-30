@@ -402,6 +402,10 @@
       <h3>📊 Prosjektoversikt — hva skjer på hvert prosjekt</h3>
       <div class="loading-dots"><span></span><span></span><span></span></div>
     </div>
+    <div class="ans-dash-block status-followup-block" id="statusFollowup">
+      <h3>🎯 Prosjektoversikt — hva bør følges opp på hvert prosjekt</h3>
+      <div class="loading-dots"><span></span><span></span><span></span></div>
+    </div>
     <p class="subnote" style="margin-top:10px;text-align:center">Data caches i 15 min for å spare LLM-kall. Klikk «↻» øverst for å oppdatere.</p>`;
 
     try {
@@ -530,6 +534,26 @@
             </div>
           `).join("")}</div>` : !d.claudeEnabled ? `<div class="empty">Krever ANTHROPIC_API_KEY for prosjekt-oppsummering.</div>`
            : `<div class="empty">Ingen prosjekter med timer siste 3 mnd.</div>`);
+      }
+
+      // Seksjon 6: Hva bør følges opp på hvert prosjekt
+      const c6 = document.getElementById("statusFollowup");
+      if (c6) {
+        const psums = d.col5_projectSummaries || [];
+        const withFollowup = psums.filter((p) => p.followup && p.followup.trim());
+        c6.innerHTML = c6.querySelector("h3").outerHTML +
+          (withFollowup.length ? `<div class="proj-summaries-grid">${withFollowup.map((p) => `
+            <div class="proj-followup-card">
+              <div class="psc-head">
+                <div class="psc-title"><b>${esc(p.name)}</b>${p.number ? `<span class="subnote"> · ${esc(p.number)}</span>` : ""}</div>
+                ${p.isManager ? '<span class="proj-mgr-badge">PL</span>' : ""}
+              </div>
+              ${p.customer ? `<div class="psc-customer">${esc(p.customer)}</div>` : ""}
+              <div class="psc-followup">${esc(p.followup).replace(/\n/g, "<br>").replace(/^[-•*]\s*/gm, "→ ")}</div>
+            </div>
+          `).join("")}</div>` : !d.claudeEnabled ? `<div class="empty">Krever ANTHROPIC_API_KEY for oppfølgings-forslag.</div>`
+           : psums.length ? `<div class="empty">Ingen konkrete oppfølginger generert. Klikk «↻ Oppdater status» øverst for ferskt forslag.</div>`
+           : `<div class="empty">Ingen prosjekter å analysere.</div>`);
       }
 
       // Hook up Microsoft login-flyt (innebygd device code)
