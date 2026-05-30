@@ -2454,25 +2454,71 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
         // Hent verktøy-listen først (cached)
         const tools = await orionListTools(orion);
         orionTools = tools.map((t) => t.name);
-        // Kalender: matcher på keywords
-        const calPatterns = [
-          /^(get_)?calendar/i, /^(get_)?upcoming_?meet/i, /^kalender/i, /møter|moter|meeting|agenda/i,
-          /schedule|appointment|booking/i,
+        // ISO-datoer
+        const startISO = new Date().toISOString();
+        const endISO = new Date(today.getTime() + 14 * 86400000).toISOString();
+        const from28ISO = new Date(today.getTime() - 28 * 86400000).toISOString();
+
+        // Kalender — prioriter M365 Graph-tools, så fyxer, så generiske
+        const calCandidates = [
+          { name: "m365__get-calendar-view", args: { startDateTime: startISO, endDateTime: endISO, $top: 30, $select: "subject,start,end,location,organizer,attendees,bodyPreview,isOnlineMeeting" } },
+          { name: "m365__list-calendar-events", args: { $top: 30, $orderby: "start/dateTime asc", $select: "subject,start,end,location,attendees" } },
+          { name: "m365__list-online-meetings", args: { $top: 20 } },
+          { name: "fyxer__search_meetings", args: { from: startISO, to: endISO } },
         ];
-        const calToolName = findOrionTool(tools, calPatterns);
-        if (calToolName) {
-          calendarTool = calToolName;
-          orionCalendar = await orionToolCall(orion, calToolName, { employee: name, days: 14, days_ahead: 14, range: "upcoming" });
+        for (const c of calCandidates) {
+          if (!tools.find((t) => t.name === c.name)) continue;
+          const r = await orionToolCall(orion, c.name, c.args);
+          if (r) { orionCalendar = r; calendarTool = c.name; break; }
         }
-        // E-post: matcher på keywords
-        const emailPatterns = [
-          /^(get_|list_)?(email|mail)s?$/i, /^(get_)?recent_?email/i, /^innboks|inbox/i,
-          /email|mail|post/i,
+        // Fallback til keyword-matching hvis ingen av M365-tools fungerte
+        if (!orionCalendar) {
+          const calPatterns = [/calendar/i, /meeting/i, /kalender/i, /upcoming/i, /schedule/i];
+          const cn = findOrionTool(tools, calPatterns);
+          if (cn) {
+            calendarTool = cn;
+            orionCalendar = await orionToolCall(orion, cn, { startDateTime: startISO, endDateTime: endISO, $top: 30 });
+          }
+        }
+
+        // E-post — prioriter M365 list-mail-messages, så fyxer search_context
+        const emailCandidates = [
+          {
+            name: "m365__list-mail-messages",
+            args: {
+              $top: 100,
+              $select: "subject,from,toRecipients,receivedDateTime,bodyPreview,isRead,hasAttachments",
+              $orderby: "receivedDateTime desc",
+              $filter: `receivedDateTime ge ${from28ISO}`,
+            },
+          },
+          {
+            name: "m365__list-mail-folder-messages",
+            args: {
+              "mailFolder-id": "inbox",
+              $top: 100,
+              $select: "subject,from,receivedDateTime,bodyPreview",
+              $orderby: "receivedDateTime desc",
+            },
+          },
+          {
+            name: "fyxer__search_context",
+            args: { from: from28ISO, to: new Date().toISOString(), limit: 50 },
+          },
         ];
-        const emailToolName = findOrionTool(tools, emailPatterns);
-        if (emailToolName) {
-          emailTool = emailToolName;
-          orionEmails = await orionToolCall(orion, emailToolName, { employee: name, days: 28, limit: 100 });
+        for (const c of emailCandidates) {
+          if (!tools.find((t) => t.name === c.name)) continue;
+          const r = await orionToolCall(orion, c.name, c.args);
+          if (r) { orionEmails = r; emailTool = c.name; break; }
+        }
+        // Fallback til keyword-matching
+        if (!orionEmails) {
+          const emailPatterns = [/list[_-]?mail/i, /^(get_|list_)?(email|mail)s?$/i, /innboks|inbox/i, /mail|email/i];
+          const en = findOrionTool(tools, emailPatterns);
+          if (en) {
+            emailTool = en;
+            orionEmails = await orionToolCall(orion, en, { $top: 50, $orderby: "receivedDateTime desc" });
+          }
         }
       }
 
