@@ -1690,7 +1690,7 @@ app.get("/api/employee-status", requireAuth, async (req, res) => {
     if (!orion || !orion.enabled || !orion.url) {
       return res.json({ ok: false, reason: "Orion MCP er ikke aktivert for denne ansatte" });
     }
-    const url = orion.url.replace(/\/+$/, "");
+    const url = orion.url.replace(/\/+$/, "").replace(/([^:])\/{2,}/g, "$1/");
     const tryEndpoints = [];
     if (orion.statusPath) {
       const customUrl = orion.statusPath.startsWith("http") ? orion.statusPath : url + (orion.statusPath.startsWith("/") ? orion.statusPath : "/" + orion.statusPath);
@@ -1732,16 +1732,26 @@ app.get("/api/employee-orion-probe", requireAuth, async (req, res) => {
     const cfg = (getConfig().employeeSettings || {})[name];
     const orion = cfg?.orion;
     if (!orion?.url) return res.json({ ok: false, reason: "Mangler Orion-URL" });
-    const url = orion.url.replace(/\/+$/, "");
+    const url = orion.url.replace(/\/+$/, "").replace(/([^:])\/{2,}/g, "$1/");
     const probes = [
       { method: "GET", url: url + "/" },
       { method: "GET", url: url + "/.well-known/mcp" },
-      { method: "GET", url: url + "/health" },
-      { method: "GET", url: url + "/healthz" },
       { method: "GET", url: url + "/api" },
+      { method: "GET", url: url + "/api/tools" },
       { method: "GET", url: url + "/openapi.json" },
-      { method: "POST", url: url, body: { jsonrpc: "2.0", id: 1, method: "tools/list" } },
+      // POST mot vanlige chat-stier (det de fleste web-baserte MCP/agent-hubs eksponerer)
+      { method: "POST", url: url + "/api/chat", body: { message: "ping" } },
+      { method: "POST", url: url + "/api/v1/chat", body: { message: "ping" } },
+      { method: "POST", url: url + "/api/messages", body: { message: "ping" } },
+      { method: "POST", url: url + "/api/orion/chat", body: { message: "ping" } },
+      { method: "POST", url: url + "/chat", body: { message: "ping" } },
+      // MCP standard
+      { method: "POST", url: url + "/api/mcp", body: { jsonrpc: "2.0", id: 1, method: "tools/list" } },
       { method: "POST", url: url + "/mcp", body: { jsonrpc: "2.0", id: 1, method: "tools/list" } },
+      { method: "POST", url: url, body: { jsonrpc: "2.0", id: 1, method: "tools/list" } },
+      // SSE-baserte servere
+      { method: "GET", url: url + "/sse" },
+      { method: "GET", url: url + "/events" },
     ];
     const results = [];
     for (const p of probes) {
@@ -1865,7 +1875,7 @@ app.post("/api/employee-chat", requireAuth, async (req, res) => {
     if (!orion || !orion.enabled || !orion.url) {
       return res.json({ ok: false, reason: "Orion MCP er ikke aktivert for denne ansatte" });
     }
-    const url = orion.url.replace(/\/+$/, "");
+    const url = orion.url.replace(/\/+$/, "").replace(/([^:])\/{2,}/g, "$1/");
     const tool = orion.toolName || "chat";
     const proto = orion.protocol || "auto";
 
