@@ -2455,9 +2455,16 @@ async function orionToolCall(orion, toolName, args) {
       // Generelle JSON-RPC- og MCP-feil → prøv neste variant
       if (errMsg) continue;
       if (isError) continue;
-      // Hvis teksten ser ut som en feilmelding (på norsk eller engelsk), prøv neste
-      if (typeof txt === "string" && /^(\s*)(error|feil|ugyldig|invalid|exception|failed|kunne ikke|fant ikke)/i.test(txt.trim())) continue;
-      if (typeof txt === "string" && /\bMCP[- ]feil\b|\b-?32\d{3}\b/.test(txt)) continue;
+      // Aggressiv error-deteksjon i innhold (start eller midt i tekst):
+      // - Norske/engelske feilord (start)
+      // - MCP-feilkoder hvor som helst
+      // - "Invalid arguments" eller "undefined" hvor som helst
+      if (typeof txt === "string") {
+        const trimmed = txt.trim();
+        if (/^(\s*)(error|feil|ugyldig|invalid|exception|failed|kunne ikke|fant ikke|beklager)/i.test(trimmed)) continue;
+        if (/MCP[\s\-_]?(error|feil)|jsonrpc.*error|-?32\d{3}/i.test(trimmed)) continue;
+        if (/invalid\s+arguments|missing\s+(required|argument)|is\s+undefined/i.test(trimmed)) continue;
+      }
 
       if (txt) return String(txt);
       if (data?.result) return JSON.stringify(data.result);
@@ -2531,28 +2538,35 @@ app.post("/api/employee-automations/refresh", requireAuth, async (req, res) => {
       $orderby: "receivedDateTime desc",
       $filter: `receivedDateTime ge ${from90}`,
     });
-    // For sent: bruk list-mail-folder-messages med ulike param-format-varianter (Orion-router er strikt)
-    let sentResult = await orionToolCall(orion, "m365__list-mail-folder-messages", {
-      mailFolderId: "sentitems", $top: 150,
-      $select: "subject,toRecipients,sentDateTime,bodyPreview",
-      $orderby: "sentDateTime desc",
-      $filter: `sentDateTime ge ${from90}`,
-    });
-    if (!sentResult) {
-      // Prøv alternativ feltnavn
+    // For sent: prøv flere param-varianter for list-mail-folder-messages.
+    // Den underliggende MCP-wrappen krever en path-parameter for folder-id, men formatet varierer.
+    let sentResult = null;
+    const sentVariants = [
+      { mailFolderId: "sentitems" },
+      { "mailFolder-id": "sentitems" },
+      { mailFolderId: "SentItems" },
+      { folder: "sentitems" },
+      { id: "sentitems" },
+      // SOme MCP servers expect parameters in a `path` object
+      { path: { "mailFolder-id": "sentitems" } },
+    ];
+    for (const folderArg of sentVariants) {
       sentResult = await orionToolCall(orion, "m365__list-mail-folder-messages", {
-        "mailFolder-id": "sentitems", $top: 150,
-        $orderby: "sentDateTime desc",
+        ...folderArg, $top: 80, $orderby: "sentDateTime desc",
       });
+      if (sentResult && typeof sentResult === "string" && !/error|invalid|undefined|feil/i.test(sentResult.slice(0, 200))) break;
+      if (sentResult && typeof sentResult === "object" && sentResult._loginRequired) break;
+      sentResult = null;
     }
-    // Sjekk login-required
+    // Sjekk login-required (kommer som spesielt objekt fra orionToolCall)
     if ((inboxResult && typeof inboxResult === "object" && inboxResult._loginRequired) ||
         (sentResult && typeof sentResult === "object" && sentResult._loginRequired)) {
       return res.status(401).json({ error: "Microsoft-pålogging trengs i Orion. Åpne Orion-chatten og logg inn først.", needsLogin: true, orionChatUrl: orion.url });
     }
-    if (!inboxResult && !sentResult) {
-      return res.status(502).json({ error: "Klarte ikke å hente e-post fra Orion." });
+    if (!inboxResult) {
+      return res.status(502).json({ error: "Klarte ikke å hente e-post fra Orion (inboks-kallet feilet). Sjekk Microsoft-pålogging." });
     }
+    // sentResult er valgfri — vi fortsetter selv om bare inboks fungerer
 
     // Send til Claude for analyse
     const sys = `Du er en ekspert på arbeidsflyt-automasjon. Analyser e-postene fra de siste 3 månedene og finn mønstre som kan automatiseres.
@@ -2572,7 +2586,8 @@ Svar på norsk. Lag 4-6 konkrete forslag som punktliste. Hvert punkt skal være 
 Hva: Hva som kan automatiseres
 Mønster: Hva i e-postdataene som tyder på at det er automatiserbart (gi konkrete eksempler)
 Verktøy: Hvilket verktøy som passer (f.eks. Outlook-regel, n8n-workflow, Fyxer AI, Power Automate)`;
-    const usr = `E-postdata for ${name} siste 3 måneder:\n\nINNBOKS:\n${String(inboxResult || "").slice(0, 8000)}\n\nSENDT:\n${String(sentResult || "").slice(0, 6000)}\n\nFinn 4-6 konkrete automatiseringsmuligheter.`;
+    const sentText = sentResult ? String(sentResult).slice(0, 6000) : "(ikke tilgjengelig)";
+    const usr = `E-postdata for ${name} siste 3 måneder:\n\nINNBOKS:\n${String(inboxResult).slice(0, 9000)}\n\nSENDT:\n${sentText}\n\nFinn 4-6 konkrete automatiseringsmuligheter basert på innboksen.`;
     const suggestions = await callClaude(sys, usr, "claude-sonnet-4-6");
     if (!suggestions) return res.status(502).json({ error: "Claude svarte ikke" });
 
