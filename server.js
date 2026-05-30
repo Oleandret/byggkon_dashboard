@@ -2531,42 +2531,52 @@ app.post("/api/employee-automations/refresh", requireAuth, async (req, res) => {
     const tools = await orionListTools(orion);
     if (!tools.length) return res.status(502).json({ error: "Orion svarer ikke. Sjekk tilkobling i Innstillinger." });
 
-    // Hent 3 mnd e-post via M365. Bruker list-mail-messages som ikke trenger mailFolderId.
-    const inboxResult = await orionToolCall(orion, "m365__list-mail-messages", {
-      $top: 200,
-      $select: "subject,from,toRecipients,receivedDateTime,bodyPreview",
-      $orderby: "receivedDateTime desc",
-      $filter: `receivedDateTime ge ${from90}`,
-    });
-    // For sent: prøv flere param-varianter for list-mail-folder-messages.
-    // Den underliggende MCP-wrappen krever en path-parameter for folder-id, men formatet varierer.
-    let sentResult = null;
-    const sentVariants = [
-      { mailFolderId: "sentitems" },
-      { "mailFolder-id": "sentitems" },
-      { mailFolderId: "SentItems" },
-      { folder: "sentitems" },
-      { id: "sentitems" },
-      // SOme MCP servers expect parameters in a `path` object
-      { path: { "mailFolder-id": "sentitems" } },
-    ];
-    for (const folderArg of sentVariants) {
-      sentResult = await orionToolCall(orion, "m365__list-mail-folder-messages", {
-        ...folderArg, $top: 80, $orderby: "sentDateTime desc",
+    // Foretrekk Fyxer (har egen integrasjon, ingen Microsoft device-code login nødvendig)
+    // Fyxer-toolet søker i e-post, møter og dokumenter samtidig
+    let emailContext = null;
+    let dataSource = "";
+    if (tools.find((t) => t.name === "fyxer__search_context")) {
+      // Søk etter alle slags emner som ofte tyder på automatiserbare mønstre
+      const queries = [
+        "ukentlige rapporter, månedlige fakturaer, statusoppdateringer, recurring meetings, automatic notifications",
+        "tilbakevendende oppgaver, mønstre, rutiner",
+      ];
+      const results = [];
+      for (const q of queries) {
+        const r = await orionToolCall(orion, "fyxer__search_context", { query: q, from: from90, to: new Date().toISOString(), limit: 30 });
+        if (r && typeof r === "string") results.push(r);
+        else if (r && typeof r === "object" && r._loginRequired) { dataSource = "fyxer-needs-login"; break; }
+      }
+      if (results.length) {
+        emailContext = results.join("\n\n");
+        dataSource = "fyxer";
+      }
+    }
+    // Fallback til M365 hvis Fyxer ikke ga noe
+    if (!emailContext && tools.find((t) => t.name === "m365__list-mail-messages")) {
+      const m365Result = await orionToolCall(orion, "m365__list-mail-messages", {
+        $top: 200,
+        $select: "subject,from,toRecipients,receivedDateTime,bodyPreview",
+        $orderby: "receivedDateTime desc",
+        $filter: `receivedDateTime ge ${from90}`,
       });
-      if (sentResult && typeof sentResult === "string" && !/error|invalid|undefined|feil/i.test(sentResult.slice(0, 200))) break;
-      if (sentResult && typeof sentResult === "object" && sentResult._loginRequired) break;
-      sentResult = null;
+      if (m365Result && typeof m365Result === "object" && m365Result._loginRequired) {
+        dataSource = "m365-needs-login";
+      } else if (m365Result) {
+        emailContext = String(m365Result);
+        dataSource = "m365";
+      }
     }
-    // Sjekk login-required (kommer som spesielt objekt fra orionToolCall)
-    if ((inboxResult && typeof inboxResult === "object" && inboxResult._loginRequired) ||
-        (sentResult && typeof sentResult === "object" && sentResult._loginRequired)) {
-      return res.status(401).json({ error: "Microsoft-pålogging trengs i Orion. Åpne Orion-chatten og logg inn først.", needsLogin: true, orionChatUrl: orion.url });
+    if (!emailContext) {
+      if (dataSource.includes("needs-login")) {
+        const isM365 = dataSource === "m365-needs-login";
+        return res.status(401).json({
+          error: isM365 ? "Microsoft-pålogging trengs i Orion (M365-verktøyene)." : "Fyxer trenger autorisasjon i Orion.",
+          needsLogin: true, orionChatUrl: orion.url,
+        });
+      }
+      return res.status(502).json({ error: "Klarte ikke å hente e-post (verken via Fyxer eller M365)." });
     }
-    if (!inboxResult) {
-      return res.status(502).json({ error: "Klarte ikke å hente e-post fra Orion (inboks-kallet feilet). Sjekk Microsoft-pålogging." });
-    }
-    // sentResult er valgfri — vi fortsetter selv om bare inboks fungerer
 
     // Send til Claude for analyse
     const sys = `Du er en ekspert på arbeidsflyt-automasjon. Analyser e-postene fra de siste 3 månedene og finn mønstre som kan automatiseres.
@@ -2586,15 +2596,15 @@ Svar på norsk. Lag 4-6 konkrete forslag som punktliste. Hvert punkt skal være 
 Hva: Hva som kan automatiseres
 Mønster: Hva i e-postdataene som tyder på at det er automatiserbart (gi konkrete eksempler)
 Verktøy: Hvilket verktøy som passer (f.eks. Outlook-regel, n8n-workflow, Fyxer AI, Power Automate)`;
-    const sentText = sentResult ? String(sentResult).slice(0, 6000) : "(ikke tilgjengelig)";
-    const usr = `E-postdata for ${name} siste 3 måneder:\n\nINNBOKS:\n${String(inboxResult).slice(0, 9000)}\n\nSENDT:\n${sentText}\n\nFinn 4-6 konkrete automatiseringsmuligheter basert på innboksen.`;
+    const usr = `E-postdata for ${name} siste 3 måneder (kilde: ${dataSource}):\n\n${emailContext.slice(0, 15000)}\n\nFinn 4-6 konkrete automatiseringsmuligheter basert på dataen.`;
     const suggestions = await callClaude(sys, usr, "claude-sonnet-4-6");
     if (!suggestions) return res.status(502).json({ error: "Claude svarte ikke" });
 
     const result = {
       suggestions,
       generatedAt: new Date().toISOString(),
-      emailCount: { inbox: typeof inboxResult === "string" ? (inboxResult.match(/subject/gi) || []).length : 0, sent: typeof sentResult === "string" ? (sentResult.match(/subject/gi) || []).length : 0 },
+      dataSource,
+      contextLength: emailContext.length,
     };
     saveSnapshot("emp-automations:" + name, result);
     res.json({ ok: true, ...result });
