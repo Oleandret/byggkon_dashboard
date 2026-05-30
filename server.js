@@ -2620,22 +2620,29 @@ app.get("/api/employee-status-rich", requireAuth, async (req, res) => {
     if (!name) return res.status(400).json({ error: "Mangler navn" });
     const force = req.query.force === "1" || req.query.force === "true";
 
-    // Hvis force=1: invalider eksisterende snapshot for å tvinge ferskt LLM-kall
-    if (force) {
-      const snap = getSnapshot("emp-status-rich:" + name);
-      if (snap) saveSnapshot("emp-status-rich:" + name, snap.data); // dummy save oppdaterer ikke ts, så vi må manuelt sette
-      // Enklere: gå rundt serveWithSnapshot helt når force=true
+    // Hjelper: injiser fersk projekt-meta (rolle + beskrivelse) inn i et status-objekt
+    // — slik at brukerens manuelle endringer ALLTID vises, selv om snapshot er cached
+    function injectFreshMeta(statusData) {
+      if (!statusData) return statusData;
+      const freshMeta = (getConfig().employeeProjectMeta || {})[name] || {};
+      const enrich = (p) => {
+        const m = freshMeta[p.name];
+        return m ? { ...p, role: m.role || "", description: m.description || "" } : p;
+      };
+      if (Array.isArray(statusData.col2_projects)) statusData.col2_projects = statusData.col2_projects.map(enrich);
+      if (Array.isArray(statusData.col5_projectSummaries)) statusData.col5_projectSummaries = statusData.col5_projectSummaries.map(enrich);
+      return statusData;
     }
 
-    // Hvis vi har cached og IKKE er force, returner cached direkte (uten LLM-kall)
+    // Hvis vi har cached og IKKE er force, returner cached direkte (uten LLM-kall) — men med ferskt meta
     if (!force) {
       const cached = getSnapshot("emp-status-rich:" + name);
       if (cached?.data) {
-        return res.json({ ...cached.data, _cached: true, _cachedAt: new Date(cached.savedAt).toISOString() });
+        return res.json({ ...injectFreshMeta(cached.data), _cached: true, _cachedAt: new Date(cached.savedAt).toISOString() });
       }
     }
 
-    res.json(await serveWithSnapshot("emp-status-rich:" + name, async () => {
+    const builtData = await serveWithSnapshot("emp-status-rich:" + name, async () => {
       const cfg = (getConfig().employeeSettings || {})[name];
       const orion = cfg?.orion;
       const orionEnabled = !!(orion?.enabled && orion?.url);
@@ -2863,7 +2870,8 @@ Bare JSON.`;
         m365LoginRequired: typeof _calLoginRequired !== "undefined" && _calLoginRequired || typeof _emailLoginRequired !== "undefined" && _emailLoginRequired,
         orionChatUrl: orion.url,
       };
-    }, 24 * 60 * 60 * 1000)); // 24 t cache — frontend trigger manuell refresh ved behov
+    }, 24 * 60 * 60 * 1000); // 24 t cache — frontend trigger manuell refresh ved behov
+    res.json(injectFreshMeta(builtData));
   } catch (err) { res.status(502).json({ error: err.message }); }
 });
 
