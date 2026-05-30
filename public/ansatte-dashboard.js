@@ -357,8 +357,14 @@
         });
         const d = await r.json();
         typing.remove();
-        if (!d.ok) addMsg("assistant", "⚠ " + (d.reason || "Ingen svar fra Orion."));
-        else addMsg("assistant", d.reply || "(tomt svar)");
+        if (!d.ok) {
+          let txt = "⚠ " + (d.reason || "Ingen svar fra Orion.");
+          if (d.attempts) {
+            txt += "\n\nForsøkte:\n" + d.attempts.map((a) => "• " + a.label + " → " + (a.error || ("HTTP " + a.status))).join("\n");
+            txt += "\n\nGå til ⚙ Innstillinger → Diagnostikk for å finne riktig sti.";
+          }
+          addMsg("assistant", txt);
+        } else addMsg("assistant", d.reply || "(tomt svar)");
       } catch (e) { typing.remove(); addMsg("assistant", "⚠ Feil: " + e.message); }
     });
     document.getElementById("chatClear").addEventListener("click", () => { chatHistory = []; renderChat(emp); });
@@ -415,22 +421,45 @@
         <p class="subnote">Orion er en valgfri MCP-hub som henter data fra ulike kilder for å vise en status-oversikt. Hver ansatt bestemmer selv om de vil koble til. URL og nøkkel lagres trygt på serveren og deles ikke videre.</p>
         <div class="settings-form">
           <label class="settings-row">
-            <span>Orion MCP-URL</span>
+            <span>Orion MCP-URL (basis-URL, uten sti)</span>
             <input id="orionUrl" type="url" class="kon-f" placeholder="https://orion.byggkon.ai" value="${esc(set.orion?.url || "")}" />
           </label>
           <label class="settings-row">
             <span>API-nøkkel</span>
             <input id="orionKey" type="password" class="kon-f" placeholder="${set.orion?.hasKey ? "(nøkkel er lagret — la stå tom for å beholde)" : "Lim inn API-nøkkelen"}" />
           </label>
+          <label class="settings-row">
+            <span>Protokoll</span>
+            <select id="orionProto" class="kon-f">
+              <option value="auto" ${(set.orion?.protocol || "auto") === "auto" ? "selected" : ""}>Auto (prøv alle)</option>
+              <option value="mcp" ${set.orion?.protocol === "mcp" ? "selected" : ""}>MCP JSON-RPC (tools/call)</option>
+              <option value="rest" ${set.orion?.protocol === "rest" ? "selected" : ""}>REST (/chat, /api/chat)</option>
+              <option value="openai" ${set.orion?.protocol === "openai" ? "selected" : ""}>OpenAI-stil (/v1/chat/completions)</option>
+            </select>
+          </label>
+          <label class="settings-row">
+            <span>Chat-sti (valgfri, overstyrer auto — f.eks. <code>/agent/chat</code> eller hel URL)</span>
+            <input id="orionChatPath" type="text" class="kon-f" placeholder="/chat eller https://..." value="${esc(set.orion?.chatPath || "")}" />
+          </label>
+          <label class="settings-row">
+            <span>Status-sti (valgfri)</span>
+            <input id="orionStatusPath" type="text" class="kon-f" placeholder="/status eller https://..." value="${esc(set.orion?.statusPath || "")}" />
+          </label>
+          <label class="settings-row">
+            <span>Verktøy-navn for MCP (valgfri — f.eks. <code>chat</code>, <code>ask</code>, <code>query</code>)</span>
+            <input id="orionTool" type="text" class="kon-f" placeholder="chat" value="${esc(set.orion?.toolName || "")}" />
+          </label>
           <label class="settings-row settings-row-check">
             <input type="checkbox" id="orionEnabled" ${set.orion?.enabled ? "checked" : ""} />
-            <span><b>Aktiver Orion</b> — bruk denne MCP-en for Status-fanen</span>
+            <span><b>Aktiver Orion</b> — bruk denne MCP-en for Status og Chat</span>
           </label>
           <div class="org-actions">
             <button class="btn-primary" id="orionSave">Lagre</button>
-            <button class="btn-ghost" id="orionTest">Test tilkobling</button>
+            <button class="btn-ghost" id="orionTest">Test status</button>
+            <button class="btn-ghost" id="orionProbe">🔍 Diagnostikk</button>
             <span id="orionTestMsg" class="subnote"></span>
           </div>
+          <div id="orionProbeOut" class="probe-out" hidden></div>
         </div>
       </div>
 
@@ -447,20 +476,60 @@
       </div>`;
 
     document.getElementById("orionSave").addEventListener("click", async () => {
-      const url = document.getElementById("orionUrl").value.trim();
-      const keyInp = document.getElementById("orionKey").value.trim();
-      const enabled = document.getElementById("orionEnabled").checked;
-      await saveSettings(emp.name, { orion: { url, key: keyInp, enabled } });
+      const payload = {
+        orion: {
+          url: document.getElementById("orionUrl").value.trim(),
+          key: document.getElementById("orionKey").value.trim(),
+          enabled: document.getElementById("orionEnabled").checked,
+          protocol: document.getElementById("orionProto").value,
+          chatPath: document.getElementById("orionChatPath").value.trim(),
+          statusPath: document.getElementById("orionStatusPath").value.trim(),
+          toolName: document.getElementById("orionTool").value.trim(),
+        },
+      };
+      await saveSettings(emp.name, payload);
       document.getElementById("orionTestMsg").textContent = "✓ Lagret";
       renderDash();
     });
     document.getElementById("orionTest").addEventListener("click", async () => {
       const msg = document.getElementById("orionTestMsg");
-      msg.textContent = "Tester …";
+      const out = document.getElementById("orionProbeOut");
+      msg.textContent = "Tester status …"; out.hidden = true;
       try {
         const r = await fetch("/api/employee-status?name=" + encodeURIComponent(emp.name));
         const d = await r.json();
-        msg.textContent = d.ok ? "✓ Tilkobling OK" : "✗ " + (d.reason || "Feil");
+        if (d.ok) { msg.textContent = "✓ Tilkobling OK (" + esc(d.source || "") + ")"; }
+        else {
+          msg.textContent = "✗ " + (d.reason || "Feil");
+          if (d.attempts) {
+            out.hidden = false;
+            out.innerHTML = `<h4>Forsøkte:</h4><table class="probe-tbl"><thead><tr><th>Label</th><th>URL</th><th>Status</th></tr></thead><tbody>${d.attempts.map((a) => `<tr><td>${esc(a.label)}</td><td><code>${esc(a.url)}</code></td><td>${a.error ? `<span class="probe-err">${esc(a.error)}</span>` : esc(String(a.status))}</td></tr>`).join("")}</tbody></table>`;
+          }
+        }
+      } catch (e) { msg.textContent = "✗ " + e.message; }
+    });
+    document.getElementById("orionProbe").addEventListener("click", async () => {
+      const msg = document.getElementById("orionTestMsg");
+      const out = document.getElementById("orionProbeOut");
+      msg.textContent = "Prober Orion …"; out.hidden = true;
+      try {
+        const r = await fetch("/api/employee-orion-probe?name=" + encodeURIComponent(emp.name));
+        const d = await r.json();
+        if (!d.ok) { msg.textContent = "✗ " + (d.reason || "Feil"); return; }
+        msg.textContent = "✓ Diagnostikk ferdig";
+        out.hidden = false;
+        out.innerHTML = `<h4>Endepunkter som svarte:</h4>
+          <table class="probe-tbl">
+            <thead><tr><th>Metode</th><th>URL</th><th>Status</th><th>Type</th><th>Svar</th></tr></thead>
+            <tbody>${(d.results || []).map((r) => `<tr>
+              <td>${esc(r.method)}</td>
+              <td><code>${esc(r.url)}</code></td>
+              <td>${r.error ? `<span class="probe-err">err</span>` : `<b class="probe-${r.status < 400 ? "ok" : "err"}">${r.status}</b>`}</td>
+              <td class="subnote">${esc(r.contentType || "")}</td>
+              <td class="subnote">${esc(r.error || (r.snippet || "").slice(0, 80))}</td>
+            </tr>`).join("")}</tbody>
+          </table>
+          <p class="subnote">Tips: Endepunkt med status 200 og JSON-svar er kandidater. Lim inn URL-en (etter basis-URL) i «Chat-sti» / «Status-sti» og lagre.</p>`;
       } catch (e) { msg.textContent = "✗ " + e.message; }
     });
     document.getElementById("visSave").addEventListener("click", async () => {

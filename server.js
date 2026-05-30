@@ -9,7 +9,7 @@ import { buildEconomy } from "./src/economy.js";
 import { getNewsFeed } from "./src/newsfeed.js";
 import { clearCache, resetClient, getInvoices, getCustomers, getSupplierInvoices, getSupplierInvoiceDetails, getSuppliers, getForwardableInvoices, getProjects, getProjectAddresses, getTimeEntries, getTimeEntriesDetailed, getEmployees, getProjectsEconomyDetails, getAccounts, getBalanceSheet, ymd } from "./src/tripletex.js";
 import { geocodeOne, sleep } from "./src/geocode.js";
-import { serveWithSnapshot, expireSnapshots } from "./src/snapshot.js";
+import { serveWithSnapshot, expireSnapshots, startBackgroundWarmer } from "./src/snapshot.js";
 const snapTtl = () => getConfig().cacheTtlMs || 300000;
 import { getConfig, saveConfig, getConfigForAdmin, SETTINGS_PATH } from "./src/settings.js";
 
@@ -1635,11 +1635,18 @@ app.post("/api/dept-tilbud", requireAuth, (req, res) => {
 // ---- Ansatt-innstillinger (Orion MCP + visibility per ansatt) ----
 app.get("/api/employee-settings", requireAuth, (req, res) => {
   const all = getConfig().employeeSettings || {};
-  // Maskér MCP-keys
   const out = {};
   for (const [name, s] of Object.entries(all)) {
     out[name] = {
-      orion: { url: s.orion?.url || "", enabled: !!s.orion?.enabled, hasKey: !!s.orion?.key },
+      orion: {
+        url: s.orion?.url || "",
+        enabled: !!s.orion?.enabled,
+        hasKey: !!s.orion?.key,
+        chatPath: s.orion?.chatPath || "",
+        statusPath: s.orion?.statusPath || "",
+        protocol: s.orion?.protocol || "auto", // auto | mcp | rest | openai
+        toolName: s.orion?.toolName || "",
+      },
       visibility: s.visibility || {},
     };
   }
@@ -1655,11 +1662,14 @@ app.post("/api/employee-settings", requireAuth, (req, res) => {
     const orionPrev = prev.orion || {};
     const orion = {
       url: body.orion?.url !== undefined ? String(body.orion.url).slice(0, 500) : (orionPrev.url || ""),
-      // Hold på eksisterende key hvis den ikke sendes inn på nytt (tom streng = behold)
       key: (body.orion && typeof body.orion.key === "string" && body.orion.key)
         ? String(body.orion.key).slice(0, 500)
         : (orionPrev.key || ""),
       enabled: typeof body.orion?.enabled === "boolean" ? body.orion.enabled : !!orionPrev.enabled,
+      chatPath: body.orion?.chatPath !== undefined ? String(body.orion.chatPath).slice(0, 200) : (orionPrev.chatPath || ""),
+      statusPath: body.orion?.statusPath !== undefined ? String(body.orion.statusPath).slice(0, 200) : (orionPrev.statusPath || ""),
+      protocol: ["auto", "mcp", "rest", "openai"].includes(body.orion?.protocol) ? body.orion.protocol : (orionPrev.protocol || "auto"),
+      toolName: body.orion?.toolName !== undefined ? String(body.orion.toolName).slice(0, 60) : (orionPrev.toolName || ""),
     };
     const visibility = body.visibility && typeof body.visibility === "object"
       ? Object.fromEntries(Object.entries(body.visibility).map(([k, v]) => [String(k).slice(0, 40), !!v]))
@@ -1680,15 +1690,18 @@ app.get("/api/employee-status", requireAuth, async (req, res) => {
     if (!orion || !orion.enabled || !orion.url) {
       return res.json({ ok: false, reason: "Orion MCP er ikke aktivert for denne ansatte" });
     }
-    // Best-effort JSON-RPC kall til Orion MCP. Vi forventer enten /status-endpoint,
-    // eller en standard MCP tools/call mot et "get_status"-verktøy.
     const url = orion.url.replace(/\/+$/, "");
-    const tryEndpoints = [
-      { method: "GET", url: url + "/status?employee=" + encodeURIComponent(name) },
-      { method: "GET", url: url + "/api/status?employee=" + encodeURIComponent(name) },
-      { method: "POST", url: url, body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "get_status", arguments: { employee: name } } } },
-    ];
-    let lastErr = null;
+    const tryEndpoints = [];
+    if (orion.statusPath) {
+      const customUrl = orion.statusPath.startsWith("http") ? orion.statusPath : url + (orion.statusPath.startsWith("/") ? orion.statusPath : "/" + orion.statusPath);
+      tryEndpoints.push({ method: "GET", url: customUrl + (customUrl.includes("?") ? "&" : "?") + "employee=" + encodeURIComponent(name), label: "custom" });
+      tryEndpoints.push({ method: "POST", url: customUrl, body: { employee: name }, label: "custom POST" });
+    }
+    tryEndpoints.push({ method: "GET", url: url + "/status?employee=" + encodeURIComponent(name), label: "/status" });
+    tryEndpoints.push({ method: "GET", url: url + "/api/status?employee=" + encodeURIComponent(name), label: "/api/status" });
+    tryEndpoints.push({ method: "POST", url: url, body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: orion.toolName || "get_status", arguments: { employee: name } } }, label: "mcp-root" });
+    tryEndpoints.push({ method: "POST", url: url + "/mcp", body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: orion.toolName || "get_status", arguments: { employee: name } } }, label: "mcp" });
+    const attempts = [];
     for (const ep of tryEndpoints) {
       try {
         const r = await fetch(ep.url, {
@@ -1700,13 +1713,54 @@ app.get("/api/employee-status", requireAuth, async (req, res) => {
           body: ep.body ? JSON.stringify(ep.body) : undefined,
           signal: AbortSignal.timeout(8000),
         });
-        if (!r.ok) { lastErr = "HTTP " + r.status; continue; }
+        attempts.push({ label: ep.label, url: ep.url, status: r.status });
+        if (!r.ok) continue;
         const txt = await r.text();
         let data; try { data = JSON.parse(txt); } catch { data = { raw: txt }; }
-        return res.json({ ok: true, source: ep.url, data });
-      } catch (e) { lastErr = e.message; }
+        return res.json({ ok: true, source: ep.label, data });
+      } catch (e) { attempts.push({ label: ep.label, url: ep.url, error: e.message }); }
     }
-    res.json({ ok: false, reason: "Orion svarte ikke: " + (lastErr || "ukjent feil") });
+    res.json({ ok: false, reason: "Orion svarte ikke på noen av de prøvde endepunktene. Sett eksakt 'Status-sti' i innstillinger.", attempts });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ---- Orion discovery: prober vanlige stier og rapporterer hva som svarer ----
+app.get("/api/employee-orion-probe", requireAuth, async (req, res) => {
+  try {
+    const name = String(req.query.name || "").trim();
+    if (!name) return res.status(400).json({ error: "Mangler navn" });
+    const cfg = (getConfig().employeeSettings || {})[name];
+    const orion = cfg?.orion;
+    if (!orion?.url) return res.json({ ok: false, reason: "Mangler Orion-URL" });
+    const url = orion.url.replace(/\/+$/, "");
+    const probes = [
+      { method: "GET", url: url + "/" },
+      { method: "GET", url: url + "/.well-known/mcp" },
+      { method: "GET", url: url + "/health" },
+      { method: "GET", url: url + "/healthz" },
+      { method: "GET", url: url + "/api" },
+      { method: "GET", url: url + "/openapi.json" },
+      { method: "POST", url: url, body: { jsonrpc: "2.0", id: 1, method: "tools/list" } },
+      { method: "POST", url: url + "/mcp", body: { jsonrpc: "2.0", id: 1, method: "tools/list" } },
+    ];
+    const results = [];
+    for (const p of probes) {
+      try {
+        const r = await fetch(p.url, {
+          method: p.method,
+          headers: { "Content-Type": "application/json", ...(orion.key ? { Authorization: "Bearer " + orion.key, "X-Api-Key": orion.key } : {}) },
+          body: p.body ? JSON.stringify(p.body) : undefined,
+          signal: AbortSignal.timeout(6000),
+        });
+        const ct = r.headers.get("content-type") || "";
+        let snippet = "";
+        try { snippet = (await r.text()).slice(0, 200); } catch {}
+        results.push({ method: p.method, url: p.url, status: r.status, contentType: ct, snippet });
+      } catch (e) {
+        results.push({ method: p.method, url: p.url, error: e.message });
+      }
+    }
+    res.json({ ok: true, results });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1812,14 +1866,37 @@ app.post("/api/employee-chat", requireAuth, async (req, res) => {
       return res.json({ ok: false, reason: "Orion MCP er ikke aktivert for denne ansatte" });
     }
     const url = orion.url.replace(/\/+$/, "");
-    // Prøv standard MCP tools/call mot et "chat" eller "ask" verktøy, så fallback til /chat endpoint
-    const tryEndpoints = [
-      { method: "POST", url: url, body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "chat", arguments: { employee: name, message, history } } } },
-      { method: "POST", url: url, body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "ask", arguments: { employee: name, question: message, history } } } },
-      { method: "POST", url: url + "/chat", body: { employee: name, message, history } },
-      { method: "POST", url: url + "/api/chat", body: { employee: name, message, history } },
-    ];
-    let lastErr = null;
+    const tool = orion.toolName || "chat";
+    const proto = orion.protocol || "auto";
+
+    // Bygg listen av endepunkter å prøve, basert på protokoll-valg
+    const tryEndpoints = [];
+    if (orion.chatPath) {
+      // Brukerdefinert sti — prøv først
+      const customUrl = orion.chatPath.startsWith("http") ? orion.chatPath : url + (orion.chatPath.startsWith("/") ? orion.chatPath : "/" + orion.chatPath);
+      tryEndpoints.push({ method: "POST", url: customUrl, body: { employee: name, message, history }, label: "custom" });
+      tryEndpoints.push({ method: "POST", url: customUrl, body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: tool, arguments: { employee: name, message, history } } }, label: "custom-mcp" });
+      tryEndpoints.push({ method: "POST", url: customUrl, body: { messages: [...history.map((h) => ({ role: h.role, content: h.text })), { role: "user", content: message }] }, label: "custom-openai" });
+    }
+    if (proto === "auto" || proto === "mcp") {
+      tryEndpoints.push({ method: "POST", url: url, body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: tool, arguments: { employee: name, message, history } } }, label: "mcp-root" });
+      tryEndpoints.push({ method: "POST", url: url + "/mcp", body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: tool, arguments: { employee: name, message, history } } }, label: "mcp" });
+      tryEndpoints.push({ method: "POST", url: url + "/rpc", body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: tool, arguments: { employee: name, message, history } } }, label: "rpc" });
+    }
+    if (proto === "auto" || proto === "rest") {
+      tryEndpoints.push({ method: "POST", url: url + "/chat", body: { employee: name, message, history }, label: "rest /chat" });
+      tryEndpoints.push({ method: "POST", url: url + "/api/chat", body: { employee: name, message, history }, label: "rest /api/chat" });
+      tryEndpoints.push({ method: "POST", url: url + "/message", body: { employee: name, message, history }, label: "rest /message" });
+      tryEndpoints.push({ method: "POST", url: url + "/ask", body: { employee: name, question: message, history }, label: "rest /ask" });
+      tryEndpoints.push({ method: "POST", url: url + "/query", body: { employee: name, query: message }, label: "rest /query" });
+    }
+    if (proto === "auto" || proto === "openai") {
+      const msgs = [...history.map((h) => ({ role: h.role, content: h.text })), { role: "user", content: message }];
+      tryEndpoints.push({ method: "POST", url: url + "/v1/chat/completions", body: { messages: msgs }, label: "openai /v1/chat/completions" });
+      tryEndpoints.push({ method: "POST", url: url + "/chat/completions", body: { messages: msgs }, label: "openai /chat/completions" });
+    }
+
+    const attempts = [];
     for (const ep of tryEndpoints) {
       try {
         const r = await fetch(ep.url, {
@@ -1831,15 +1908,24 @@ app.post("/api/employee-chat", requireAuth, async (req, res) => {
           body: JSON.stringify(ep.body),
           signal: AbortSignal.timeout(30000),
         });
-        if (!r.ok) { lastErr = "HTTP " + r.status; continue; }
+        attempts.push({ label: ep.label, url: ep.url, status: r.status });
+        if (!r.ok) continue;
         const txt = await r.text();
         let data; try { data = JSON.parse(txt); } catch { data = { reply: txt }; }
-        // Trekk ut svartekst fra vanlige formater
-        const reply = data.reply || data.message || data.text || data.result?.content?.[0]?.text || data.result?.text || data.choices?.[0]?.message?.content || (typeof data === "string" ? data : JSON.stringify(data));
-        return res.json({ ok: true, reply: String(reply), raw: data });
-      } catch (e) { lastErr = e.message; }
+        const reply = data.reply || data.message || data.text
+          || data.result?.content?.[0]?.text || data.result?.text
+          || data.choices?.[0]?.message?.content || data.response
+          || (typeof data === "string" ? data : null);
+        return res.json({ ok: true, reply: String(reply || JSON.stringify(data)), raw: data, source: ep.label });
+      } catch (e) {
+        attempts.push({ label: ep.label, url: ep.url, error: e.message });
+      }
     }
-    res.json({ ok: false, reason: "Orion svarte ikke: " + (lastErr || "ukjent feil") });
+    res.json({
+      ok: false,
+      reason: "Orion svarte ikke på noen av de prøvde endepunktene. Sett eksakt 'Chat-sti' i innstillinger.",
+      attempts,
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -2219,5 +2305,44 @@ app.get("/healthz", (req, res) => res.json({ ok: true }));
 
 // ---- Statisk frontend (beskyttet) ----
 app.use(requireAuth, express.static(path.join(__dirname, "public")));
+
+// Bakgrunnsjobb: hold snapshots ferske gjennom dagen.
+// Disse er de tyngste endepunktene som henter mye fra Tripletex.
+const buildBalance = async () => {
+  const today = new Date();
+  const todayStr = ymd(today);
+  const yearStart = new Date(today.getFullYear(), 0, 1);
+  return getBalanceSheet(ymd(yearStart), todayStr);
+};
+startBackgroundWarmer({
+  overview: async () => (await import("./src/metrics.js")).buildOverview(),
+  economy: async () => (await import("./src/economy.js")).buildEconomy(),
+  costs: async () => {
+    const today = new Date();
+    const to = ymd(today);
+    const from = ymd(new Date(today.getFullYear() - 1, today.getMonth(), today.getDate()));
+    const [sis, supplierList] = await Promise.all([getSupplierInvoices(from, to), getSuppliers().catch(() => [])]);
+    const supContact = new Map();
+    for (const s of supplierList) {
+      if (!s.name) continue;
+      supContact.set(s.name, { email: s.email || s.invoiceEmail || "", phone: s.phoneNumber || s.phone || "", orgNr: s.organizationNumber || "" });
+    }
+    const bySup = new Map(); let total = 0;
+    for (const s of sis) {
+      const nm = s.supplier?.name || "Ukjent";
+      if (SALARY_RE.test(nm)) continue;
+      const id = s.supplier?.id;
+      const cost = Math.abs(s.amount || 0);
+      const c = supContact.get(nm) || {};
+      const cur = bySup.get(nm) || { name: nm, id, cost: 0, count: 0, email: c.email || "", phone: c.phone || "", orgNr: c.orgNr || "" };
+      cur.cost += cost; cur.count += 1; total += cost;
+      if (id && !cur.id) cur.id = id;
+      bySup.set(nm, cur);
+    }
+    const meta = getConfig().supplierMeta || {};
+    const all = [...bySup.values()].sort((a, b) => b.cost - a.cost);
+    return { suppliers: all.filter((s) => !(meta[s.name] && meta[s.name].terminated)), terminated: all.filter((s) => meta[s.name] && meta[s.name].terminated), total };
+  },
+}, 10 * 60 * 1000); // 10 minutter
 
 app.listen(PORT, () => console.log(`Bygg-Kon dashboard kjører på port ${PORT}`));

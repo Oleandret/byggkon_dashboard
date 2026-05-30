@@ -49,3 +49,31 @@ export async function serveWithSnapshot(key, builder, ttlMs = 300000) {
     throw err; // ingen snapshot å falle tilbake på ennå
   }
 }
+
+// Bakgrunnsjobb: kjør gitte builders periodisk og lagre snapshots.
+// Gjør at "siste kjente data" alltid er friske når brukeren åpner dashbordet —
+// brukeren ser data umiddelbart i stedet for å vente på MCP-kall.
+let _warmTimer = null;
+let _warming = false;
+export function startBackgroundWarmer(builders, intervalMs = 10 * 60 * 1000) {
+  // builders: { key: () => Promise<data>, ... }
+  async function runOnce() {
+    if (_warming) return;
+    _warming = true;
+    for (const [key, builder] of Object.entries(builders)) {
+      try {
+        const data = await builder();
+        saveSnapshot(key, data);
+        console.log("[warmer] ✓", key);
+      } catch (e) {
+        console.warn("[warmer] ✗", key, e.message);
+      }
+    }
+    _warming = false;
+  }
+  if (_warmTimer) clearInterval(_warmTimer);
+  // Første kjøring etter 30 sek (gi serveren tid til å starte), så hver intervalMs
+  setTimeout(runOnce, 30 * 1000);
+  _warmTimer = setInterval(runOnce, intervalMs);
+  console.log("[warmer] startet — intervall " + Math.round(intervalMs / 60000) + " min, " + Object.keys(builders).length + " endepunkter");
+}
