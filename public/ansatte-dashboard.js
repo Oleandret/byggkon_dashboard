@@ -138,6 +138,7 @@
         <button class="ans-subtab ${activeSub === "oversikt" ? "active" : ""}" data-asub="oversikt">📋 Oversikt</button>
         <button class="ans-subtab ${activeSub === "chat" ? "active" : ""}" data-asub="chat">💬 Chat${set.orion?.enabled ? "" : " <span class=\"subnote\">(av)</span>"}</button>
         <button class="ans-subtab ${activeSub === "timer" ? "active" : ""}" data-asub="timer">⏱ Timeoversikt</button>
+        <button class="ans-subtab ${activeSub === "kalender" ? "active" : ""}" data-asub="kalender">📅 Kalender</button>
         <button class="ans-subtab ${activeSub === "status" ? "active" : ""}" data-asub="status">🟢 Status${set.orion?.enabled ? "" : " <span class=\"subnote\">(av)</span>"}</button>
         <button class="ans-subtab ${activeSub === "automasjoner" ? "active" : ""}" data-asub="automasjoner">⚡ Automasjoner</button>
         <button class="ans-subtab ${activeSub === "innstillinger" ? "active" : ""}" data-asub="innstillinger">⚙ Innstillinger</button>
@@ -146,11 +147,113 @@
     // Vis riktig sub-sub-tab innhold
     if (activeSub === "oversikt") renderOversikt(emp, role, goals, bill);
     else if (activeSub === "timer") renderTimer(emp);
+    else if (activeSub === "kalender") renderKalender(emp);
     else if (activeSub === "chat") renderChat(emp);
     else if (activeSub === "status") renderStatus(emp);
     else if (activeSub === "automasjoner") renderAutomasjoner(emp);
     else if (activeSub === "innstillinger") renderInnstillinger(emp);
   }
+
+  /* ============ KALENDER (ukevisning) ============ */
+  let calendarWeekOffset = 0;
+  async function renderKalender(emp) {
+    ["ansDashKpis", "ansDashGrid"].forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = true; });
+    const allGrids = document.querySelectorAll("#ansDashCard > .grid-2"); allGrids.forEach((g) => g.hidden = true);
+    const content = document.getElementById("ansDashContent") || (() => { const d = document.createElement("div"); d.id = "ansDashContent"; document.getElementById("ansDashCard").appendChild(d); return d; })();
+
+    content.innerHTML = `<div class="cal-week-wrap">
+      <div class="cal-week-toolbar">
+        <button class="btn-ghost" id="calPrevWeek">← Forrige uke</button>
+        <button class="btn-ghost" id="calThisWeek">Denne uka</button>
+        <button class="btn-ghost" id="calNextWeek">Neste uke →</button>
+        <span class="cal-week-label" id="calWeekLabel">Laster …</span>
+        <button class="btn-ghost" id="calReload" title="Oppdater" style="margin-left:auto">↻</button>
+      </div>
+      <div id="calWeekGrid"><div class="loading-dots"><span></span><span></span><span></span></div></div>
+    </div>`;
+
+    async function load() {
+      const grid = document.getElementById("calWeekGrid");
+      const label = document.getElementById("calWeekLabel");
+      grid.innerHTML = `<div class="loading-dots"><span></span><span></span><span></span></div>`;
+      try {
+        const r = await fetch("/api/employee-calendar-week?name=" + encodeURIComponent(emp.name) + "&weekOffset=" + calendarWeekOffset);
+        const d = await r.json();
+        const monday = d.weekStart ? new Date(d.weekStart) : new Date();
+        const sunday = d.weekEnd ? new Date(d.weekEnd) : new Date();
+        label.textContent = `Uke ${weekNumber(monday)} · ${monday.toLocaleDateString("nb-NO", { day: "2-digit", month: "short" })}–${sunday.toLocaleDateString("nb-NO", { day: "2-digit", month: "short" })}`;
+        if (!d.ok) {
+          if (d.needsLogin) {
+            grid.innerHTML = `<div class="m365-login-notice"><h4>🔐 Microsoft-pålogging trengs</h4><p>Logg inn på Microsoft i Orion-chatten for å se kalender.</p>${d.orionChatUrl ? `<a href="${esc(d.orionChatUrl)}" target="_blank" rel="noopener">Åpne Orion-chatten →</a>` : ""}</div>`;
+          } else if (d.needsOrion) {
+            grid.innerHTML = `<div class="empty">Orion MCP ikke aktivert. Gå til <b>⚙ Innstillinger</b>.</div>`;
+          } else {
+            grid.innerHTML = `<div class="empty">${esc(d.reason || "Klarte ikke hente kalender")}</div>`;
+          }
+          return;
+        }
+        // Hvis vi har rawText (parsing feilet), vis det
+        if (d.rawText && !d.events.length) {
+          grid.innerHTML = `<div class="empty">Mottok ikke strukturert kalender-data. Rå-svar:</div><pre class="code-snip">${esc(d.rawText)}</pre>`;
+          return;
+        }
+        // Grupper hendelser per dag
+        const byDay = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+        for (const ev of (d.events || [])) {
+          if (!ev.start) continue;
+          const date = new Date(ev.start);
+          const dow = (date.getDay() + 6) % 7; // 0 = mandag
+          byDay[dow].push(ev);
+        }
+        Object.values(byDay).forEach((arr) => arr.sort((a, b) => String(a.start).localeCompare(String(b.start))));
+
+        const dayNames = ["Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag", "Søndag"];
+        grid.innerHTML = `<div class="cal-week-grid">${[0,1,2,3,4,5,6].map((dow) => {
+          const dayDate = new Date(monday);
+          dayDate.setDate(monday.getDate() + dow);
+          const isToday = sameDay(dayDate, new Date());
+          const events = byDay[dow];
+          return `<div class="cal-day-col ${isToday ? "today" : ""} ${dow >= 5 ? "weekend" : ""}">
+            <div class="cal-day-header">
+              <div class="cal-day-name">${esc(dayNames[dow])}</div>
+              <div class="cal-day-date">${dayDate.toLocaleDateString("nb-NO", { day: "2-digit", month: "short" })}</div>
+              ${isToday ? `<div class="cal-today-pill">I dag</div>` : ""}
+            </div>
+            ${events.length ? events.map((ev) => {
+              const start = ev.start ? new Date(ev.start) : null;
+              const end = ev.end ? new Date(ev.end) : null;
+              const timeStr = ev.isAllDay ? "Hele dagen"
+                : start ? start.toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" }) + (end ? "–" + end.toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" }) : "") : "";
+              return `<div class="cal-event ${ev.isOnlineMeeting ? "online" : ""}">
+                <div class="cal-event-time">${esc(timeStr)}</div>
+                <div class="cal-event-title">${esc(ev.subject)}</div>
+                ${ev.location ? `<div class="cal-event-loc">📍 ${esc(ev.location)}</div>` : ""}
+                ${ev.isOnlineMeeting ? `<div class="cal-event-online">💻 Teams-møte</div>` : ""}
+                ${ev.attendees && ev.attendees.length ? `<div class="cal-event-att subnote">${esc(ev.attendees.slice(0, 3).join(", "))}${ev.attendees.length > 3 ? ` +${ev.attendees.length - 3}` : ""}</div>` : ""}
+              </div>`;
+            }).join("") : `<div class="cal-day-empty">Ingen møter</div>`}
+          </div>`;
+        }).join("")}</div>`;
+      } catch (e) {
+        grid.innerHTML = `<div class="empty">Feil: ${esc(e.message)}</div>`;
+      }
+    }
+
+    document.getElementById("calPrevWeek").addEventListener("click", () => { calendarWeekOffset--; load(); });
+    document.getElementById("calNextWeek").addEventListener("click", () => { calendarWeekOffset++; load(); });
+    document.getElementById("calThisWeek").addEventListener("click", () => { calendarWeekOffset = 0; load(); });
+    document.getElementById("calReload").addEventListener("click", load);
+    load();
+  }
+
+  function weekNumber(d) {
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dayNum = (date.getUTCDay() + 6) % 7;
+    date.setUTCDate(date.getUTCDate() - dayNum + 3);
+    const firstThursday = new Date(Date.UTC(date.getUTCFullYear(), 0, 4));
+    return 1 + Math.round(((date - firstThursday) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+  }
+  function sameDay(a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
 
   /* ============ AUTOMASJONER (wishlist) ============ */
   async function renderAutomasjoner(emp) {

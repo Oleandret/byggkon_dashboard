@@ -2290,6 +2290,70 @@ app.get("/api/employee-orion-probe", requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ---- Per-ansatt ukekalender (henter fra Orion M365) ----
+app.get("/api/employee-calendar-week", requireAuth, async (req, res) => {
+  try {
+    const name = String(req.query.name || "").trim();
+    if (!name) return res.status(400).json({ error: "Mangler navn" });
+    // Uke-offset: 0 = denne uka, -1 = forrige, 1 = neste
+    const weekOffset = Number(req.query.weekOffset) || 0;
+    const cfg = (getConfig().employeeSettings || {})[name];
+    const orion = cfg?.orion;
+    if (!orion?.enabled || !orion?.url) return res.json({ ok: false, reason: "Orion ikke aktivert", needsOrion: true });
+
+    // Beregn uke-start (mandag) og slutt (søndag)
+    const now = new Date();
+    const day = (now.getDay() + 6) % 7; // 0 = mandag
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - day + weekOffset * 7);
+    monday.setHours(0, 0, 0, 0);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    const startISO = monday.toISOString();
+    const endISO = sunday.toISOString();
+
+    const calResult = await orionToolCall(orion, "m365__get-calendar-view", {
+      startDateTime: startISO, endDateTime: endISO,
+    });
+    if (calResult && typeof calResult === "object" && calResult._loginRequired) {
+      return res.json({ ok: false, needsLogin: true, orionChatUrl: orion.url });
+    }
+    if (!calResult) {
+      return res.json({ ok: false, reason: "Klarte ikke å hente kalender" });
+    }
+
+    // Parse hendelser fra Orion-svaret. Det kan være JSON-array eller tekst — vi prøver begge.
+    let events = [];
+    try {
+      const parsed = typeof calResult === "string" ? JSON.parse(calResult) : calResult;
+      const items = parsed.value || parsed.events || parsed.items || (Array.isArray(parsed) ? parsed : null);
+      if (items) {
+        events = items.map((e) => ({
+          subject: e.subject || e.title || "(uten emne)",
+          start: e.start?.dateTime || e.startDateTime || e.start,
+          end: e.end?.dateTime || e.endDateTime || e.end,
+          startTimeZone: e.start?.timeZone || "",
+          location: e.location?.displayName || e.location || "",
+          organizer: e.organizer?.emailAddress?.name || e.organizer?.name || "",
+          attendees: Array.isArray(e.attendees) ? e.attendees.map((a) => a.emailAddress?.name || a.name || a.emailAddress?.address || "").filter(Boolean) : [],
+          isOnlineMeeting: !!e.isOnlineMeeting,
+          isAllDay: !!e.isAllDay,
+          bodyPreview: e.bodyPreview || "",
+          webLink: e.webLink || "",
+          showAs: e.showAs || "",
+        }));
+      }
+    } catch {
+      // Hvis JSON-parsing feiler, returnerer vi rå-svaret som "tekst" så frontend kan vise det
+      return res.json({ ok: true, weekStart: startISO, weekEnd: endISO, rawText: String(calResult).slice(0, 8000), events: [] });
+    }
+
+    res.json({ ok: true, weekStart: startISO, weekEnd: endISO, events, weekOffset });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ---- Per-ansatt timeoversikt (siste 2 + 4 uker, ALT fra Tripletex) ----
 app.get("/api/employee-time", requireAuth, async (req, res) => {
   try {
