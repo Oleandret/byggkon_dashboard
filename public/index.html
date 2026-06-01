@@ -937,11 +937,13 @@
           <h2>MCP-nøkler 🔒</h2>
           <div class="org-actions">
             <button id="mcpEdit" class="btn-ghost">🔓 Lås opp</button>
-            <button id="mcpAdd" class="btn-ghost" hidden>+ Kunde</button>
+            <button id="mcpSeed" class="btn-ghost" hidden>👥 Trekk inn ansatte</button>
+            <button id="mcpAdd" class="btn-ghost" hidden>+ Rad</button>
             <button id="mcpSave" class="btn-primary" hidden>Lagre</button>
           </div>
         </div>
-        <p class="subnote">Kun ledelsen. Nøklene behandles som passord og lagres kun på serveren. Lås opp for å oppdatere, lås igjen for å fryse lista.</p>
+        <p class="subnote">Kun ledelsen. Nøklene behandles som passord og lagres kun på serveren. Lås opp for å oppdatere, lås igjen for å fryse lista. «Trekk inn ansatte» lager 4 rader (Nova, Loki, Hilde, Orion) per ansatt.</p>
+        <div class="org-actions" style="margin:0 0 10px"><input id="mcpSearch" class="kon-f" type="search" placeholder="🔍 Søk på kunde eller firmanavn …" style="max-width:340px" /></div>
         <div class="table-wrap tall"><table id="mcpTable"></table></div>
       </div>
     </main>
