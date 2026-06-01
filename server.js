@@ -1260,11 +1260,13 @@ app.post("/api/mcpkeys", requireAuth, (req, res) => {
     if (!list) return res.status(400).json({ error: "Mangler mcpKeys-liste" });
     const clean = list.map((x) => ({
       customer: String(x.customer || "").slice(0, 120),
+      company: String(x.company || "").slice(0, 120),
       email: String(x.email || "").slice(0, 160),
       phone: String(x.phone || "").slice(0, 40),
       date: String(x.date || "").slice(0, 10),
       agent: String(x.agent || "").slice(0, 40),
       key: String(x.key || "").slice(0, 400),
+      cancelled: Boolean(x.cancelled),
       note: String(x.note || "").slice(0, 1000),
     }));
     saveConfig({ mcpKeys: clean });
@@ -2232,7 +2234,16 @@ app.post("/api/employee-m365-login", requireAuth, async (req, res) => {
     const loginResult = await orionToolCall(orion, "m365__login", {});
     if (!loginResult) return res.status(502).json({ error: "Orion svarte ikke på m365__login" });
 
-    const text = typeof loginResult === "string" ? loginResult : JSON.stringify(loginResult);
+    // orionToolCall pakker svar som inneholder "sign in" inn som _loginRequired – for selve
+    // login-verktøyet er det forventet (device-code-instruksen sier "sign in"), så hent ut teksten.
+    const text = typeof loginResult === "string" ? loginResult
+      : (loginResult && loginResult._loginRequired ? String(loginResult.message || "") : JSON.stringify(loginResult));
+
+    // Allerede innlogget? Da finnes ingen device-kode – meld suksess så frontend laster kalenderen.
+    if (/already\s+(logged|signed)\s*-?\s*in|login\s+success|innlogget|"success"\s*:\s*true/i.test(text)) {
+      return res.json({ ok: true, alreadyLoggedIn: true, raw: text.slice(0, 1000) });
+    }
+
     // Parse ut URL og kode
     const urlMatch = text.match(/https?:\/\/[^\s)\]]+/);
     const codeMatch = text.match(/\b([A-Z0-9]{8,10})\b/);

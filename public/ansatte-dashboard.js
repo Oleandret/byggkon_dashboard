@@ -913,6 +913,14 @@
             const r = await fetch("/api/employee-m365-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: btn.dataset.name }) });
             const d2 = await r.json();
             if (!r.ok) throw new Error(d2.error || "Feil");
+            // Allerede innlogget – ingen device-kode trengs. Last statussiden på nytt.
+            if (d2.alreadyLoggedIn) {
+              flow.hidden = false;
+              flow.innerHTML = `<div class="m365-verify-msg" style="color:#1d6a3b">✓ Allerede innlogget i Microsoft — laster kalender på nytt …</div>`;
+              btn.remove();
+              setTimeout(() => { statusData = null; renderStatus(emp); }, 1200);
+              return;
+            }
             flow.hidden = false;
             flow.innerHTML = `
               <div class="m365-flow-step"><b>1.</b> Klikk: <a href="${esc(d2.verificationUrl)}" target="_blank" rel="noopener" class="m365-link">${esc(d2.verificationUrl)}</a></div>
