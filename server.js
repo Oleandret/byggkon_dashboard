@@ -1252,6 +1252,26 @@ app.post("/api/intentions", requireAuth, (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
+// ---- MCP-nøkler til kunder (KI & IT) ----
+app.get("/api/mcpkeys", requireAuth, (req, res) => res.json({ mcpKeys: getConfig().mcpKeys || [] }));
+app.post("/api/mcpkeys", requireAuth, (req, res) => {
+  try {
+    const list = Array.isArray(req.body?.mcpKeys) ? req.body.mcpKeys : null;
+    if (!list) return res.status(400).json({ error: "Mangler mcpKeys-liste" });
+    const clean = list.map((x) => ({
+      customer: String(x.customer || "").slice(0, 120),
+      email: String(x.email || "").slice(0, 160),
+      phone: String(x.phone || "").slice(0, 40),
+      date: String(x.date || "").slice(0, 10),
+      agent: String(x.agent || "").slice(0, 40),
+      key: String(x.key || "").slice(0, 400),
+      note: String(x.note || "").slice(0, 1000),
+    }));
+    saveConfig({ mcpKeys: clean });
+    res.json({ ok: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
 // ---- Pårørende per ansatt (HR) ----
 app.get("/api/nextofkin", requireAuth, (req, res) => res.json({ nextOfKin: getConfig().nextOfKin || [] }));
 app.post("/api/nextofkin", requireAuth, (req, res) => {

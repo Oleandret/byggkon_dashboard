@@ -87,6 +87,7 @@
           <button class="tab" data-tab="kvalitet">Kvalitetssikring</button>
           <button class="tab" data-tab="itsystem">IT-system</button>
           <button class="tab" data-tab="office365">Office 365</button>
+          <button class="tab" data-tab="mcpkeys">MCP-nøkler 🔒</button>
           <button class="tab" data-tab="logg">📋 Logg</button>
         </div>
       </div>
@@ -923,6 +924,25 @@
         </div>
         <p class="subnote">Selskaper vi samarbeider med. Lås opp for å oppdatere, lås igjen for å fryse lista.</p>
         <div class="table-wrap tall"><table id="intTable"></table></div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ============ FANE: MCP-NØKLER ============ -->
+  <section class="tab-panel" id="panel-mcpkeys">
+    <main class="container">
+      <div class="page-intro"><span class="pi-ico">🔑</span><span class="pi-txt"><b>Hva siden gjør:</b> Register over MCP-nøkler vi har levert til kunder for agentene. <b>Hensikt:</b> Holde oversikt over hvilken kunde som har hvilken nøkkel, når den ble bestilt og hvordan vi når dem. Lås opp for å redigere, lås igjen for å fryse lista.</span></div>
+      <div class="card">
+        <div class="proj-head">
+          <h2>MCP-nøkler 🔒</h2>
+          <div class="org-actions">
+            <button id="mcpEdit" class="btn-ghost">🔓 Lås opp</button>
+            <button id="mcpAdd" class="btn-ghost" hidden>+ Kunde</button>
+            <button id="mcpSave" class="btn-primary" hidden>Lagre</button>
+          </div>
+        </div>
+        <p class="subnote">Kun ledelsen. Nøklene behandles som passord og lagres kun på serveren. Lås opp for å oppdatere, lås igjen for å fryse lista.</p>
+        <div class="table-wrap tall"><table id="mcpTable"></table></div>
       </div>
     </main>
   </section>
@@ -1807,6 +1827,7 @@ cd ~/pitzDaily &amp;&amp; blockMesh &amp;&amp; simpleFoam &amp;&amp; paraFoam</p
   <script src="/kiagents.js"></script>
   <script src="/hrextra.js"></script>
   <script src="/intentions.js"></script>
+  <script src="/mcpkeys.js"></script>
   <script src="/nextofkin.js"></script>
   <script src="/fagmoter.js"></script>
   <script src="/contacts.js"></script>
