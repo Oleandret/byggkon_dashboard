@@ -55,6 +55,11 @@ function requireAdmin(req, res, next) {
 // ---- Ansatt-innlogging ----
 app.get("/login", (req, res) => res.sendFile(path.join(__dirname, "public", "login.html")));
 app.post("/login", (req, res) => {
+  // Når Microsoft OAuth er konfigurert er passord-pålogging deaktivert —
+  // alle MÅ logge inn med @byggkon.no via Microsoft.
+  if (OAUTH_ENABLED) {
+    return res.redirect("/login?error=password-disabled");
+  }
   if ((req.body?.password || "") === getConfig().dashboardPassword) {
     req.session.loggedIn = true;
     return res.redirect("/");
