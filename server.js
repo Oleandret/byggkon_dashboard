@@ -78,7 +78,22 @@ app.post("/logout", (req, res) => {
 const MS_CLIENT_ID = process.env.MICROSOFT_CLIENT_ID || "";
 const MS_CLIENT_SECRET = process.env.MICROSOFT_CLIENT_SECRET || "";
 const MS_TENANT = process.env.MICROSOFT_TENANT_ID || "byggkon.no"; // tenant-ID eller "byggkon.no"
-const MS_REDIRECT_URI = process.env.MICROSOFT_REDIRECT_URI || ""; // https://din-app.up.railway.app/auth/microsoft/callback
+
+// Normaliser redirect URI så dobbel slash (//) ikke kan oppstå — Azure er strikt
+// og sammenligner tegn for tegn. Eksempel:
+//   "https://app.com/"  + "/auth/cb"  → "https://app.com//auth/cb"  ← feil
+//   "https://app.com"   + "/auth/cb"  → "https://app.com/auth/cb"   ← riktig
+function _normalizeRedirectUri(raw) {
+  if (!raw) return "";
+  // Trim, fjern trailing slash, fjern dupliserte slasher (bortsett fra etter protokoll)
+  return String(raw).trim().replace(/\/+$/, "").replace(/([^:])\/{2,}/g, "$1/");
+}
+const MS_REDIRECT_URI_RAW = process.env.MICROSOFT_REDIRECT_URI || "";
+const MS_REDIRECT_URI = _normalizeRedirectUri(MS_REDIRECT_URI_RAW);
+if (MS_REDIRECT_URI && MS_REDIRECT_URI !== MS_REDIRECT_URI_RAW) {
+  console.warn(`[OAuth] Normaliserte MICROSOFT_REDIRECT_URI: "${MS_REDIRECT_URI_RAW}" → "${MS_REDIRECT_URI}"`);
+}
+
 const ALLOWED_DOMAIN = process.env.OAUTH_ALLOWED_DOMAIN || "byggkon.no";
 const OAUTH_ENABLED = !!(MS_CLIENT_ID && MS_CLIENT_SECRET && MS_REDIRECT_URI);
 
