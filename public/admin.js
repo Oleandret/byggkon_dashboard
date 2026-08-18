@@ -83,7 +83,7 @@ document.getElementById("settingsForm").addEventListener("submit", async (e) => 
   const f = e.target;
   // Bare send med felter som har verdi (tomme token/passord beholdes på serveren).
   const payload = {};
-  const fields = ["companyName", "heroImageUrl", "regnskapsagentMcpUrl",
+  const fields = ["companyName", "heroImageUrl", "tripletexMcpUrl",
     "dashboardPassword", "weeklyCapacityHours", "refreshSeconds", "cacheTtlMs",
     "companyOrgNr", "companyAddress", "companyEmail", "companyPhone", "companyWebsite"];
   for (const k of fields) {
@@ -113,7 +113,7 @@ document.getElementById("settingsForm").addEventListener("submit", async (e) => 
   const msg = document.getElementById("savedMsg");
   msg.hidden = false; setTimeout(() => (msg.hidden = true), 3000);
   // Tøm token/passord-felt og oppdater "satt"-merker
-  ["regnskapsagentMcpUrl", "dashboardPassword"].forEach((k) => (f[k].value = ""));
+  ["tripletexMcpUrl", "dashboardPassword"].forEach((k) => (f[k].value = ""));
   loadSettings();
 });
 

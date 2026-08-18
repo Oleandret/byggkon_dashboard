@@ -487,7 +487,7 @@ app.post("/api/admin/settings", requireAdmin, (req, res) => {
     const allowed = [
       "companyName",
       "heroImageUrl",
-      "regnskapsagentMcpUrl",
+      "tripletexMcpUrl",
       "dashboardPassword",
       "weeklyCapacityHours",
       "cacheTtlMs",
@@ -508,9 +508,13 @@ app.post("/api/admin/settings", requireAdmin, (req, res) => {
         partial[k] = v;
       }
     }
-    // Valider MCP-URL: må være en faktisk http(s)-adresse (ikke f.eks. et passord)
-    if (partial.regnskapsagentMcpUrl !== undefined && !/^https?:\/\//i.test(partial.regnskapsagentMcpUrl)) {
-      return res.status(400).json({ error: "Regnskapsagent MCP-URL må starte med https:// — lim inn hele URL-en fra Regnskapsagent, ikke et passord." });
+    // Bakoverkompatibelt: eldre admin-sider sendte feltet som regnskapsagentMcpUrl.
+    if (partial.tripletexMcpUrl === undefined && typeof req.body?.regnskapsagentMcpUrl === "string") {
+      partial.tripletexMcpUrl = req.body.regnskapsagentMcpUrl;
+    }
+    // Valider MCP-URL: må være en faktisk http(s)-adresse (ikke f.eks. et token)
+    if (partial.tripletexMcpUrl !== undefined && !/^https?:\/\//i.test(partial.tripletexMcpUrl)) {
+      return res.status(400).json({ error: "Tripletex MCP-URL må starte med https:// — lim inn hele adressen til MCP-serveren (…/mcp), ikke et token." });
     }
     // Verdier (array) lagres direkte hvis sendt
     if (Array.isArray(req.body?.values)) {
@@ -788,7 +792,7 @@ app.get("/api/driftssentral", requireAuth, async (req, res) => {
 const STATUS_AGENTS = [
   { key: "loki", name: "Loki AI", url: "https://byggkon-loki-ai-production.up.railway.app/", check: true },
   { key: "nova", name: "Nova AI", url: "https://nova-ai-agent-bygg-kon-production.up.railway.app/", check: true },
-  { key: "regnskap", name: "Regnskapsagent", url: "", check: false },
+  { key: "tripletex", name: "Tripletex MCP", url: "", check: false },
   { key: "hilde", name: "Hilde (eiendom)", url: "https://byggkon.bluemint.dev", check: false },
 ];
 let agentStatusCache = { ts: 0, agents: [] };

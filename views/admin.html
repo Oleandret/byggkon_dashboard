@@ -49,7 +49,7 @@
         <div class="sc-icon">🔌</div>
         <div class="sc-body">
           <div class="sc-title">MCP & datakilder</div>
-          <div class="sc-desc">Tripletex, regnskapsagent og andre integrasjoner.</div>
+          <div class="sc-desc">Tripletex MCP og andre integrasjoner.</div>
         </div>
       </button>
       <button type="button" class="set-card" data-set="tilgang">
@@ -122,11 +122,11 @@
       </div>
 
       <div class="set-panel" id="set-mcp">
-        <div class="section-title">Datakilde (Regnskapsagent MCP)</div>
+        <div class="section-title">Datakilde (Tripletex MCP)</div>
         <div class="field">
-          <label for="regnskapsagentMcpUrl">Regnskapsagent MCP-URL <span id="mcpSet" class="set" hidden>· satt</span></label>
-          <input id="regnskapsagentMcpUrl" name="regnskapsagentMcpUrl" type="password" autocomplete="off" placeholder="https://regnskapsagent.no/api/mcp/… (la stå tom for å beholde)" />
-          <div class="hint">Hentes i Regnskapsagent-dashbordet («Kopier URL-en»). Denne gir tilgang til Tripletex-dataene – behandle den som et passord. Lagres kun på serveren (helst som miljøvariabel i Railway).</div>
+          <label for="tripletexMcpUrl">Tripletex MCP-URL <span id="mcpSet" class="set" hidden>· satt</span></label>
+          <input id="tripletexMcpUrl" name="tripletexMcpUrl" type="password" autocomplete="off" placeholder="https://tripletex-mcp-production.up.railway.app/mcp (la stå tom for å beholde)" />
+          <div class="hint">Adressen til vår egen <b>tripletex-mcp</b>-server (Railway-tjenesten kjørt med <code>MCP_TRANSPORT=http</code>, endepunkt <code>/mcp</code>). Selve Tripletex-tokenene ligger som miljøvariabler på MCP-tjenesten, ikke her. URL-en gir tilgang til Tripletex-dataene – behandle den som et passord. Lagres kun på serveren (helst som miljøvariabel i Railway).</div>
         </div>
 
         <div class="section-title">Andre MCP-servere (Loki, Nova, Eiendom …)</div>

@@ -1,4 +1,6 @@
-// Datalag mot Tripletex – via Regnskapsagent-MCP (ikke REST-API direkte).
+// Datalag mot Tripletex – via vår egen tripletex-mcp-server (ikke REST-API direkte).
+// MCP-verktøyene er tynne proxyer over Tripletex API v2, så vi sender Tripletex sine
+// egne parametre (fields, isClosed, dateFrom/dateTo …) rett gjennom.
 // Tripletex tillater maks 1000 rader per kall, så vi paginerer med from/count.
 import { callTool, resetClient as resetMcp } from "./mcpClient.js";
 import { getConfig } from "./settings.js";

@@ -530,7 +530,7 @@
             ${opts}
           </select>
           <p class="subnote" style="margin-top:8px">💡 Endre navnet i <b>Organisasjon</b>-fanen slik at det matcher Tripletex-navnet ovenfor.</p>
-        </div>` : `<p class="subnote">Ingen ansatte funnet i Tripletex — sjekk Regnskapsagent-tilkoblingen.</p>`}
+        </div>` : `<p class="subnote">Ingen ansatte funnet i Tripletex — sjekk Tripletex MCP-tilkoblingen.</p>`}
       </div>`;
     }
     content.innerHTML = `${matchWarning}<div class="grid-2" style="margin-top:14px">
@@ -734,7 +734,7 @@
               <option>— bla gjennom for å finne riktig navn —</option>${opts}
             </select>
             <p class="subnote" style="margin-top:6px">💡 Endre navnet i <b>Organisasjon</b>-fanen til å matche Tripletex.</p>
-          </div>` : `<p class="subnote">Ingen ansatte funnet — sjekk Regnskapsagent-tilkoblingen.</p>`}`;
+          </div>` : `<p class="subnote">Ingen ansatte funnet — sjekk Tripletex MCP-tilkoblingen.</p>`}`;
         bar.insertAdjacentElement("afterend", warn);
       }
 

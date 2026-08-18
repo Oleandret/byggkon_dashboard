@@ -1,5 +1,6 @@
-// MCP-klient mot Regnskapsagent (Tripletex via MCP).
-// Snakker "streamable HTTP" JSON-RPC mot URL-en fra Regnskapsagent.
+// MCP-klient mot vår egen Tripletex MCP-server (repoet Oleandret/tripletex-mcp,
+// startet med MCP_TRANSPORT=http og eksponert på .../mcp).
+// Snakker "streamable HTTP" JSON-RPC mot den URL-en.
 // URL-en hentes fra innstillinger/miljøvariabel og er hemmelig.
 import { getConfig } from "./settings.js";
 
@@ -27,10 +28,10 @@ function parseBody(text) {
 }
 
 async function rpc(method, params, isNotification = false) {
-  const { regnskapsagentMcpUrl } = getConfig();
-  if (!regnskapsagentMcpUrl) {
+  const { tripletexMcpUrl } = getConfig();
+  if (!tripletexMcpUrl) {
     throw new Error(
-      "Regnskapsagent MCP-URL er ikke satt. Legg den inn på admin-siden (/admin) eller som miljøvariabel REGNSKAPSAGENT_MCP_URL."
+      "Tripletex MCP-URL er ikke satt. Legg den inn på admin-siden (/admin) eller som miljøvariabel TRIPLETEX_MCP_URL (f.eks. https://tripletex-mcp-production.up.railway.app/mcp)."
     );
   }
   const headers = {
@@ -42,7 +43,7 @@ async function rpc(method, params, isNotification = false) {
   const body = { jsonrpc: "2.0", method, params };
   if (!isNotification) body.id = Math.floor(Math.random() * 1e9);
 
-  const res = await fetch(regnskapsagentMcpUrl, {
+  const res = await fetch(tripletexMcpUrl, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
@@ -64,7 +65,7 @@ async function ensureInit() {
       await rpc("initialize", {
         protocolVersion: "2024-11-05",
         capabilities: {},
-        clientInfo: { name: "byggkon-dashboard", version: "1.0" },
+        clientInfo: { name: "byggkon-dashboard", version: "2.0" },
       });
       await rpc("notifications/initialized", {}, true);
     })().catch((e) => {
