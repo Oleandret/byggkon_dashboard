@@ -84,7 +84,7 @@ document.getElementById("settingsForm").addEventListener("submit", async (e) => 
   const f = e.target;
   // Bare send med felter som har verdi (tomme token/passord beholdes på serveren).
   const payload = {};
-  const fields = ["companyName", "heroImageUrl", "tripletexMcpUrl", "tripletexJwt",
+  const fields = ["companyName", "heroImageUrl", "tripletexMcpUrl",
     "dashboardPassword", "weeklyCapacityHours", "refreshSeconds", "cacheTtlMs",
     "companyOrgNr", "companyAddress", "companyEmail", "companyPhone", "companyWebsite"];
   for (const k of fields) {
@@ -114,7 +114,7 @@ document.getElementById("settingsForm").addEventListener("submit", async (e) => 
   const msg = document.getElementById("savedMsg");
   msg.hidden = false; setTimeout(() => (msg.hidden = true), 3000);
   // Tøm token/passord-felt og oppdater "satt"-merker
-  ["tripletexMcpUrl", "tripletexJwt", "dashboardPassword"].forEach((k) => (f[k].value = ""));
+  ["tripletexMcpUrl", "dashboardPassword"].forEach((k) => (f[k].value = ""));
   loadSettings();
 });
 
@@ -143,6 +143,44 @@ if (upBtn) {
     reader.readAsDataURL(f);
   });
 }
+
+// ---- Test av Tripletex-tilkoblingen ----
+const TEST_MARK = { ok: "✓", error: "✕", skipped: "–" };
+const TEST_COLOR = { ok: "#1e8b6f", error: "#c0392b", skipped: "#9aa0a6" };
+
+function renderTestSteps(d) {
+  const rows = (d.steps || []).map((s) => `
+    <div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid rgba(3,2,19,.08)">
+      <span style="color:${TEST_COLOR[s.status] || "#9aa0a6"};font-weight:700;line-height:1.4">${TEST_MARK[s.status] || "?"}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600">${esc(s.name)}${s.ms != null ? ` <span style="font-weight:400;color:#9aa0a6">${s.ms} ms</span>` : ""}</div>
+        <div style="color:#4a4a55;word-break:break-word">${esc(s.detail)}</div>
+        ${s.hint ? `<div style="margin-top:4px;color:#8a6d1f">→ ${esc(s.hint)}</div>` : ""}
+      </div>
+    </div>`).join("");
+  const head = d.ok
+    ? `<div style="color:#1e8b6f;font-weight:700">✓ Tilkoblingen virker</div>`
+    : `<div style="color:#c0392b;font-weight:700">✕ Tilkoblingen virker ikke</div>`;
+  return `${head}<div style="margin-top:10px">${rows}</div>`;
+}
+
+document.getElementById("testRun")?.addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  const box = document.getElementById("testResults");
+  btn.disabled = true;
+  box.innerHTML = `<div class="hint">Kjører test … (kan ta noen sekunder)</div>`;
+  try {
+    const res = await fetch("/api/admin/test-connection", { method: "POST" });
+    if (res.status === 401 || res.status === 403) { location.href = "/admin/login"; return; }
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || `Testen kunne ikke kjøres (HTTP ${res.status}).`);
+    box.innerHTML = renderTestSteps(d);
+  } catch (err) {
+    box.innerHTML = `<div style="color:#c0392b">Testen kunne ikke kjøres: ${esc(err.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 // ---- Faner i innstillinger ----
 document.querySelectorAll("#setTabs .set-card, #setTabs .set-tab").forEach((b) => {

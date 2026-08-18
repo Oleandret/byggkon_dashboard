@@ -6,6 +6,7 @@ import { getConfig } from "./settings.js";
 
 let sessionId = null;
 let initPromise = null;
+let serverInfo = null; // { name, version } fra initialize-svaret
 
 function parseBody(text) {
   if (!text) return null;
@@ -65,11 +66,15 @@ async function rpc(method, params, isNotification = false) {
 async function ensureInit() {
   if (!initPromise) {
     initPromise = (async () => {
-      await rpc("initialize", {
+      const r = await rpc("initialize", {
         protocolVersion: "2024-11-05",
         capabilities: {},
         clientInfo: { name: "byggkon-dashboard", version: "2.0" },
       });
+      if (r?.error) {
+        throw new Error(`MCP initialize: ${r.error.message || JSON.stringify(r.error)}`);
+      }
+      serverInfo = r?.result?.serverInfo || null;
       await rpc("notifications/initialized", {}, true);
     })().catch((e) => {
       initPromise = null; // tillat ny init ved feil
@@ -118,7 +123,25 @@ async function callToolOnce(name, args) {
   return payload;
 }
 
+// Kobler opp og returnerer serverens navn/versjon – brukes av tilkoblingstesten.
+export async function handshake() {
+  await ensureInit();
+  return serverInfo;
+}
+
+// Verktøyene MCP-serveren tilbyr. Brukes av tilkoblingstesten for å sjekke at
+// serveren har det dashbordet trenger.
+export async function listTools() {
+  await ensureInit();
+  const r = await rpc("tools/list", {});
+  if (r?.error) {
+    throw new Error(`MCP tools/list: ${r.error.message || JSON.stringify(r.error)}`);
+  }
+  return r?.result?.tools || [];
+}
+
 export function resetClient() {
   sessionId = null;
   initPromise = null;
+  serverInfo = null;
 }

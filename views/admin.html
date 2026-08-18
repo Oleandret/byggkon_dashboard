@@ -52,6 +52,13 @@
           <div class="sc-desc">Tripletex MCP og andre integrasjoner.</div>
         </div>
       </button>
+      <button type="button" class="set-card" data-set="test">
+        <div class="sc-icon">🩺</div>
+        <div class="sc-body">
+          <div class="sc-title">Test tilkobling</div>
+          <div class="sc-desc">Sjekk at veien til Tripletex virker, steg for steg.</div>
+        </div>
+      </button>
       <button type="button" class="set-card" data-set="tilgang">
         <div class="sc-icon">🔐</div>
         <div class="sc-body">
@@ -129,9 +136,8 @@
           <div class="hint">Adressen til vår egen <b>tripletex-mcp</b>-server (Railway-tjenesten kjørt med <code>MCP_TRANSPORT=http</code>, endepunkt <code>/mcp</code>). Lagres kun på serveren (helst som miljøvariabel i Railway).</div>
         </div>
         <div class="field">
-          <label for="tripletexJwt">Tripletex API-nøkkel (JWT) <span id="jwtSet" class="set" hidden>· satt</span></label>
-          <input id="tripletexJwt" name="tripletexJwt" type="password" autocomplete="off" placeholder="lim inn JWT-hemmeligheten (la stå tom for å beholde)" />
-          <div class="hint">Opprettes i Tripletex under <b>Selskap → API-tokens</b> av en bruker med admin-rettigheter, og vises bare én gang. Denne gir full tilgang til regnskapet – behandle den som et passord. Lagres kun på serveren og sendes videre til MCP-serveren ved hvert kall. La feltet stå tomt hvis nøkkelen heller er satt som <code>TRIPLETEX_JWT</code> på MCP-tjenesten.</div>
+          <label>Tripletex API-nøkkel (JWT) <span id="jwtSet" class="set" hidden>· satt</span></label>
+          <div class="hint">Settes som miljøvariabelen <code>TRIPLETEX_JWT</code> i Railway – ikke her. Nøkkelen opprettes i Tripletex under <b>Selskap → API-tokens</b> av en bruker med admin-rettigheter, og vises bare én gang.<br /><br />Legg den enten på <b>MCP-tjenesten</b> (anbefalt – da trenger ikke dashbordet kjenne nøkkelen i det hele tatt), eller på <b>dashbord-tjenesten</b>, som da sender den videre ved hvert kall. Merket «satt» over gjelder det siste. Sjekk at det virker under <b>Test tilkobling</b>.</div>
         </div>
 
         <div class="section-title">Andre MCP-servere (Loki, Nova, Eiendom …)</div>
@@ -139,6 +145,15 @@
           <div class="hint">Legg til MCP-serverne bedriften har, så systemet kan snakke med dem og hente informasjon. URL må starte med https://. Behandles som passord – lagres kun på serveren. Disse brukes av KI-rapporter og kontaktlisten.</div>
           <div id="mcpList"></div>
           <button type="button" id="mcpAdd" class="btn-ghost" style="margin-top:8px">+ Legg til MCP</button>
+        </div>
+      </div>
+
+      <div class="set-panel" id="set-test">
+        <div class="section-title">Test av Tripletex-tilkoblingen</div>
+        <div class="field">
+          <div class="hint">Går gjennom hele kjeden ett steg om gangen – fra innstillingene her, via MCP-serveren, til et ekte datauttrekk fra Tripletex. Stopper det opp, ser du nøyaktig hvor og hva som må fikses.</div>
+          <button type="button" id="testRun" class="btn-ghost" style="margin-top:12px">Kjør test</button>
+          <div id="testResults" style="margin-top:16px"></div>
         </div>
       </div>
 

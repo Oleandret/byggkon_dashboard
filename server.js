@@ -13,6 +13,7 @@ import { geocodeOne, sleep } from "./src/geocode.js";
 import { serveWithSnapshot, expireSnapshots, startBackgroundWarmer, getSnapshot, saveSnapshot, deleteSnapshot } from "./src/snapshot.js";
 const snapTtl = () => getConfig().cacheTtlMs || 300000;
 import { getConfig, saveConfig, getConfigForAdmin, SETTINGS_PATH } from "./src/settings.js";
+import { runConnectionTests } from "./src/diagnostics.js";
 
 // Mappe for opplastede filer (ved siden av innstillingsfila – legg på Volume på Railway).
 const UPLOAD_DIR = path.join(path.dirname(SETTINGS_PATH), "uploads");
@@ -482,13 +483,22 @@ app.get("/admin", requireAdmin, (req, res) =>
 // ---- Admin-API ----
 app.get("/api/admin/settings", requireAdmin, (req, res) => res.json(getConfigForAdmin()));
 
+// Tester hele veien fram til Tripletex og rapporterer hvor det eventuelt stopper.
+app.post("/api/admin/test-connection", requireAdmin, async (req, res) => {
+  try {
+    res.json(await runConnectionTests());
+  } catch (err) {
+    console.error("Feil i /api/admin/test-connection:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/api/admin/settings", requireAdmin, (req, res) => {
   try {
     const allowed = [
       "companyName",
       "heroImageUrl",
       "tripletexMcpUrl",
-      "tripletexJwt",
       "dashboardPassword",
       "weeklyCapacityHours",
       "cacheTtlMs",
