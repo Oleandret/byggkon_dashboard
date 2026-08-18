@@ -126,7 +126,12 @@
         <div class="field">
           <label for="tripletexMcpUrl">Tripletex MCP-URL <span id="mcpSet" class="set" hidden>· satt</span></label>
           <input id="tripletexMcpUrl" name="tripletexMcpUrl" type="password" autocomplete="off" placeholder="https://tripletex-mcp-production.up.railway.app/mcp (la stå tom for å beholde)" />
-          <div class="hint">Adressen til vår egen <b>tripletex-mcp</b>-server (Railway-tjenesten kjørt med <code>MCP_TRANSPORT=http</code>, endepunkt <code>/mcp</code>). Selve Tripletex-tokenene ligger som miljøvariabler på MCP-tjenesten, ikke her. URL-en gir tilgang til Tripletex-dataene – behandle den som et passord. Lagres kun på serveren (helst som miljøvariabel i Railway).</div>
+          <div class="hint">Adressen til vår egen <b>tripletex-mcp</b>-server (Railway-tjenesten kjørt med <code>MCP_TRANSPORT=http</code>, endepunkt <code>/mcp</code>). Lagres kun på serveren (helst som miljøvariabel i Railway).</div>
+        </div>
+        <div class="field">
+          <label for="tripletexJwt">Tripletex API-nøkkel (JWT) <span id="jwtSet" class="set" hidden>· satt</span></label>
+          <input id="tripletexJwt" name="tripletexJwt" type="password" autocomplete="off" placeholder="lim inn JWT-hemmeligheten (la stå tom for å beholde)" />
+          <div class="hint">Opprettes i Tripletex under <b>Selskap → API-tokens</b> av en bruker med admin-rettigheter, og vises bare én gang. Denne gir full tilgang til regnskapet – behandle den som et passord. Lagres kun på serveren og sendes videre til MCP-serveren ved hvert kall. La feltet stå tomt hvis nøkkelen heller er satt som <code>TRIPLETEX_JWT</code> på MCP-tjenesten.</div>
         </div>
 
         <div class="section-title">Andre MCP-servere (Loki, Nova, Eiendom …)</div>

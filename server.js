@@ -488,6 +488,7 @@ app.post("/api/admin/settings", requireAdmin, (req, res) => {
       "companyName",
       "heroImageUrl",
       "tripletexMcpUrl",
+      "tripletexJwt",
       "dashboardPassword",
       "weeklyCapacityHours",
       "cacheTtlMs",

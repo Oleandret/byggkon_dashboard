@@ -37,6 +37,10 @@ function defaults() {
     // fortsetter å virke til variabelen er byttet ut.
     tripletexMcpUrl:
       process.env.TRIPLETEX_MCP_URL || process.env.REGNSKAPSAGENT_MCP_URL || "",
+    // JWT fra Tripletex (Selskap → API-tokens). Sendes til MCP-serveren som
+    // header ved hvert kall. Står den tom, bruker MCP-serveren sin egen
+    // TRIPLETEX_JWT-miljøvariabel i stedet.
+    tripletexJwt: process.env.TRIPLETEX_JWT || "",
     dashboardPassword: process.env.DASHBOARD_PASSWORD || "byggkon",
     weeklyCapacityHours: Number(process.env.WEEKLY_CAPACITY_HOURS || 37.5),
     cacheTtlMs: Number(process.env.CACHE_TTL_MS || 5 * 60 * 1000),
@@ -481,6 +485,7 @@ export function getConfigForAdmin() {
     departments: c.departments || [],
     logoUrl: c.logoUrl || "",
     hasMcpUrl: Boolean(c.tripletexMcpUrl),
+    hasTripletexJwt: Boolean(c.tripletexJwt),
     hasDashboardPassword: Boolean(c.dashboardPassword),
     weeklyCapacityHours: c.weeklyCapacityHours,
     cacheTtlMs: c.cacheTtlMs,

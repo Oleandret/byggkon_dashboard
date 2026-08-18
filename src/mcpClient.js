@@ -28,7 +28,7 @@ function parseBody(text) {
 }
 
 async function rpc(method, params, isNotification = false) {
-  const { tripletexMcpUrl } = getConfig();
+  const { tripletexMcpUrl, tripletexJwt } = getConfig();
   if (!tripletexMcpUrl) {
     throw new Error(
       "Tripletex MCP-URL er ikke satt. Legg den inn på admin-siden (/admin) eller som miljøvariabel TRIPLETEX_MCP_URL (f.eks. https://tripletex-mcp-production.up.railway.app/mcp)."
@@ -38,6 +38,9 @@ async function rpc(method, params, isNotification = false) {
     "Content-Type": "application/json",
     Accept: "application/json, text/event-stream",
   };
+  // Tripletex-nøkkelen sendes med hvert kall. Er den ikke satt her, faller
+  // MCP-serveren tilbake på sin egen TRIPLETEX_JWT-miljøvariabel.
+  if (tripletexJwt) headers["X-Tripletex-Jwt"] = tripletexJwt;
   if (sessionId) headers["Mcp-Session-Id"] = sessionId;
 
   const body = { jsonrpc: "2.0", method, params };
@@ -76,8 +79,26 @@ async function ensureInit() {
   return initPromise;
 }
 
+// MCP-serveren holder sesjonene i minnet, så de forsvinner ved ny deploy.
+// Da er den lagrede session-ID-en vår ugyldig og kallet avvises – én ny
+// initialisering fikser det.
+function isStaleSession(err) {
+  const msg = String(err?.message || "");
+  return /HTTP (400|404)/.test(msg) || /session/i.test(msg);
+}
+
 // Kaller et MCP-verktøy og returnerer parset JSON-resultat.
 export async function callTool(name, args = {}) {
+  try {
+    return await callToolOnce(name, args);
+  } catch (err) {
+    if (!isStaleSession(err)) throw err;
+    resetClient();
+    return callToolOnce(name, args);
+  }
+}
+
+async function callToolOnce(name, args) {
   await ensureInit();
   const r = await rpc("tools/call", { name, arguments: args });
   const result = r?.result;

@@ -45,25 +45,23 @@ Krever at Integrasjoner-modulen er aktiv på kontoen. Sørg også for at brukere
 **b) Deploy MCP-serveren på Railway**
 
 1. Railway → **New Project → Deploy from GitHub repo** → `Oleandret/tripletex-mcp`.
-2. **Variables:**
-   ```
-   MCP_TRANSPORT=http
-   TRIPLETEX_JWT=<jwt-hemmeligheten fra steg a>
-   ```
-   (`TRIPLETEX_ENV=test` hvis du vil kjøre mot Tripletex sitt testmiljø.)
+2. **Variables:** `MCP_TRANSPORT=http` (og `TRIPLETEX_ENV=test` hvis du vil kjøre mot Tripletex sitt testmiljø).
 3. **Settings → Networking → Generate Domain.** Helsesjekken svarer på `/`, MCP-endepunktet er `/mcp`.
-
-> Har du allerede consumer + employee token, virker de fortsatt: sett `TRIPLETEX_CONSUMER_TOKEN` og `TRIPLETEX_EMPLOYEE_TOKEN` i stedet for `TRIPLETEX_JWT`.
 
 **c) Koble dashbordet til**
 
-Legg inn hele adressen — med `/mcp` til slutt — som `TRIPLETEX_MCP_URL` i Railway, eller på `/admin`:
+På `/admin` → **MCP & datakilder** legger du inn to felter:
 
-```
-https://tripletex-mcp-production.up.railway.app/mcp
-```
+| Felt | Verdi |
+|---|---|
+| Tripletex MCP-URL | `https://tripletex-mcp-production.up.railway.app/mcp` — hele adressen, med `/mcp` til slutt |
+| Tripletex API-nøkkel (JWT) | hemmeligheten fra steg a |
 
-URL-en er hemmelig (MCP-serveren har ingen egen autentisering) — behandle den som et passord.
+Dashbordet sender nøkkelen videre til MCP-serveren som `X-Tripletex-Jwt`-header ved hvert kall. Begge verdiene lagres kun på serveren og kan alternativt settes som `TRIPLETEX_MCP_URL` og `TRIPLETEX_JWT` i Railway.
+
+> Vil du heller la nøkkelen ligge på MCP-tjenesten, setter du `TRIPLETEX_JWT` der og lar feltet på `/admin` stå tomt. Har du allerede consumer + employee token fra før, virker de også — sett `TRIPLETEX_CONSUMER_TOKEN` og `TRIPLETEX_EMPLOYEE_TOKEN` på MCP-tjenesten.
+
+Merk at MCP-serveren ikke har egen pålogging: kjenner noen både URL-en og nøkkelen, har de tilgang til regnskapet. Behandle begge som passord.
 
 > Migrering fra Regnskapsagent: den gamle `REGNSKAPSAGENT_MCP_URL` leses fortsatt som fallback, og et lagret `regnskapsagentMcpUrl` i innstillingsfila migreres automatisk. Fjern begge når `TRIPLETEX_MCP_URL` er på plass.
 
