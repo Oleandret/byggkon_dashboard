@@ -82,6 +82,18 @@ async function ensureClient(redirectUri) {
   const metadata = await discoverOauth();
   if (!metadata) throw new Error("MCP-serveren tilbyr ikke OAuth.");
 
+  // Har vi fått tildelt en klient-ID av Tripletex, bruker vi den og hopper over
+  // automatisk registrering. Det er veien videre hvis de godkjenner adressen vår.
+  const envClientId = process.env.TRIPLETEX_OAUTH_CLIENT_ID;
+  if (envClientId) {
+    return {
+      clientId: envClientId.trim(),
+      clientSecret: (process.env.TRIPLETEX_OAUTH_CLIENT_SECRET || "").trim(),
+      redirectUri,
+      issuer: metadata.issuer || "",
+    };
+  }
+
   const stored = getConfig().tripletexOauthClient;
   if (stored?.clientId && stored.redirectUri === redirectUri && stored.issuer === metadata.issuer) {
     return stored;
@@ -106,6 +118,16 @@ async function ensureClient(redirectUri) {
   });
   const body = await res.text();
   if (!res.ok) {
+    // Tripletex sin MCP-beta tar bare imot klienter fra en godkjent liste
+    // (Claude, ChatGPT, VS Code og localhost). En selvhostet webapp som denne
+    // blir avvist til adressen vår er lagt inn hos dem.
+    if (/allowlist/i.test(body) || /invalid_client_metadata/.test(body)) {
+      throw new Error(
+        `Tripletex godtar ikke adressen vår ennå. De slipper bare gjennom klienter på en godkjent liste. ` +
+          `Be Tripletex legge inn ${redirectUri} — eller sett TRIPLETEX_OAUTH_CLIENT_ID hvis de gir deg en klient-ID. ` +
+          `Inntil videre: bruk vår egen MCP-server (se README).`
+      );
+    }
     throw new Error(`Klientregistrering feilet (HTTP ${res.status}): ${body.slice(0, 300)}`);
   }
   let data;

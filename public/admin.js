@@ -161,7 +161,11 @@ function renderTripletexOauth(o) {
       : "Tilkoblet Tripletex. Tilgangen fornyes automatisk.";
     connect.textContent = "Koble til på nytt";
   } else {
-    status.textContent = "Ikke tilkoblet. Trykk «Koble til Tripletex» for å logge inn.";
+    const uri = o.redirectUri || location.origin + "/admin/tripletex/callback";
+    status.innerHTML =
+      `Ikke tilkoblet. Trykk «Koble til Tripletex» for å logge inn.<br />` +
+      `<span style="color:#6b6b76">Tripletex sin MCP-beta godtar foreløpig bare klienter på en godkjent liste. ` +
+      `Blir du avvist, be dem legge inn denne adressen: <code>${esc(uri)}</code></span>`;
     connect.textContent = "Koble til Tripletex";
   }
 }

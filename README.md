@@ -39,6 +39,7 @@ Dashbordet henter alt fra Tripletex gjennom en MCP-server. Det finnes to å velg
 | Drift | Tripletex drifter den | vi drifter den |
 | Verktøy | laget for chat-assistenter | laget for dette dashbordet |
 | Pris | gratis i beta, blir betalt | gratis |
+| Status for oss | **blokkert** — adressen vår er ikke godkjent hos Tripletex | virker |
 
 **Dashbordet henter i dag data fra vår egen.** Den er en tynn proxy rett over Tripletex API v2, og gir oss det dashbordet faktisk trenger: bulk-uttrekk med paginering opptil 1000 rader per kall, og `fields` for å utvide nøstede objekter. Tripletex sin egen server er bygget for at en assistent skal slå opp enkeltting i en samtale, og har andre verktøynavn og andre svarformater.
 
@@ -90,6 +91,14 @@ Vår egen MCP-server har ingen egen pålogging: kjenner noen både URL-en og nø
 3. Kjør **Test tilkobling**.
 
 Dashbordet registrerer seg selv som OAuth-klient (dynamic client registration), bruker authorization code med PKCE, og fornyer tilgangen automatisk med refresh token — samme flyt som Claude-connectoren. Adressen Tripletex sender deg tilbake til utledes fra domenet dashbordet kjører på, og kan overstyres med `TRIPLETEX_OAUTH_REDIRECT_URI`.
+
+> ⚠️ **Virker ikke i dag.** Tripletex sin MCP-beta tar bare imot klienter fra en godkjent liste — Claude, ChatGPT, VS Code og `localhost`. En selvhostet webapp som denne blir avvist:
+>
+> ```
+> invalid_client_metadata: redirect_uri https://…/admin/tripletex/callback is not on the allowlist
+> ```
+>
+> For å komme videre må Tripletex legge inn adressen vår. Gir de deg en klient-ID i stedet for at vi registrerer oss selv, settes den som `TRIPLETEX_OAUTH_CLIENT_ID` (og eventuelt `TRIPLETEX_OAUTH_CLIENT_SECRET`) — da hoppes registreringen over.
 
 > **OAuth-tokenene lagres i innstillingsfila**, ikke som miljøvariabler — de fornyes løpende og kan ikke ligge i Railway. Uten et Volume montert på `SETTINGS_PATH` må du koble til på nytt etter hver deploy.
 
