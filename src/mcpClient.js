@@ -3,6 +3,7 @@
 // Snakker "streamable HTTP" JSON-RPC mot den URL-en.
 // URL-en hentes fra innstillinger/miljøvariabel og er hemmelig.
 import { getConfig } from "./settings.js";
+import { getAccessToken, refreshAccessToken } from "./tripletexOauth.js";
 
 let sessionId = null;
 let initPromise = null;
@@ -39,9 +40,12 @@ async function rpc(method, params, isNotification = false) {
     "Content-Type": "application/json",
     Accept: "application/json, text/event-stream",
   };
-  // Tripletex-nøkkelen sendes med hvert kall. Er den ikke satt her, faller
-  // MCP-serveren tilbake på sin egen TRIPLETEX_JWT-miljøvariabel.
-  if (tripletexJwt) headers["X-Tripletex-Jwt"] = tripletexJwt;
+  // To måter å autentisere, avhengig av hvilken MCP-server vi peker på:
+  //   Tripletex sin egen (mcp.tripletex.no) krever OAuth – Bearer-token.
+  //   Vår selvhostede tar nøkkelen som header, eller har den i miljøet sitt.
+  const accessToken = await getAccessToken();
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  else if (tripletexJwt) headers["X-Tripletex-Jwt"] = tripletexJwt;
   if (sessionId) headers["Mcp-Session-Id"] = sessionId;
 
   const body = { jsonrpc: "2.0", method, params };
@@ -92,11 +96,22 @@ function isStaleSession(err) {
   return /HTTP (400|404)/.test(msg) || /session/i.test(msg);
 }
 
+// Utløpt eller trukket tilbake access token.
+function isAuthError(err) {
+  const msg = String(err?.message || "");
+  return /HTTP 401/.test(msg) || /invalid_token/i.test(msg);
+}
+
 // Kaller et MCP-verktøy og returnerer parset JSON-resultat.
 export async function callTool(name, args = {}) {
   try {
     return await callToolOnce(name, args);
   } catch (err) {
+    if (isAuthError(err)) {
+      await refreshAccessToken(); // kaster videre hvis vi må koble til på nytt
+      resetClient();
+      return callToolOnce(name, args);
+    }
     if (!isStaleSession(err)) throw err;
     resetClient();
     return callToolOnce(name, args);

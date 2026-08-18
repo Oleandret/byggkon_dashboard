@@ -136,8 +136,16 @@
           <div class="hint">Adressen til vår egen <b>tripletex-mcp</b>-server (Railway-tjenesten kjørt med <code>MCP_TRANSPORT=http</code>, endepunkt <code>/mcp</code>). Lagres kun på serveren (helst som miljøvariabel i Railway).</div>
         </div>
         <div class="field">
-          <label>Tripletex API-nøkkel (JWT) <span id="jwtSet" class="set" hidden>· satt</span></label>
-          <div class="hint">Settes som miljøvariabelen <code>TRIPLETEX_JWT</code> i Railway – ikke her. Nøkkelen opprettes i Tripletex under <b>Selskap → API-tokens</b> av en bruker med admin-rettigheter, og vises bare én gang.<br /><br />Legg den enten på <b>MCP-tjenesten</b> (anbefalt – da trenger ikke dashbordet kjenne nøkkelen i det hele tatt), eller på <b>dashbord-tjenesten</b>, som da sender den videre ved hvert kall. Merket «satt» over gjelder det siste. Sjekk at det virker under <b>Test tilkobling</b>.</div>
+          <label>Pålogging <span id="ttxConnected" class="set" hidden>· tilkoblet</span></label>
+          <div id="ttxStatus" class="hint">Laster …</div>
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+            <a id="ttxConnect" class="btn-ghost" href="/admin/tripletex/connect">Koble til Tripletex</a>
+            <button type="button" id="ttxDisconnect" class="btn-ghost" hidden>Koble fra</button>
+          </div>
+          <div class="hint" style="margin-top:10px">
+            Peker MCP-URL-en på <b>Tripletex sin egen server</b> (<code>https://mcp.tripletex.no/</code>), logger du inn med OAuth – samme måte som Claude-connectoren. Ingen nøkler å lime inn.<br /><br />
+            Peker den på <b>vår egen tripletex-mcp</b> på Railway, brukes i stedet miljøvariabelen <code>TRIPLETEX_JWT</code> <span id="jwtSet" class="set" hidden>· satt</span>, som settes på MCP-tjenesten. Da er knappen over unødvendig.
+          </div>
         </div>
 
         <div class="section-title">Andre MCP-servere (Loki, Nova, Eiendom …)</div>

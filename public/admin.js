@@ -17,6 +17,7 @@ async function loadSettings() {
   document.getElementById("cacheTtlMs").value = s.cacheTtlMs ?? "";
   document.getElementById("mcpSet").hidden = !s.hasMcpUrl;
   document.getElementById("jwtSet").hidden = !s.hasTripletexJwt;
+  renderTripletexOauth(s.tripletexOauth || {});
   document.getElementById("passwordSet").hidden = !s.hasDashboardPassword;
   // Firmaopplysninger
   ["companyOrgNr", "companyAddress", "companyEmail", "companyPhone", "companyWebsite", "floorPlanUrl"].forEach((k) => {
@@ -144,9 +145,60 @@ if (upBtn) {
   });
 }
 
+// ---- OAuth mot Tripletex sin MCP-server ----
+function renderTripletexOauth(o) {
+  const badge = document.getElementById("ttxConnected");
+  const status = document.getElementById("ttxStatus");
+  const connect = document.getElementById("ttxConnect");
+  const disconnect = document.getElementById("ttxDisconnect");
+  if (!status) return;
+  badge.hidden = !o.connected;
+  disconnect.hidden = !o.connected;
+  if (o.connected) {
+    const since = o.connectedAt ? new Date(o.connectedAt).toLocaleString("nb-NO") : "";
+    status.textContent = since
+      ? `Tilkoblet Tripletex siden ${since}. Tilgangen fornyes automatisk.`
+      : "Tilkoblet Tripletex. Tilgangen fornyes automatisk.";
+    connect.textContent = "Koble til på nytt";
+  } else {
+    status.textContent = "Ikke tilkoblet. Trykk «Koble til Tripletex» for å logge inn.";
+    connect.textContent = "Koble til Tripletex";
+  }
+}
+
+document.getElementById("ttxDisconnect")?.addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  try {
+    const res = await fetch("/api/admin/tripletex/disconnect", { method: "POST" });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.error || `HTTP ${res.status}`);
+    }
+    loadSettings();
+  } catch (err) {
+    showError("Kunne ikke koble fra: " + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// Beskjed etter at Tripletex har sendt oss tilbake fra innloggingen.
+(function showTripletexResult() {
+  const ttx = new URLSearchParams(location.search).get("ttx");
+  if (!ttx) return;
+  if (ttx === "ok") {
+    const msg = document.getElementById("savedMsg");
+    if (msg) { msg.textContent = "✓ Tilkoblet Tripletex"; msg.hidden = false; setTimeout(() => (msg.hidden = true), 6000); }
+  } else {
+    showError("Tilkobling til Tripletex feilet: " + ttx);
+  }
+  history.replaceState(null, "", location.pathname);
+})();
+
 // ---- Test av Tripletex-tilkoblingen ----
-const TEST_MARK = { ok: "✓", error: "✕", skipped: "–" };
-const TEST_COLOR = { ok: "#1e8b6f", error: "#c0392b", skipped: "#9aa0a6" };
+const TEST_MARK = { ok: "✓", warn: "!", error: "✕", skipped: "–" };
+const TEST_COLOR = { ok: "#1e8b6f", warn: "#b8860b", error: "#c0392b", skipped: "#9aa0a6" };
 
 function renderTestSteps(d) {
   const rows = (d.steps || []).map((s) => `
@@ -158,9 +210,12 @@ function renderTestSteps(d) {
         ${s.hint ? `<div style="margin-top:4px;color:#8a6d1f">→ ${esc(s.hint)}</div>` : ""}
       </div>
     </div>`).join("");
+  const hasError = (d.steps || []).some((s) => s.status === "error");
   const head = d.ok
     ? `<div style="color:#1e8b6f;font-weight:700">✓ Tilkoblingen virker</div>`
-    : `<div style="color:#c0392b;font-weight:700">✕ Tilkoblingen virker ikke</div>`;
+    : hasError
+      ? `<div style="color:#c0392b;font-weight:700">✕ Tilkoblingen virker ikke</div>`
+      : `<div style="color:#b8860b;font-weight:700">! Tilkoblingen virker, men ikke alt dashbordet trenger er på plass</div>`;
   return `${head}<div style="margin-top:10px">${rows}</div>`;
 }
 

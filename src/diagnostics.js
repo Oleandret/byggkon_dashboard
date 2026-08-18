@@ -1,13 +1,18 @@
 // Tilkoblingstest for Tripletex-kjeden: innstillinger → MCP-server → Tripletex.
 // Kjøres fra admin-siden. Går ett steg om gangen og stopper ved første feil,
 // slik at svaret peker på hvor det faktisk klikker – ikke bare at "noe" er galt.
+//
+// Testen skal virke mot begge servertypene vi kan peke på: vår egen selvhostede
+// tripletex-mcp, og Tripletex sin egen mcp.tripletex.no som krever OAuth. Den
+// lister derfor opp hva serveren faktisk tilbyr i stedet for å ta for gitt at
+// verktøyene heter det vi forventer.
 import { getConfig } from "./settings.js";
 import { callTool, handshake, listTools, resetClient } from "./mcpClient.js";
+import { discoverOauth, getOauthStatus } from "./tripletexOauth.js";
 
 const HEALTH_TIMEOUT_MS = 10000;
 
-// Verktøyene dashbordet faktisk kaller. Mangler noen av dem, er MCP-serveren
-// enten en eldre versjon eller en annen server enn vi tror.
+// Verktøyene dashbordet faktisk kaller.
 const REQUIRED_TOOLS = [
   "search_projects",
   "search_orders",
@@ -21,12 +26,11 @@ const REQUIRED_TOOLS = [
   "get_balance_sheet",
 ];
 
-function short(value, max = 400) {
+function short(value, max = 500) {
   return String(value ?? "").slice(0, max);
 }
 
-// Maskerer en URL slik at den kan vises i nettleseren uten å lekke hele
-// adressen – vi viser vertsnavn og sti, men ikke query/token.
+// Vertsnavn og sti, uten query – trygt å vise i nettleseren.
 function safeUrl(url) {
   try {
     const u = new URL(url);
@@ -40,8 +44,8 @@ export async function runConnectionTests() {
   const steps = [];
   let failed = false;
 
-  // Kjører ett steg. Etter første feil markeres resten som ikke kjørt, slik at
-  // en feil tidlig i kjeden ikke drukner i følgefeil lenger ute.
+  // Etter første feil markeres resten som ikke kjørt, slik at en feil tidlig i
+  // kjeden ikke drukner i følgefeil lenger ute.
   async function step(name, hint, fn) {
     if (failed) {
       steps.push({ name, status: "skipped", detail: "Ikke kjørt – et tidligere steg feilet." });
@@ -49,9 +53,16 @@ export async function runConnectionTests() {
     }
     const startedAt = Date.now();
     try {
-      const detail = await fn();
-      steps.push({ name, status: "ok", detail: short(detail || "OK"), ms: Date.now() - startedAt });
-      return detail;
+      const result = await fn();
+      const warn = result && typeof result === "object" && result.warn;
+      steps.push({
+        name,
+        status: warn ? "warn" : "ok",
+        detail: short(warn ? result.warn : result || "OK"),
+        hint: warn ? hint : undefined,
+        ms: Date.now() - startedAt,
+      });
+      return result;
     } catch (err) {
       failed = true;
       steps.push({
@@ -66,6 +77,7 @@ export async function runConnectionTests() {
   }
 
   const config = getConfig();
+  let usesOauth = false;
 
   await step(
     "Innstillinger",
@@ -79,44 +91,70 @@ export async function runConnectionTests() {
       } catch {
         throw new Error(`"${short(url, 60)}" er ikke en gyldig URL.`);
       }
-      if (!/^https?:$/.test(parsed.protocol)) {
-        throw new Error("URL-en må starte med https://");
+      if (!/^https?:$/.test(parsed.protocol)) throw new Error("URL-en må starte med https://");
+      return `MCP-URL: ${safeUrl(url)}`;
+    }
+  );
+
+  await step(
+    "Type MCP-server",
+    "Sjekk at URL-en peker dit du tror. Tripletex sin egen server er https://mcp.tripletex.no/, vår egen ligger på Railway og slutter på /mcp.",
+    async () => {
+      const metadata = await discoverOauth().catch(() => null);
+      usesOauth = Boolean(metadata);
+      if (!usesOauth) {
+        return `Selvhostet MCP-server uten OAuth. ${
+          config.tripletexJwt
+            ? "TRIPLETEX_JWT er satt på dashbordet og sendes med hvert kall."
+            : "MCP-serveren må ha sin egen TRIPLETEX_JWT."
+        }`;
       }
-      const notes = [`MCP-URL: ${safeUrl(url)}`];
-      if (!parsed.pathname.endsWith("/mcp")) {
-        notes.push("Merk: adressen slutter ikke på /mcp – det er vanligvis feil.");
-      }
-      notes.push(
-        config.tripletexJwt
-          ? "TRIPLETEX_JWT er satt på dashbordet og sendes med hvert kall."
-          : "TRIPLETEX_JWT er ikke satt på dashbordet – MCP-serveren må ha sin egen."
-      );
-      return notes.join(" ");
+      return `Krever OAuth (utsteder ${safeUrl(metadata.issuer || config.tripletexMcpUrl)}).`;
     }
   );
 
   await step(
     "Helsesjekk av MCP-serveren",
-    "Sjekk at tjenesten kjører i Railway, og at MCP_TRANSPORT=http er satt.",
+    "Sjekk at tjenesten kjører. For vår egen: at MCP_TRANSPORT=http er satt i Railway.",
     async () => {
       const origin = new URL(config.tripletexMcpUrl).origin;
-      const res = await fetch(origin + "/health", {
+      // Tripletex sin server har ikke /health, men svarer på rot-URL-en.
+      const res = await fetch(usesOauth ? origin : origin + "/health", {
         signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
       });
       const body = await res.text().catch(() => "");
-      if (!res.ok) throw new Error(`HTTP ${res.status} fra ${origin}/health: ${short(body, 200)}`);
+      // 401 fra en OAuth-server betyr at den lever og krever pålogging – det er
+      // ikke en feil her, det håndteres i neste steg.
+      if (!res.ok && !(usesOauth && res.status === 401)) {
+        throw new Error(`HTTP ${res.status} fra ${origin}: ${short(body, 200)}`);
+      }
       try {
         const data = JSON.parse(body);
-        return `${data.server || "ukjent server"} ${data.version || ""} svarer på ${origin}`.trim();
+        if (data.server) return `${data.server} ${data.version || ""} svarer på ${origin}`.trim();
       } catch {
-        return `${origin} svarer (HTTP ${res.status})`;
+        /* ikke JSON – det går fint */
       }
+      return `${origin} svarer (HTTP ${res.status})`;
+    }
+  );
+
+  await step(
+    "Pålogging",
+    "Gå til MCP & datakilder og trykk «Koble til Tripletex».",
+    async () => {
+      if (!usesOauth) return "Ikke nødvendig – serveren bruker ikke OAuth.";
+      const status = getOauthStatus();
+      if (!status.connected) {
+        throw new Error("Ikke koblet til Tripletex ennå – ingen OAuth-pålogging er fullført.");
+      }
+      const expires = status.expiresAt ? new Date(status.expiresAt).toLocaleString("nb-NO") : "ukjent";
+      return `Koblet til. Tilgangen utløper ${expires} og fornyes automatisk.`;
     }
   );
 
   await step(
     "MCP-håndtrykk",
-    "Serveren svarer, men snakker ikke MCP på denne adressen. Sjekk at URL-en slutter på /mcp.",
+    "Serveren svarer, men snakker ikke MCP på denne adressen. Sjekk at URL-en er riktig.",
     async () => {
       resetClient(); // tving en fersk sesjon, ellers tester vi bare en gammel
       const info = await handshake();
@@ -126,33 +164,49 @@ export async function runConnectionTests() {
     }
   );
 
-  await step(
+  // Verktøysteget feiler ikke, det rapporterer. Peker vi på en annen MCP-server
+  // enn vår egen, heter verktøyene noe annet – og da er det nettopp lista over
+  // hva som finnes vi trenger å se.
+  const toolStep = await step(
     "Verktøy",
-    "MCP-serveren er trolig en eldre versjon. Deploy siste versjon av tripletex-mcp.",
+    "Dashbordet kan ikke hente data før disse finnes. Vår egen tripletex-mcp har dem alle – Tripletex sin egen server bruker andre navn, og da må datalaget kobles om.",
     async () => {
       const tools = await listTools();
-      const names = new Set(tools.map((t) => t.name));
-      const missing = REQUIRED_TOOLS.filter((t) => !names.has(t));
+      const names = tools.map((t) => t.name);
+      const present = new Set(names);
+      const missing = REQUIRED_TOOLS.filter((t) => !present.has(t));
       if (missing.length) {
-        throw new Error(`Mangler ${missing.length} verktøy: ${missing.join(", ")}`);
+        return {
+          warn:
+            `${tools.length} verktøy tilgjengelig, men ${missing.length} av ${REQUIRED_TOOLS.length} dashbordet trenger mangler: ` +
+            `${missing.join(", ")}. Serveren tilbyr: ${names.join(", ")}`,
+          names,
+        };
       }
       return `${tools.length} verktøy tilgjengelig, alle ${REQUIRED_TOOLS.length} dashbordet trenger er på plass.`;
     }
   );
 
+  const available = new Set(
+    (toolStep && typeof toolStep === "object" && toolStep.names) || REQUIRED_TOOLS
+  );
+
   await step(
     "Tripletex-pålogging",
-    "Nøkkelen mangler eller er avvist. Sjekk TRIPLETEX_JWT, og at den er laget i samme miljø (produksjon vs. test).",
+    "Nøkkelen mangler eller er avvist. Sjekk at den er laget i samme miljø (produksjon vs. test).",
     async () => {
+      if (!available.has("whoami")) {
+        return "Hoppet over – serveren har ikke et whoami-verktøy.";
+      }
       const me = await callTool("whoami");
       if (me?.httpStatus >= 400 || me?.tripletexResponse) {
         const msg = me.tripletexResponse?.message || me.message || `HTTP ${me.httpStatus}`;
         throw new Error(`Tripletex avviste påloggingen: ${msg}`);
       }
       const v = me?.value || me || {};
-      const company = v.companyName || v.company?.name || v.companyId || "";
-      const employee = v.employeeName || v.employee?.name || "";
-      const who = [company, employee].filter(Boolean).join(" · ");
+      const who = [v.companyName || v.company?.name || v.companyId, v.employeeName || v.employee?.name]
+        .filter(Boolean)
+        .join(" · ");
       return who ? `Pålogget: ${who}` : "Pålogget Tripletex.";
     }
   );
@@ -161,6 +215,11 @@ export async function runConnectionTests() {
     "Datauttrekk",
     "Påloggingen virker, men prosjektdata kommer ikke ut. Sjekk rettighetene til brukeren nøkkelen ble laget for.",
     async () => {
+      if (!available.has("search_projects")) {
+        throw new Error(
+          "Serveren har ikke search_projects, så dashbordet kan ikke hente prosjekter fra den."
+        );
+      }
       const data = await callTool("search_projects", {
         isClosed: false,
         from: 0,
@@ -191,7 +250,7 @@ export async function runConnectionTests() {
   );
 
   return {
-    ok: !failed,
+    ok: !failed && !steps.some((s) => s.status === "warn"),
     checkedAt: new Date().toISOString(),
     steps,
   };

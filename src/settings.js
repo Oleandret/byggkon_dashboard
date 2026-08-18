@@ -487,6 +487,17 @@ export function getConfigForAdmin() {
     logoUrl: c.logoUrl || "",
     hasMcpUrl: Boolean(c.tripletexMcpUrl),
     hasTripletexJwt: Boolean(c.tripletexJwt),
+    // Status for OAuth-koblingen mot Tripletex sin MCP-server. Aldri selve
+    // tokenene – bare om vi er koblet til og når det utløper.
+    tripletexOauth: {
+      connected: Boolean(c.tripletexOauthTokens?.accessToken),
+      clientRegistered: Boolean(c.tripletexOauthClient?.clientId),
+      redirectUri: c.tripletexOauthClient?.redirectUri || "",
+      connectedAt: c.tripletexOauthTokens?.connectedAt || "",
+      expiresAt: c.tripletexOauthTokens?.expiresAtMs
+        ? new Date(c.tripletexOauthTokens.expiresAtMs).toISOString()
+        : "",
+    },
     hasDashboardPassword: Boolean(c.dashboardPassword),
     weeklyCapacityHours: c.weeklyCapacityHours,
     cacheTtlMs: c.cacheTtlMs,
