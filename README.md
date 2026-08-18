@@ -32,14 +32,15 @@ Du kan også sette `TRIPLETEX_MCP_URL` m.m. som miljøvariabler (se `.env.exampl
 
 Dashbordet henter data via MCP-serveren i repoet [**Oleandret/tripletex-mcp**](https://github.com/Oleandret/tripletex-mcp), som er en tynn proxy rett over Tripletex API v2. Ingen tredjepart står lenger mellom oss og regnskapet — tokenene ligger på vår egen Railway-tjeneste.
 
-**a) Skaff tokens i Tripletex**
+**a) Lag en API-nøkkel i Tripletex**
 
-| Token | Hvor |
-|---|---|
-| `TRIPLETEX_CONSUMER_TOKEN` | søk om produksjonstilgang på [developer.tripletex.no](https://developer.tripletex.no) (2–3 ukers behandling) |
-| `TRIPLETEX_EMPLOYEE_TOKEN` | Tripletex → **Innstillinger → Integrasjoner → API-tilgang** (krever admin-rettigheter) |
+Bygg-Kon er ett selskap, så vi bruker Tripletex sin **interne integrasjon**. Da trengs verken consumer token eller søknaden med 2–3 ukers behandlingstid:
 
-> Sørg for at employee-tokenet har tilstrekkelige rettigheter, ellers ser dashbordet bare deler av dataene.
+1. Logg inn i Tripletex som bruker med admin-rettigheter.
+2. **Selskap → API-tokens →** opprett ny.
+3. Kopier JWT-hemmeligheten. **Den vises bare én gang.**
+
+Krever at Integrasjoner-modulen er aktiv på kontoen. Sørg også for at brukeren som oppretter tokenet har tilstrekkelige rettigheter, ellers ser dashbordet bare deler av dataene.
 
 **b) Deploy MCP-serveren på Railway**
 
@@ -47,11 +48,12 @@ Dashbordet henter data via MCP-serveren i repoet [**Oleandret/tripletex-mcp**](h
 2. **Variables:**
    ```
    MCP_TRANSPORT=http
-   TRIPLETEX_CONSUMER_TOKEN=...
-   TRIPLETEX_EMPLOYEE_TOKEN=...
+   TRIPLETEX_JWT=<jwt-hemmeligheten fra steg a>
    ```
    (`TRIPLETEX_ENV=test` hvis du vil kjøre mot Tripletex sitt testmiljø.)
 3. **Settings → Networking → Generate Domain.** Helsesjekken svarer på `/`, MCP-endepunktet er `/mcp`.
+
+> Har du allerede consumer + employee token, virker de fortsatt: sett `TRIPLETEX_CONSUMER_TOKEN` og `TRIPLETEX_EMPLOYEE_TOKEN` i stedet for `TRIPLETEX_JWT`.
 
 **c) Koble dashbordet til**
 
