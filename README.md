@@ -72,7 +72,7 @@ Det er alt. Nøkkelen settes bevisst **ikke** fra admin-siden, så den aldri hav
 
 Testen stopper ved første feil og viser hva som må fikses.
 
-**Hvordan påloggingen fungerer:** JWT-en byttes i en session token via `POST /token/session/:createFromRefreshToken`, som brukes som passord i Basic auth med brukernavn `0`. Session token varer 12 timer og fornyes automatisk; ved 401 logges det inn på nytt og kallet prøves om igjen. Alt ligger i [`src/tripletexApi.js`](src/tripletexApi.js).
+**Hvordan påloggingen fungerer:** JWT-en byttes i en session token via `POST /token/session/:createFromRefreshToken`, som brukes som passord i Basic auth med brukernavn `0`. Session token varer 8 timer (Tripletex sitt maksimum) og fornyes automatisk; ved 401 logges det inn på nytt og kallet prøves om igjen. Alt ligger i [`src/tripletexApi.js`](src/tripletexApi.js).
 
 **Endepunktene dashbordet henter fra**
 

@@ -20,8 +20,9 @@ import { getConfig } from "./settings.js";
 const PROD_BASE = "https://tripletex.no/v2";
 const TEST_BASE = "https://api-test.tripletex.tech/v2";
 
-// Session token varer så lenge vi ber om. 12 timer holder for et dashboard.
-const SESSION_TTL_SECONDS = 12 * 60 * 60;
+// Tripletex tillater 300–28800 sekunder (5 min til 8 timer) på session token.
+// Vi tar maks – dashbordet kaller ofte, og tokenet fornyes automatisk uansett.
+const SESSION_TTL_SECONDS = 28800;
 // Forny litt før utløp så et kall aldri rekker å bli avvist underveis.
 const RENEW_MARGIN_MS = 60 * 1000;
 const REQUEST_TIMEOUT_MS = 30000;
@@ -40,6 +41,29 @@ export class TripletexError extends Error {
 
 function baseUrl() {
   return getConfig().tripletexEnv === "test" ? TEST_BASE : PROD_BASE;
+}
+
+// Plukker ut Tripletex sin egen feilbeskrivelse. Den er nesten alltid mer
+// presis enn noe vi kan gjette oss til, så den skal alltid være med videre.
+function explain(text) {
+  if (!text) return "";
+  try {
+    const parsed = JSON.parse(text);
+    const msg =
+      parsed?.message ||
+      parsed?.error_description ||
+      parsed?.error ||
+      parsed?.validationMessages?.[0]?.message ||
+      "";
+    const fields = (parsed?.validationMessages || [])
+      .map((v) => [v.field, v.message].filter(Boolean).join(": "))
+      .filter(Boolean)
+      .join("; ");
+    return [msg, fields && fields !== msg ? `(${fields})` : ""].filter(Boolean).join(" ") ||
+      text.slice(0, 300);
+  } catch {
+    return text.slice(0, 300);
+  }
 }
 
 function credentials() {
@@ -80,11 +104,15 @@ async function createSession() {
     });
     const text = await res.text();
     if (!res.ok) {
-      throw new TripletexError(
-        `Tripletex avviste nøkkelen (HTTP ${res.status}). Sjekk at TRIPLETEX_JWT er riktig, og at den er laget i samme miljø som vi kaller.`,
-        res.status,
-        text
-      );
+      // Ta med Tripletex sin egen forklaring. Uten den blir en presis feil
+      // ("ttlSeconds er utenfor lovlig område") til et gjett om feil nøkkel.
+      const notes = [`Tripletex avviste innloggingen (HTTP ${res.status})`, explain(text)];
+      if (!jwt.startsWith("tlxr_")) {
+        notes.push(
+          "Merk: TRIPLETEX_JWT starter ikke med «tlxr_». Er det riktig verdi som er limt inn?"
+        );
+      }
+      throw new TripletexError(notes.filter(Boolean).join(". "), res.status, text);
     }
     let parsed;
     try {
@@ -110,7 +138,7 @@ async function createSession() {
   const text = await res.text();
   if (!res.ok) {
     throw new TripletexError(
-      `Tripletex avviste tokenene (HTTP ${res.status}).`,
+      `Tripletex avviste tokenene (HTTP ${res.status}). ${explain(text)}`.trim(),
       res.status,
       text
     );
@@ -170,16 +198,11 @@ export async function apiGet(path, params, isRetry = false) {
 
   const text = await res.text();
   if (!res.ok) {
-    let detail = text.slice(0, 300);
-    try {
-      const parsed = JSON.parse(text);
-      const msg = parsed?.message || parsed?.error || "";
-      const vm = parsed?.validationMessages;
-      detail = [msg, vm ? JSON.stringify(vm) : ""].filter(Boolean).join(" ") || detail;
-    } catch {
-      /* behold rå tekst */
-    }
-    throw new TripletexError(`Tripletex ${path} avviste kallet (HTTP ${res.status}): ${detail}`, res.status, text);
+    throw new TripletexError(
+      `Tripletex ${path} avviste kallet (HTTP ${res.status}): ${explain(text)}`,
+      res.status,
+      text
+    );
   }
   if (!text) return {};
   try {

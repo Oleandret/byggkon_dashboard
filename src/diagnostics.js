@@ -51,7 +51,7 @@ export async function runConnectionTests() {
 
   await step(
     "Innlogging",
-    "Tripletex avviste nøkkelen. Sjekk at den er kopiert riktig, ikke er slettet, og er laget i samme miljø som vi kaller.",
+    "Les Tripletex sin egen forklaring over – den peker som regel rett på hva som er galt.",
     async () => {
       resetSession(); // tving en fersk innlogging, ellers tester vi en gammel
       const me = await whoAmI();
