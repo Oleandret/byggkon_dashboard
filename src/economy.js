@@ -14,9 +14,10 @@ function summarize(rows, accById) {
   let assets = 0, bank = 0, receivables = 0;                 // balanse (balanceOut)
   let equity = 0, liabilities = 0, supplierDebt = 0;
   for (const r of rows) {
-    const a = accById.get(r.account?.id);
-    if (!a) continue;
-    const n = Number(a.number);
+    // Kontonummeret følger med i svaret. Kontoplanen er bare reserve, i tilfelle
+    // et eldre cachet svar mangler det.
+    const n = Number(r.account?.number ?? accById.get(r.account?.id)?.number);
+    if (!Number.isFinite(n)) continue;
     const ch = r.balanceChange || 0;
     const out = r.balanceOut || 0;
     // Resultat (3000-8299): inntekt er kredit (negativ), kost er debet (positiv)

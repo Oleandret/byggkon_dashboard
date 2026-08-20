@@ -48,10 +48,20 @@ export async function buildOverview() {
     monthsYTD.push({ m, from: ymd(d), to: ymd(end > today ? today : end) });
   }
 
+  // Åpne ordre er åpne uansett når de ble registrert, så vi kan ikke begrense
+  // søket til inneværende år – da forsvinner alt som har ligget lenge, som er
+  // nettopp det man vil se. Tripletex krever et datointervall, så vi tar vidt.
+  const ordersFrom = ymd(new Date(today.getFullYear() - 5, 0, 1));
+
+  // Samme sak for fakturaer: en ubetalt faktura fra i fjor er fortsatt utestående,
+  // og er nettopp den man vil fange opp under «forfalt». Omsetningen hentes fra
+  // hovedboken, så disse radene brukes bare til utestående.
+  const invoicesFrom = ymd(new Date(today.getFullYear() - 3, 0, 1));
+
   const [projects, invoices, orders, employees, timeEntries, monthRevRows, weather] = await Promise.all([
     getProjects({ isClosed: false }),
-    getInvoices(ymd(yearStart), todayStr),
-    getOpenOrders(ymd(yearStart), todayStr),
+    getInvoices(invoicesFrom, todayStr),
+    getOpenOrders(ordersFrom, todayStr),
     getEmployees(),
     getTimeEntries(timeFrom, todayStr),
     // Omsetning per måned fra hovedboken (konto 3xxx, eks. mva) – samme grunnlag som Økonomi-fanen

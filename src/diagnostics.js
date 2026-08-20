@@ -8,6 +8,16 @@ function short(value, max = 500) {
   return String(value ?? "").slice(0, max);
 }
 
+// Tripletex sine *To-datoer er eksklusive, så "til og med i dag" betyr i morgen.
+// Testen går utenom datalaget for å holde uttrekkene små, og må derfor gjøre
+// den samme omregningen selv.
+function ymdOffset(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export async function runConnectionTests() {
   const steps = [];
   let failed = false;
@@ -96,12 +106,9 @@ export async function runConnectionTests() {
     "Timer",
     "Prosjekter kommer ut, men ikke timeføringer. Sjekk at brukeren har tilgang til timelistene.",
     async () => {
-      const today = new Date();
-      const from = new Date(today);
-      from.setDate(from.getDate() - 30);
       const data = await apiGet("/timesheet/entry", {
-        dateFrom: from.toISOString().slice(0, 10),
-        dateTo: today.toISOString().slice(0, 10),
+        dateFrom: ymdOffset(-30),
+        dateTo: ymdOffset(1),
         from: 0,
         count: 1,
         fields: "id,date,hours,employee(id,firstName,lastName)",
@@ -115,18 +122,59 @@ export async function runConnectionTests() {
     "Regnskap",
     "Saldobalansen svarer ikke. Økonomi-fanen vil være tom. Sjekk at brukeren har tilgang til regnskapet.",
     async () => {
-      const today = new Date();
-      const janFirst = new Date(today.getFullYear(), 0, 1);
       const data = await apiGet("/balanceSheet", {
-        dateFrom: janFirst.toISOString().slice(0, 10),
-        dateTo: today.toISOString().slice(0, 10),
+        dateFrom: `${new Date().getFullYear()}-01-01`,
+        dateTo: ymdOffset(1),
         accountNumberFrom: 3000,
-        accountNumberTo: 3999,
+        accountNumberTo: 4000, // eksklusiv, så dette dekker 3000–3999
         from: 0,
         count: 1,
       });
       const total = data?.fullResultSize ?? (data?.values || []).length;
       return `Saldobalansen svarer (${total} inntektskontoer med bevegelse i år).`;
+    }
+  );
+
+  // Kryssjekk: omsetning hittil i år fra hovedboken mot summen av utgående
+  // fakturaer eks. mva i samme periode. De skal ikke stemme eksakt – periodisering,
+  // manuelle bilag og kreditnotaer gjør forskjell – men er avviket stort, er noe
+  // galt med selve uttrekket. Det var slik den eksklusive dateTo-en ga for lav
+  // omsetning uten at noe så ut til å feile.
+  await step(
+    "Kryssjekk omsetning",
+    "Stort avvik betyr som regel at en periode eller et kontointervall er feil avgrenset – ikke at regnskapet er feil.",
+    async () => {
+      const yearStart = `${new Date().getFullYear()}-01-01`;
+      const tomorrow = ymdOffset(1);
+      const [ledger, invoices] = await Promise.all([
+        apiGet("/balanceSheet", {
+          dateFrom: yearStart,
+          dateTo: tomorrow,
+          accountNumberFrom: 3000,
+          accountNumberTo: 4000,
+          from: 0,
+          count: 1000,
+          fields: "account(id,number),balanceChange",
+        }),
+        apiGet("/invoice", {
+          invoiceDateFrom: yearStart,
+          invoiceDateTo: tomorrow,
+          from: 0,
+          count: 1000,
+          fields: "id,amountExcludingVat",
+        }),
+      ]);
+      const fromLedger = (ledger?.values || []).reduce((s, r) => s + -(r.balanceChange || 0), 0);
+      const invoiceRows = invoices?.values || [];
+      const fromInvoices = invoiceRows.reduce((s, i) => s + (i.amountExcludingVat || 0), 0);
+      const nok = (n) => Math.round(n).toLocaleString("nb-NO");
+      const truncated = (invoices?.fullResultSize ?? invoiceRows.length) > invoiceRows.length;
+      const diff = fromLedger === 0 ? 1 : Math.abs(fromLedger - fromInvoices) / Math.abs(fromLedger);
+      const note = truncated ? " (fakturasummen er basert på de første 1000 fakturaene)" : "";
+      return (
+        `Hovedbok (3000–3999): ${nok(fromLedger)} kr. Fakturert eks. mva: ${nok(fromInvoices)} kr. ` +
+        `Avvik ${Math.round(diff * 100)} %${note}.`
+      );
     }
   );
 

@@ -21,8 +21,29 @@ const TIME_ENTRIES = "/timesheet/entry";
 const ACCOUNTS = "/ledger/account";
 const BALANCE_SHEET = "/balanceSheet";
 
+// Lokal kalenderdato. toISOString() ville gitt UTC-datoen, og siden vi bygger
+// datoer som new Date(år, måned, dag) i lokal tid ville 1. januar blitt til
+// 31. desember året før i enhver tidssone øst for UTC.
 function ymd(date) {
-  return date.toISOString().slice(0, 10);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+// ---- Tripletex sin datokonvensjon ----
+// Alle *From-parametre er inklusive, alle *To-parametre er EKSKLUSIVE
+// ("To and excluding" i openapi.json). Det samme gjelder accountNumberTo.
+//
+// Resten av dashbordet regner i inklusive perioder – "januar" er 01-01 til
+// 01-31, "hittil i år" slutter i dag. Vi oversetter derfor her, ett sted, i
+// stedet for å be hvert kallsted huske på det. Uten dette mistet hver periode
+// sin siste dag, og for omsetning per måned var det nettopp månedens siste dag
+// – der mye av faktureringen ligger.
+function dayAfter(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
 }
 
 export function clearCache() {
@@ -89,7 +110,7 @@ export async function getProjectAddresses() {
 export async function getInvoices(fromDate, toDate) {
   return fetchAll(INVOICES, {
     invoiceDateFrom: fromDate,
-    invoiceDateTo: toDate,
+    invoiceDateTo: dayAfter(toDate),
     fields:
       "id,invoiceNumber,invoiceDate,invoiceDueDate,amount,amountCurrency,amountOutstanding,isCredited,customer(id,name)",
   });
@@ -98,7 +119,7 @@ export async function getInvoices(fromDate, toDate) {
 export async function getOpenOrders(fromDate, toDate) {
   return fetchAll(ORDERS, {
     orderDateFrom: fromDate,
-    orderDateTo: toDate,
+    orderDateTo: dayAfter(toDate),
     isClosed: false,
     fields: "id,number,orderDate,deliveryDate,isClosed,customerName,customer(id,name)",
   });
@@ -113,7 +134,7 @@ export async function getEmployees() {
 export async function getTimeEntries(fromDate, toDate) {
   return fetchAll(TIME_ENTRIES, {
     dateFrom: fromDate,
-    dateTo: toDate,
+    dateTo: dayAfter(toDate),
     fields:
       "id,date,hours,chargeableHours,chargeable,hourlyRate,project(id,name),employee(id,firstName,lastName)",
   });
@@ -124,7 +145,7 @@ export async function getTimeEntries(fromDate, toDate) {
 export async function getTimeEntriesDetailed(fromDate, toDate, employeeId) {
   const params = {
     dateFrom: fromDate,
-    dateTo: toDate,
+    dateTo: dayAfter(toDate),
     fields: "id,date,hours,chargeableHours,chargeable,hourlyRate,comment,locked,approved,project(id,name,number),activity(id,name),employee(id,firstName,lastName)",
   };
   if (employeeId) params.employeeId = employeeId;
@@ -133,7 +154,7 @@ export async function getTimeEntriesDetailed(fromDate, toDate, employeeId) {
   } catch {
     // Fallback hvis enkelte felter ikke støttes
     return fetchAll(TIME_ENTRIES, {
-      dateFrom: fromDate, dateTo: toDate,
+      dateFrom: fromDate, dateTo: dayAfter(toDate),
       fields: "id,date,hours,chargeableHours,project(id,name),activity(id,name),employee(id,firstName,lastName),comment",
       ...(employeeId ? { employeeId } : {}),
     });
@@ -144,7 +165,7 @@ export async function getTimeEntriesDetailed(fromDate, toDate, employeeId) {
 export async function getSupplierInvoices(fromDate, toDate) {
   return fetchAll(SUPPLIER_INVOICES, {
     invoiceDateFrom: fromDate,
-    invoiceDateTo: toDate,
+    invoiceDateTo: dayAfter(toDate),
     fields: "id,invoiceDate,amount,supplier(id,name)",
   });
 }
@@ -165,7 +186,7 @@ export async function getSuppliers() {
 export async function getForwardableInvoices(fromDate, toDate) {
   try {
     const data = await apiGet(SUPPLIER_INVOICES, {
-      invoiceDateFrom: fromDate, invoiceDateTo: toDate, from: 0, count: 1000, fields: "*",
+      invoiceDateFrom: fromDate, invoiceDateTo: dayAfter(toDate), from: 0, count: 1000, fields: "*",
     });
     const re = /\b(vf|viderefaktur)/i;
     return (data?.values || []).filter((r) => re.test(String(r.comment || r.description || r.title || "")));
@@ -176,7 +197,7 @@ export async function getForwardableInvoices(fromDate, toDate) {
 export async function getSupplierInvoiceDetails(supplierId, fromDate, toDate) {
   try {
     const data = await apiGet(SUPPLIER_INVOICES, {
-      supplierId, invoiceDateFrom: fromDate, invoiceDateTo: toDate,
+      supplierId, invoiceDateFrom: fromDate, invoiceDateTo: dayAfter(toDate),
       from: 0, count: 1000, fields: "*",
     });
     return data?.values || [];
@@ -195,12 +216,19 @@ export async function getAccounts() {
 
 // Saldobalanse for en periode. balanceChange = bevegelse i perioden,
 // balanceOut = utgående saldo (brukes til balanseregnskapet).
+//
+// toDate og numberTo er inklusive her, slik kallstedene naturlig leser dem.
+// Tripletex vil ha dem eksklusive, så begge får +1 på vei ut.
 export async function getBalanceSheet(fromDate, toDate, numberFrom = 1000, numberTo = 8299) {
   return fetchAll(BALANCE_SHEET, {
     dateFrom: fromDate,
-    dateTo: toDate,
+    dateTo: dayAfter(toDate),
     accountNumberFrom: numberFrom,
-    accountNumberTo: numberTo,
+    accountNumberTo: numberTo + 1,
+    // Be om kontonummeret direkte. Uten dette kommer account tilbake som bare
+    // {id, url}, og vi må slå opp nummeret i en separat kontoplan – der en konto
+    // som mangler fører til at beløpet stilltiende forsvinner ut av regnskapet.
+    fields: "account(id,number,name),balanceIn,balanceChange,balanceOut",
   });
 }
 
