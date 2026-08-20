@@ -39,7 +39,7 @@ Dashbordet henter alt fra Tripletex gjennom en MCP-server. Det finnes to å velg
 | Drift | Tripletex drifter den | vi drifter den |
 | Verktøy | laget for chat-assistenter | laget for dette dashbordet |
 | Pris | gratis i beta, blir betalt | gratis |
-| Status for oss | **blokkert** — adressen vår er ikke godkjent hos Tripletex | virker |
+| Status for oss | **stengt inntil videre** — Tripletex åpner ikke for egne klienter ennå | virker |
 
 **Dashbordet henter i dag data fra vår egen.** Den er en tynn proxy rett over Tripletex API v2, og gir oss det dashbordet faktisk trenger: bulk-uttrekk med paginering opptil 1000 rader per kall, og `fields` for å utvide nøstede objekter. Tripletex sin egen server er bygget for at en assistent skal slå opp enkeltting i en samtale, og har andre verktøynavn og andre svarformater.
 
@@ -98,7 +98,11 @@ Dashbordet registrerer seg selv som OAuth-klient (dynamic client registration), 
 > invalid_client_metadata: redirect_uri https://…/admin/tripletex/callback is not on the allowlist
 > ```
 >
-> For å komme videre må Tripletex legge inn adressen vår. Gir de deg en klient-ID i stedet for at vi registrerer oss selv, settes den som `TRIPLETEX_OAUTH_CLIENT_ID` (og eventuelt `TRIPLETEX_OAUTH_CLIENT_SECRET`) — da hoppes registreringen over.
+> **Avklart med Tripletex support 20.08.2026:** de kan ikke legge inn adressen vår, og har ingen ordning for å tildele klient-ID-er til egne integrasjoner. Allowlisten er forbeholdt de offisielle klientene. Egne MCP-klienter skal støttes senere, ved at kunden selv registrerer redirect-URI per klient, men det er ikke utviklet ennå og har ingen dato.
+>
+> De bekreftet samtidig at **implementasjonen vår er riktig satt opp, og ikke skal trenge endringer når støtten kommer**. Koden blir derfor stående. Får vi en klient-ID en dag, settes den som `TRIPLETEX_OAUTH_CLIENT_ID` (og eventuelt `TRIPLETEX_OAUTH_CLIENT_SECRET`), så hoppes selvregistreringen over.
+>
+> Tripletex sin egen anbefaling i mellomtiden er å bruke det ordinære API-et for et internt dashboard som dette — altså nøyaktig det vår egen MCP-server gjør.
 
 > **OAuth-tokenene lagres i innstillingsfila**, ikke som miljøvariabler — de fornyes løpende og kan ikke ligge i Railway. Uten et Volume montert på `SETTINGS_PATH` må du koble til på nytt etter hver deploy.
 
