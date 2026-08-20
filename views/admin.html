@@ -129,22 +129,12 @@
       </div>
 
       <div class="set-panel" id="set-mcp">
-        <div class="section-title">Datakilde (Tripletex MCP)</div>
+        <div class="section-title">Datakilde (Tripletex)</div>
         <div class="field">
-          <label for="tripletexMcpUrl">Tripletex MCP-URL <span id="mcpSet" class="set" hidden>· satt</span></label>
-          <input id="tripletexMcpUrl" name="tripletexMcpUrl" type="password" autocomplete="off" placeholder="https://tripletex-mcp-production.up.railway.app/mcp (la stå tom for å beholde)" />
-          <div class="hint">Adressen til vår egen <b>tripletex-mcp</b>-server (Railway-tjenesten kjørt med <code>MCP_TRANSPORT=http</code>, endepunkt <code>/mcp</code>). Lagres kun på serveren (helst som miljøvariabel i Railway).</div>
-        </div>
-        <div class="field">
-          <label>Pålogging <span id="ttxConnected" class="set" hidden>· tilkoblet</span></label>
-          <div id="ttxStatus" class="hint">Laster …</div>
-          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-            <a id="ttxConnect" class="btn-ghost" href="/admin/tripletex/connect">Koble til Tripletex</a>
-            <button type="button" id="ttxDisconnect" class="btn-ghost" hidden>Koble fra</button>
-          </div>
-          <div class="hint" style="margin-top:10px">
-            Peker MCP-URL-en på <b>Tripletex sin egen server</b> (<code>https://mcp.tripletex.no/</code>), logger du inn med OAuth – samme måte som Claude-connectoren. Ingen nøkler å lime inn.<br /><br />
-            Peker den på <b>vår egen tripletex-mcp</b> på Railway, brukes i stedet miljøvariabelen <code>TRIPLETEX_JWT</code> <span id="jwtSet" class="set" hidden>· satt</span>, som settes på MCP-tjenesten. Da er knappen over unødvendig.
+          <label>API-nøkkel <span id="jwtSet" class="set" hidden>· satt</span> <span id="envSet" class="set" hidden></span></label>
+          <div class="hint">
+            Dashbordet henter alt rett fra Tripletex sitt API. Nøkkelen settes som miljøvariabelen <code>TRIPLETEX_JWT</code> i Railway – ikke her, så den ikke havner i innstillingsfila.<br /><br />
+            Den lages i Tripletex under <b>Selskap → API-tokens</b> av en bruker med admin-rettigheter, og vises bare én gang. Sjekk at den virker under <b>Test tilkobling</b>.
           </div>
         </div>
 

@@ -14,12 +14,6 @@ import { serveWithSnapshot, expireSnapshots, startBackgroundWarmer, getSnapshot,
 const snapTtl = () => getConfig().cacheTtlMs || 300000;
 import { getConfig, saveConfig, getConfigForAdmin, SETTINGS_PATH } from "./src/settings.js";
 import { runConnectionTests } from "./src/diagnostics.js";
-import {
-  buildAuthorizeUrl,
-  exchangeCode,
-  disconnect as tripletexOauthDisconnect,
-  randomToken,
-} from "./src/tripletexOauth.js";
 
 // Mappe for opplastede filer (ved siden av innstillingsfila – legg på Volume på Railway).
 const UPLOAD_DIR = path.join(path.dirname(SETTINGS_PATH), "uploads");
@@ -489,65 +483,6 @@ app.get("/admin", requireAdmin, (req, res) =>
 // ---- Admin-API ----
 app.get("/api/admin/settings", requireAdmin, (req, res) => res.json(getConfigForAdmin()));
 
-// ---- OAuth mot Tripletex sin MCP-server ----
-// Adressen Tripletex sender brukeren tilbake til. Utledes fra forespørselen slik
-// at den treffer uansett hvilket domene dashbordet kjører på, men kan overstyres.
-function tripletexRedirectUri(req) {
-  const explicit = process.env.TRIPLETEX_OAUTH_REDIRECT_URI;
-  if (explicit) return _normalizeRedirectUri(explicit);
-  const host = req.get("x-forwarded-host") || req.get("host");
-  const proto = String(req.get("x-forwarded-proto") || req.protocol || "https").split(",")[0].trim();
-  return _normalizeRedirectUri(`${proto}://${host}/admin/tripletex/callback`);
-}
-
-app.get("/admin/tripletex/connect", requireAdmin, async (req, res) => {
-  try {
-    const state = randomToken();
-    const codeVerifier = randomToken();
-    req.session.ttxState = state;
-    req.session.ttxVerifier = codeVerifier;
-    const url = await buildAuthorizeUrl({
-      redirectUri: tripletexRedirectUri(req),
-      state,
-      codeVerifier,
-    });
-    res.redirect(url);
-  } catch (err) {
-    console.error("Tripletex OAuth-start feilet:", err.message);
-    res.redirect("/admin?ttx=" + encodeURIComponent(err.message));
-  }
-});
-
-app.get("/admin/tripletex/callback", requireAdmin, async (req, res) => {
-  const { code, state, error, error_description } = req.query;
-  const expectedState = req.session?.ttxState;
-  const codeVerifier = req.session?.ttxVerifier;
-  delete req.session.ttxState;
-  delete req.session.ttxVerifier;
-  try {
-    if (error) throw new Error(error_description || String(error));
-    if (!code) throw new Error("Fikk ingen kode tilbake fra Tripletex.");
-    if (!state || state !== expectedState) throw new Error("State stemmer ikke – prøv på nytt.");
-    if (!codeVerifier) throw new Error("Mangler PKCE-verifier – prøv på nytt.");
-    await exchangeCode({ code, redirectUri: tripletexRedirectUri(req), codeVerifier });
-    resetClient(); // ny MCP-sesjon med det ferske tokenet
-    res.redirect("/admin?ttx=ok");
-  } catch (err) {
-    console.error("Tripletex OAuth-callback feilet:", err.message);
-    res.redirect("/admin?ttx=" + encodeURIComponent(err.message));
-  }
-});
-
-app.post("/api/admin/tripletex/disconnect", requireAdmin, async (req, res) => {
-  try {
-    await tripletexOauthDisconnect();
-    resetClient();
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // Tester hele veien fram til Tripletex og rapporterer hvor det eventuelt stopper.
 app.post("/api/admin/test-connection", requireAdmin, async (req, res) => {
   try {
@@ -563,7 +498,6 @@ app.post("/api/admin/settings", requireAdmin, (req, res) => {
     const allowed = [
       "companyName",
       "heroImageUrl",
-      "tripletexMcpUrl",
       "dashboardPassword",
       "weeklyCapacityHours",
       "cacheTtlMs",
@@ -583,14 +517,6 @@ app.post("/api/admin/settings", requireAdmin, (req, res) => {
         }
         partial[k] = v;
       }
-    }
-    // Bakoverkompatibelt: eldre admin-sider sendte feltet som regnskapsagentMcpUrl.
-    if (partial.tripletexMcpUrl === undefined && typeof req.body?.regnskapsagentMcpUrl === "string") {
-      partial.tripletexMcpUrl = req.body.regnskapsagentMcpUrl;
-    }
-    // Valider MCP-URL: må være en faktisk http(s)-adresse (ikke f.eks. et token)
-    if (partial.tripletexMcpUrl !== undefined && !/^https?:\/\//i.test(partial.tripletexMcpUrl)) {
-      return res.status(400).json({ error: "Tripletex MCP-URL må starte med https:// — lim inn hele adressen til MCP-serveren (…/mcp), ikke et token." });
     }
     // Verdier (array) lagres direkte hvis sendt
     if (Array.isArray(req.body?.values)) {
@@ -868,7 +794,7 @@ app.get("/api/driftssentral", requireAuth, async (req, res) => {
 const STATUS_AGENTS = [
   { key: "loki", name: "Loki AI", url: "https://byggkon-loki-ai-production.up.railway.app/", check: true },
   { key: "nova", name: "Nova AI", url: "https://nova-ai-agent-bygg-kon-production.up.railway.app/", check: true },
-  { key: "tripletex", name: "Tripletex MCP", url: "", check: false },
+  { key: "tripletex", name: "Tripletex", url: "", check: false },
   { key: "hilde", name: "Hilde (eiendom)", url: "https://byggkon.bluemint.dev", check: false },
 ];
 let agentStatusCache = { ts: 0, agents: [] };

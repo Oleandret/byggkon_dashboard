@@ -16,7 +16,7 @@ Et live internt dashboard som henter sanntidsdata fra **Tripletex** og gir hele 
 
 ## Slik fungerer innstillingene
 
-Det meste settes fra **admin-siden** (`/admin`), beskyttet med eget admin-passord. Der legger du inn MCP-URL-en til Tripletex-serveren, ansatt-passord, ukekapasitet, forsidebilde og oppdateringsintervall. Verdiene lagres i en JSON-fil på serveren. Selve Tripletex-tokenene ligger på MCP-tjenesten, ikke her.
+Det meste settes fra **admin-siden** (`/admin`), beskyttet med eget admin-passord. Der legger du inn ansatt-passord, ukekapasitet, forsidebilde og oppdateringsintervall. Verdiene lagres i en JSON-fil på serveren. Tripletex-nøkkelen settes som miljøvariabel, ikke her.
 
 Det eneste som **må** settes som miljøvariabel er:
 
@@ -26,28 +26,15 @@ Det eneste som **må** settes som miljøvariabel er:
 | `SESSION_SECRET` | lang tilfeldig streng som signerer innlogging |
 | `SETTINGS_PATH` | sti til innstillingsfila — på Railway: `/data/settings.json` (krever Volume, se under) |
 
-Du kan også sette `TRIPLETEX_MCP_URL` m.m. som miljøvariabler (se `.env.example`) hvis du heller vil det.
+I tillegg må `TRIPLETEX_JWT` settes som miljøvariabel — se neste avsnitt. Resten kan settes som variabler i stedet for på admin-siden, se `.env.example`.
 
-## 1. Datakilde: Tripletex via MCP
+## 1. Datakilde: Tripletex API v2
 
-Dashbordet henter alt fra Tripletex gjennom en MCP-server. Det finnes to å velge mellom, og dashbordet støtter begge — `TRIPLETEX_MCP_URL` avgjør hvilken som brukes.
+Dashbordet snakker **rett med Tripletex sitt REST-API**. Ingen mellomledd, ingen egen tjeneste å drifte — bare én nøkkel som miljøvariabel.
 
-| | [Tripletex sin egen](https://developer.tripletex.no/tripletex-mcp-beta/) | [Vår egen](https://github.com/Oleandret/tripletex-mcp) |
-|---|---|---|
-| URL | `https://mcp.tripletex.no/` | Railway-domenet vårt + `/mcp` |
-| Pålogging | OAuth, ett klikk på `/admin` | `TRIPLETEX_JWT` som miljøvariabel |
-| Drift | Tripletex drifter den | vi drifter den |
-| Verktøy | laget for chat-assistenter | laget for dette dashbordet |
-| Pris | gratis i beta, blir betalt | gratis |
-| Status for oss | **stengt inntil videre** — Tripletex åpner ikke for egne klienter ennå | virker |
+Dette er Tripletex sin egen anbefaling for et internt dashboard som dette (support, 20.08.2026).
 
-**Dashbordet henter i dag data fra vår egen.** Den er en tynn proxy rett over Tripletex API v2, og gir oss det dashbordet faktisk trenger: bulk-uttrekk med paginering opptil 1000 rader per kall, og `fields` for å utvide nøstede objekter. Tripletex sin egen server er bygget for at en assistent skal slå opp enkeltting i en samtale, og har andre verktøynavn og andre svarformater.
-
-> Vil du prøve Tripletex sin egen: sett `TRIPLETEX_MCP_URL=https://mcp.tripletex.no/`, koble til med OAuth på `/admin`, og kjør **Test tilkobling**. Testen lister opp hvilke verktøy serveren faktisk tilbyr, så du ser med én gang hva som eventuelt må kobles om i `src/tripletex.js`.
-
-### Sette opp vår egen MCP-server
-
-**a) Lag en API-nøkkel i Tripletex**
+**a) Lag en API-nøkkel**
 
 Bygg-Kon er ett selskap, så vi bruker Tripletex sin **interne integrasjon**. Da trengs verken consumer token eller søknaden med 2–3 ukers behandlingstid:
 
@@ -55,79 +42,49 @@ Bygg-Kon er ett selskap, så vi bruker Tripletex sin **interne integrasjon**. Da
 2. **Selskap → API-tokens →** opprett ny.
 3. Kopier JWT-hemmeligheten. **Den vises bare én gang.**
 
-Krever at Integrasjoner-modulen er aktiv på kontoen. Sørg også for at brukeren som oppretter tokenet har tilstrekkelige rettigheter, ellers ser dashbordet bare deler av dataene.
+Krever at Integrasjoner-modulen er aktiv på kontoen. Nøkkelen arver rettighetene til brukeren den lages for — mangler den tilgang til f.eks. regnskapet, ser dashbordet bare deler av dataene.
 
-**b) Deploy MCP-serveren på Railway**
-
-1. Railway → **New Project → Deploy from GitHub repo** → `Oleandret/tripletex-mcp`.
-2. **Variables:**
-   ```
-   MCP_TRANSPORT=http
-   TRIPLETEX_JWT=<jwt-hemmeligheten fra steg a>
-   ```
-   (`TRIPLETEX_ENV=test` hvis du vil kjøre mot Tripletex sitt testmiljø.)
-3. **Settings → Networking → Generate Domain.** Helsesjekken svarer på `/health`, MCP-endepunktet er `/mcp`.
-
-> Har du allerede consumer + employee token fra før, virker de også: sett `TRIPLETEX_CONSUMER_TOKEN` og `TRIPLETEX_EMPLOYEE_TOKEN` i stedet for `TRIPLETEX_JWT`.
-
-**c) Koble dashbordet til**
-
-Sett `TRIPLETEX_MCP_URL` i Railway på dashbord-tjenesten — hele adressen, med `/mcp` til slutt:
+**b) Legg nøkkelen inn i Railway**
 
 ```
-TRIPLETEX_MCP_URL=https://tripletex-mcp-production.up.railway.app/mcp
+TRIPLETEX_JWT=<jwt-hemmeligheten fra steg a>
 ```
 
-URL-en kan også limes inn på `/admin` → **MCP & datakilder**, men som miljøvariabel er den uavhengig av innstillingsfila.
+Det er alt. Nøkkelen settes bevisst **ikke** fra admin-siden, så den aldri havner i innstillingsfila — som miljøvariabel overlever den enhver deploy.
 
-Tripletex-nøkkelen settes **ikke** på admin-siden — den hører hjemme som `TRIPLETEX_JWT` på MCP-tjenesten. Trenger du unntaksvis at dashbordet sender den selv (f.eks. hvis én MCP-tjeneste skal betjene flere selskaper), kan `TRIPLETEX_JWT` settes på dashbord-tjenesten i stedet; da sendes den som `X-Tripletex-Jwt`-header ved hvert kall.
+| Variabel | Når |
+|---|---|
+| `TRIPLETEX_JWT` | normalt |
+| `TRIPLETEX_ENV=test` | for å kjøre mot `api-test.tripletex.tech` i stedet for produksjon |
+| `TRIPLETEX_CONSUMER_TOKEN` + `TRIPLETEX_EMPLOYEE_TOKEN` | kommersiell integrasjon mot andre selskapers regnskap |
 
-Vår egen MCP-server har ingen egen pålogging: kjenner noen både URL-en og nøkkelen, har de tilgang til regnskapet. Behandle begge som passord.
-
-### Alternativt: Tripletex sin egen server med OAuth
-
-1. Sett `TRIPLETEX_MCP_URL=https://mcp.tripletex.no/` — ingen `TRIPLETEX_JWT`, ingen egen MCP-tjeneste.
-2. `/admin` → **MCP & datakilder** → **Koble til Tripletex**. Du logger inn hos Tripletex og godkjenner tilgangen, og sendes tilbake til admin-siden.
-3. Kjør **Test tilkobling**.
-
-Dashbordet registrerer seg selv som OAuth-klient (dynamic client registration), bruker authorization code med PKCE, og fornyer tilgangen automatisk med refresh token — samme flyt som Claude-connectoren. Adressen Tripletex sender deg tilbake til utledes fra domenet dashbordet kjører på, og kan overstyres med `TRIPLETEX_OAUTH_REDIRECT_URI`.
-
-> ⚠️ **Virker ikke i dag.** Tripletex sin MCP-beta tar bare imot klienter fra en godkjent liste — Claude, ChatGPT, VS Code og `localhost`. En selvhostet webapp som denne blir avvist:
->
-> ```
-> invalid_client_metadata: redirect_uri https://…/admin/tripletex/callback is not on the allowlist
-> ```
->
-> **Avklart med Tripletex support 20.08.2026:** de kan ikke legge inn adressen vår, og har ingen ordning for å tildele klient-ID-er til egne integrasjoner. Allowlisten er forbeholdt de offisielle klientene. Egne MCP-klienter skal støttes senere, ved at kunden selv registrerer redirect-URI per klient, men det er ikke utviklet ennå og har ingen dato.
->
-> De bekreftet samtidig at **implementasjonen vår er riktig satt opp, og ikke skal trenge endringer når støtten kommer**. Koden blir derfor stående. Får vi en klient-ID en dag, settes den som `TRIPLETEX_OAUTH_CLIENT_ID` (og eventuelt `TRIPLETEX_OAUTH_CLIENT_SECRET`), så hoppes selvregistreringen over.
->
-> Tripletex sin egen anbefaling i mellomtiden er å bruke det ordinære API-et for et internt dashboard som dette — altså nøyaktig det vår egen MCP-server gjør.
-
-> **OAuth-tokenene lagres i innstillingsfila**, ikke som miljøvariabler — de fornyes løpende og kan ikke ligge i Railway. Uten et Volume montert på `SETTINGS_PATH` må du koble til på nytt etter hver deploy.
-
-> Migrering fra Regnskapsagent: den gamle `REGNSKAPSAGENT_MCP_URL` leses fortsatt som fallback, og et lagret `regnskapsagentMcpUrl` i innstillingsfila migreres automatisk. Fjern begge når `TRIPLETEX_MCP_URL` er på plass.
-
-**d) Sjekk at det virker**
+**c) Sjekk at det virker**
 
 `/admin` → **Test tilkobling** → **Kjør test** går gjennom kjeden steg for steg:
 
 | Steg | Svarer på |
 |---|---|
-| Innstillinger | er MCP-URL-en satt og gyldig? |
-| Helsesjekk | kjører MCP-tjenesten? |
-| MCP-håndtrykk | snakker den MCP på denne adressen? |
-| Verktøy | har den alle verktøyene dashbordet trenger? |
-| Tripletex-pålogging | godtar Tripletex nøkkelen? |
-| Datauttrekk | kommer det faktisk prosjektdata ut, med navn? |
+| Nøkkel | er en nøkkel satt, og hvilket miljø kaller vi? |
+| Innlogging | godtar Tripletex nøkkelen? |
+| Prosjekter | kommer det prosjektdata ut, med navn? |
+| Timer | kommer timeføringene ut? |
+| Regnskap | svarer saldobalansen, som økonomi-fanen bygger på? |
 
-Testen stopper ved første feil og viser hva som må fikses, så du slipper å gjette hvilket ledd som svikter.
+Testen stopper ved første feil og viser hva som må fikses.
 
-**e) Verktøyene dashbordet er avhengig av**
+**Hvordan påloggingen fungerer:** JWT-en byttes i en session token via `POST /token/session/:createFromRefreshToken`, som brukes som passord i Basic auth med brukernavn `0`. Session token varer 12 timer og fornyes automatisk; ved 401 logges det inn på nytt og kallet prøves om igjen. Alt ligger i [`src/tripletexApi.js`](src/tripletexApi.js).
 
-`search_projects` · `search_orders` · `search_invoices` · `search_supplier_invoices` · `search_customers` · `search_suppliers` · `search_employees` · `search_time_entries` · `search_accounts` · `get_balance_sheet`
+**Endepunktene dashbordet henter fra**
 
-Alle kalles med Tripletex sine egne parametre, inkludert `fields` for å utvide nøstede objekter (`customer(id,name)`, `project(id,name)` …) og `from`/`count` for paginering (maks 1000 rader per kall). Oppdaterer du MCP-serveren, må disse fortsette å sende `fields` videre til Tripletex — uten den mangler dashbordet kunde-, prosjekt- og ansattnavn.
+`/project` · `/order` · `/invoice` · `/supplierInvoice` · `/customer` · `/supplier` · `/employee` · `/timesheet/entry` · `/ledger/account` · `/balanceSheet`
+
+Alle kalles med `fields` for å utvide nøstede objekter (`customer(id,name)`, `project(id,name)` …) og `from`/`count` for paginering — maks 1000 rader per kall, se [`src/tripletex.js`](src/tripletex.js).
+
+### Hva med MCP?
+
+Dashbordet gikk tidligere via en MCP-server — først Regnskapsagent sin, så vår egen. Grunnen var at Regnskapsagent hadde det godkjente consumer-tokenet vi manglet. Da vi fant den interne integrasjonen med JWT, falt den grunnen bort: MCP finnes for at *språkmodeller* skal kunne kalle verktøy, og dashbordet er ingen språkmodell. Leddet er derfor fjernet.
+
+[Tripletex sin egen MCP-server](https://developer.tripletex.no/tripletex-mcp-beta/) (`mcp.tripletex.no`) er fortsatt riktig verktøy for å la **Claude eller ChatGPT** jobbe mot regnskapet i en samtale. Den bruker OAuth, og slipper foreløpig bare inn de offisielle klientene — egne klienter skal støttes senere, uten dato. Den er ikke relevant for dashbordet.
 
 ## 2. Kjør lokalt (valgfritt)
 
@@ -144,7 +101,7 @@ npm start                 # http://localhost:3000  (admin: http://localhost:3000
 3. **Variables**: legg inn minst `ADMIN_PASSWORD`, `SESSION_SECRET` og `SETTINGS_PATH=/data/settings.json`.
 4. **Volume** (for at innstillinger skal overleve ny deploy): tjenesten → **+ New → Volume**, mount path `/data`. Uten Volume nullstilles innstillingene ved hver deploy.
 5. **Settings → Networking → Generate Domain** for offentlig adresse.
-6. Åpne `/admin`, logg inn med `ADMIN_PASSWORD`, og lim inn `TRIPLETEX_MCP_URL` + ansatt-passord (om du ikke satte dem som variabler). Ferdig.
+6. Legg inn `TRIPLETEX_JWT` (se avsnitt 1), åpne `/admin`, logg inn med `ADMIN_PASSWORD`, og kjør **Test tilkobling**. Ferdig.
 
 > `PORT` settes automatisk av Railway.
 
@@ -159,7 +116,7 @@ git push -u origin main
 ## Sikkerhet
 
 - Dashbordet ligger bak ansatt-innlogging; admin-siden bak eget admin-passord.
-- MCP-URL-en ligger kun på serveren (miljøvariabel eller innstillingsfil), aldri i nettleseren. Admin-siden viser bare om den er satt, ikke selve verdien.
+- Tripletex-nøkkelen ligger kun som miljøvariabel på serveren, aldri i nettleseren og aldri i innstillingsfila. Admin-siden viser bare om den er satt, ikke selve verdien.
 - Bytt ansatt-passordet fra admin-siden ved behov.
 
 ## Filstruktur
@@ -169,8 +126,9 @@ byggkon-dashboard/
 ├─ server.js            # Express: innlogging, admin, API-ruter
 ├─ src/
 │  ├─ settings.js       # Innstillinger (fil + miljøvariabler)
-│  ├─ mcpClient.js      # JSON-RPC mot tripletex-mcp (streamable HTTP)
-│  ├─ tripletex.js      # Datalag: MCP-verktøykall, paginering + caching
+│  ├─ tripletexApi.js    # Tripletex REST v2: innlogging + session token
+│  ├─ tripletex.js      # Datalag: domeneoppslag, paginering + caching
+│  ├─ diagnostics.js    # Tilkoblingstesten på admin-siden
 │  └─ metrics.js        # Nøkkeltall, faktureringsgrad, prosjektdata
 ├─ public/              # Dashboard (index, app.js, styles.css, admin.js, login)
 ├─ views/               # Admin-sider (utenfor statisk servering)

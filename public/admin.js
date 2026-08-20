@@ -15,9 +15,10 @@ async function loadSettings() {
   document.getElementById("weeklyCapacityHours").value = s.weeklyCapacityHours ?? "";
   document.getElementById("refreshSeconds").value = s.refreshSeconds ?? "";
   document.getElementById("cacheTtlMs").value = s.cacheTtlMs ?? "";
-  document.getElementById("mcpSet").hidden = !s.hasMcpUrl;
-  document.getElementById("jwtSet").hidden = !s.hasTripletexJwt;
-  renderTripletexOauth(s.tripletexOauth || {});
+  document.getElementById("jwtSet").hidden = !(s.hasTripletexJwt || s.hasTripletexTokenPair);
+  const envBadge = document.getElementById("envSet");
+  envBadge.hidden = s.tripletexEnv !== "test";
+  envBadge.textContent = "· testmiljø";
   document.getElementById("passwordSet").hidden = !s.hasDashboardPassword;
   // Firmaopplysninger
   ["companyOrgNr", "companyAddress", "companyEmail", "companyPhone", "companyWebsite", "floorPlanUrl"].forEach((k) => {
@@ -85,7 +86,7 @@ document.getElementById("settingsForm").addEventListener("submit", async (e) => 
   const f = e.target;
   // Bare send med felter som har verdi (tomme token/passord beholdes på serveren).
   const payload = {};
-  const fields = ["companyName", "heroImageUrl", "tripletexMcpUrl",
+  const fields = ["companyName", "heroImageUrl",
     "dashboardPassword", "weeklyCapacityHours", "refreshSeconds", "cacheTtlMs",
     "companyOrgNr", "companyAddress", "companyEmail", "companyPhone", "companyWebsite"];
   for (const k of fields) {
@@ -115,7 +116,7 @@ document.getElementById("settingsForm").addEventListener("submit", async (e) => 
   const msg = document.getElementById("savedMsg");
   msg.hidden = false; setTimeout(() => (msg.hidden = true), 3000);
   // Tøm token/passord-felt og oppdater "satt"-merker
-  ["tripletexMcpUrl", "dashboardPassword"].forEach((k) => (f[k].value = ""));
+  ["dashboardPassword"].forEach((k) => (f[k].value = ""));
   loadSettings();
 });
 
@@ -144,61 +145,6 @@ if (upBtn) {
     reader.readAsDataURL(f);
   });
 }
-
-// ---- OAuth mot Tripletex sin MCP-server ----
-function renderTripletexOauth(o) {
-  const badge = document.getElementById("ttxConnected");
-  const status = document.getElementById("ttxStatus");
-  const connect = document.getElementById("ttxConnect");
-  const disconnect = document.getElementById("ttxDisconnect");
-  if (!status) return;
-  badge.hidden = !o.connected;
-  disconnect.hidden = !o.connected;
-  if (o.connected) {
-    const since = o.connectedAt ? new Date(o.connectedAt).toLocaleString("nb-NO") : "";
-    status.textContent = since
-      ? `Tilkoblet Tripletex siden ${since}. Tilgangen fornyes automatisk.`
-      : "Tilkoblet Tripletex. Tilgangen fornyes automatisk.";
-    connect.textContent = "Koble til på nytt";
-  } else {
-    const uri = o.redirectUri || location.origin + "/admin/tripletex/callback";
-    status.innerHTML =
-      `Ikke tilkoblet. Trykk «Koble til Tripletex» for å logge inn.<br />` +
-      `<span style="color:#6b6b76">Tripletex sin MCP-beta godtar foreløpig bare klienter på en godkjent liste. ` +
-      `Blir du avvist, be dem legge inn denne adressen: <code>${esc(uri)}</code></span>`;
-    connect.textContent = "Koble til Tripletex";
-  }
-}
-
-document.getElementById("ttxDisconnect")?.addEventListener("click", async (e) => {
-  const btn = e.currentTarget;
-  btn.disabled = true;
-  try {
-    const res = await fetch("/api/admin/tripletex/disconnect", { method: "POST" });
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}));
-      throw new Error(d.error || `HTTP ${res.status}`);
-    }
-    loadSettings();
-  } catch (err) {
-    showError("Kunne ikke koble fra: " + err.message);
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-// Beskjed etter at Tripletex har sendt oss tilbake fra innloggingen.
-(function showTripletexResult() {
-  const ttx = new URLSearchParams(location.search).get("ttx");
-  if (!ttx) return;
-  if (ttx === "ok") {
-    const msg = document.getElementById("savedMsg");
-    if (msg) { msg.textContent = "✓ Tilkoblet Tripletex"; msg.hidden = false; setTimeout(() => (msg.hidden = true), 6000); }
-  } else {
-    showError("Tilkobling til Tripletex feilet: " + ttx);
-  }
-  history.replaceState(null, "", location.pathname);
-})();
 
 // ---- Test av Tripletex-tilkoblingen ----
 const TEST_MARK = { ok: "✓", warn: "!", error: "✕", skipped: "–" };

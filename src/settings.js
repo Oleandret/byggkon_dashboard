@@ -31,17 +31,17 @@ function defaults() {
     heroImageUrl:
       process.env.HERO_IMAGE_URL ||
       "https://cdn.prod.website-files.com/6971dca24ade29a12176f9bf/69bd3f133cccc0a691865253_Travbaneveien3-8.jpg",
-    // URL til vår egen Tripletex MCP-server (repoet tripletex-mcp kjørt med
-    // MCP_TRANSPORT=http), f.eks. https://tripletex-mcp-production.up.railway.app/mcp
-    // Den gamle REGNSKAPSAGENT_MCP_URL leses fortsatt, så eksisterende oppsett
-    // fortsetter å virke til variabelen er byttet ut.
-    tripletexMcpUrl:
-      process.env.TRIPLETEX_MCP_URL || process.env.REGNSKAPSAGENT_MCP_URL || "",
-    // JWT fra Tripletex (Selskap → API-tokens). Settes kun som miljøvariabel,
-    // aldri fra admin-siden, så den ikke havner i innstillingsfila. Er den satt
-    // her, sendes den til MCP-serveren som header ved hvert kall; ellers bruker
-    // MCP-serveren sin egen TRIPLETEX_JWT.
+    // Tripletex-nøkler. Settes kun som miljøvariabler, aldri fra admin-siden,
+    // så de ikke havner i innstillingsfila.
+    //
+    // TRIPLETEX_JWT er den vanlige: en intern integrasjon, laget i Tripletex
+    // under Selskap → API-tokens. Consumer + employee token støttes også, for
+    // en kommersiell integrasjon mot andre selskapers regnskap.
     tripletexJwt: process.env.TRIPLETEX_JWT || "",
+    tripletexConsumerToken: process.env.TRIPLETEX_CONSUMER_TOKEN || "",
+    tripletexEmployeeToken: process.env.TRIPLETEX_EMPLOYEE_TOKEN || "",
+    // "test" kaller api-test.tripletex.tech i stedet for produksjon.
+    tripletexEnv: process.env.TRIPLETEX_ENV || "",
     dashboardPassword: process.env.DASHBOARD_PASSWORD || "byggkon",
     weeklyCapacityHours: Number(process.env.WEEKLY_CAPACITY_HOURS || 37.5),
     cacheTtlMs: Number(process.env.CACHE_TTL_MS || 5 * 60 * 1000),
@@ -447,10 +447,6 @@ export function getConfig() {
     for (const [k, v] of Object.entries(file)) {
       if (v !== undefined && v !== null && v !== "") merged[k] = v;
     }
-    // Migrering: datakilden het tidligere regnskapsagentMcpUrl i innstillingsfila.
-    if (!merged.tripletexMcpUrl && merged.regnskapsagentMcpUrl) {
-      merged.tripletexMcpUrl = merged.regnskapsagentMcpUrl;
-    }
     cached = merged;
   }
   return cached;
@@ -485,19 +481,9 @@ export function getConfigForAdmin() {
     values: c.values || [],
     departments: c.departments || [],
     logoUrl: c.logoUrl || "",
-    hasMcpUrl: Boolean(c.tripletexMcpUrl),
     hasTripletexJwt: Boolean(c.tripletexJwt),
-    // Status for OAuth-koblingen mot Tripletex sin MCP-server. Aldri selve
-    // tokenene – bare om vi er koblet til og når det utløper.
-    tripletexOauth: {
-      connected: Boolean(c.tripletexOauthTokens?.accessToken),
-      clientRegistered: Boolean(c.tripletexOauthClient?.clientId),
-      redirectUri: c.tripletexOauthClient?.redirectUri || "",
-      connectedAt: c.tripletexOauthTokens?.connectedAt || "",
-      expiresAt: c.tripletexOauthTokens?.expiresAtMs
-        ? new Date(c.tripletexOauthTokens.expiresAtMs).toISOString()
-        : "",
-    },
+    hasTripletexTokenPair: Boolean(c.tripletexConsumerToken && c.tripletexEmployeeToken),
+    tripletexEnv: c.tripletexEnv || "",
     hasDashboardPassword: Boolean(c.dashboardPassword),
     weeklyCapacityHours: c.weeklyCapacityHours,
     cacheTtlMs: c.cacheTtlMs,
