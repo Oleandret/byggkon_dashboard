@@ -40,7 +40,16 @@ Bygg-Kon er ett selskap, så vi bruker Tripletex sin **interne integrasjon**. Da
 
 1. Logg inn i Tripletex som bruker med admin-rettigheter.
 2. **Selskap → API-tokens →** opprett ny.
-3. Kopier JWT-hemmeligheten. **Den vises bare én gang.**
+3. Kopier hemmeligheten. **Den vises bare én gang.**
+
+> ⚠️ Riktig nøkkel **starter med `tlxr_`**. Tripletex har to slags nøkler som er lette å forveksle:
+>
+> | Hvor i Tripletex | Ser ut som | Trenger consumer token |
+> |---|---|---|
+> | Selskap → **API-tokens** | `tlxr_…` | nei ← bruk denne |
+> | Innstillinger → Integrasjoner → **API-tilgang** | uten prefiks | ja |
+>
+> Dashbordet kjenner dem fra hverandre og velger riktig innlogging selv. Men limer du inn den andre, må du også skaffe et consumer token — og det er nettopp ventetiden vi ville unngå. **Test tilkobling** viser hvilken av dem den fant.
 
 Krever at Integrasjoner-modulen er aktiv på kontoen. Nøkkelen arver rettighetene til brukeren den lages for — mangler den tilgang til f.eks. regnskapet, ser dashbordet bare deler av dataene.
 

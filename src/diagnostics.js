@@ -2,7 +2,7 @@
 // og stopper ved første feil, slik at svaret peker på hvor det faktisk klikker
 // – ikke bare at "noe" er galt.
 import { getConfig } from "./settings.js";
-import { apiGet, hasCredentials, resetSession, whoAmI } from "./tripletexApi.js";
+import { apiGet, credentialKind, resetSession, whoAmI } from "./tripletexApi.js";
 
 function short(value, max = 500) {
   return String(value ?? "").slice(0, max);
@@ -41,11 +41,19 @@ export async function runConnectionTests() {
     "Nøkkel",
     "Sett TRIPLETEX_JWT i Railway. Nøkkelen lages i Tripletex under Selskap → API-tokens av en bruker med admin-rettigheter.",
     () => {
-      if (!hasCredentials()) throw new Error("Ingen Tripletex-nøkkel er satt.");
-      const miljø = config.tripletexEnv === "test" ? "testmiljøet (api-test.tripletex.tech)" : "produksjon (tripletex.no)";
-      return config.tripletexJwt
-        ? `TRIPLETEX_JWT er satt. Kaller ${miljø}.`
-        : `Consumer- og employee-token er satt. Kaller ${miljø}.`;
+      const cred = credentialKind();
+      if (cred.kind === "none") throw new Error("Ingen Tripletex-nøkkel er satt.");
+      const miljø =
+        config.tripletexEnv === "test"
+          ? "testmiljøet (api-test.tripletex.tech)"
+          : "produksjon (tripletex.no)";
+      if (cred.kind === "refresh") {
+        return `Refresh token (tlxr_…) fra Selskap → API-tokens. Kaller ${miljø}.`;
+      }
+      return (
+        `Verdien tolkes som et employee token${cred.consumerToken ? " med consumer token" : " uten consumer token"}. ` +
+        `Kaller ${miljø}.`
+      );
     }
   );
 

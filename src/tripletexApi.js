@@ -75,9 +75,30 @@ function credentials() {
   };
 }
 
+// Tripletex har to slags nøkler, og de ser helt forskjellige ut. Refresh
+// tokenet fra Selskap → API-tokens har alltid tlxr_-prefiks; et employee token
+// fra Innstillinger → Integrasjoner → API-tilgang har det ikke. Vi kjenner dem
+// fra hverandre selv, så det ikke spiller noen rolle hvilken av dem som er
+// limt inn i TRIPLETEX_JWT.
+function isRefreshToken(value) {
+  return typeof value === "string" && value.startsWith("tlxr_");
+}
+
+/**
+ * Hvordan vi logger inn, ut fra hva som faktisk er satt.
+ * Returnerer { kind: "refresh" | "tokenPair" | "none", ... }
+ */
+export function credentialKind() {
+  const { jwt, consumerToken, employeeToken } = credentials();
+  if (isRefreshToken(jwt)) return { kind: "refresh", refreshToken: jwt };
+  // Alt annet i TRIPLETEX_JWT behandles som et employee token.
+  const employee = employeeToken || jwt;
+  if (employee) return { kind: "tokenPair", employeeToken: employee, consumerToken };
+  return { kind: "none" };
+}
+
 export function hasCredentials() {
-  const { jwt, employeeToken } = credentials();
-  return Boolean(jwt || employeeToken);
+  return credentialKind().kind !== "none";
 }
 
 export function resetSession() {
@@ -85,67 +106,82 @@ export function resetSession() {
   sessionInFlight = null;
 }
 
+function readSessionToken(text, status) {
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new TripletexError("Uventet svar ved innlogging mot Tripletex.", status, text);
+  }
+  const token = parsed?.value?.token ?? parsed?.token;
+  if (!token) throw new TripletexError("Innloggingen ga ingen session token.", status, text);
+  return token;
+}
+
 async function createSession() {
-  const { jwt, consumerToken, employeeToken } = credentials();
-  if (!jwt && !employeeToken) {
+  const cred = credentialKind();
+  if (cred.kind === "none") {
     throw new TripletexError(
-      "Tripletex-nøkkel mangler. Sett TRIPLETEX_JWT i Railway (lages i Tripletex under Selskap → API-tokens).",
+      "Tripletex-nøkkel mangler. Sett TRIPLETEX_JWT i Railway – nøkkelen lages i Tripletex under Selskap → API-tokens.",
       0,
       ""
     );
   }
 
-  if (jwt) {
+  if (cred.kind === "refresh") {
     const res = await fetch(`${baseUrl()}/token/session/:createFromRefreshToken`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ refreshToken: jwt, ttlSeconds: SESSION_TTL_SECONDS }),
+      body: JSON.stringify({ refreshToken: cred.refreshToken, ttlSeconds: SESSION_TTL_SECONDS }),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     const text = await res.text();
     if (!res.ok) {
-      // Ta med Tripletex sin egen forklaring. Uten den blir en presis feil
-      // ("ttlSeconds er utenfor lovlig område") til et gjett om feil nøkkel.
-      const notes = [`Tripletex avviste innloggingen (HTTP ${res.status})`, explain(text)];
-      if (!jwt.startsWith("tlxr_")) {
-        notes.push(
-          "Merk: TRIPLETEX_JWT starter ikke med «tlxr_». Er det riktig verdi som er limt inn?"
-        );
-      }
-      throw new TripletexError(notes.filter(Boolean).join(". "), res.status, text);
+      // Ta alltid med Tripletex sin egen forklaring – den er mer presis enn
+      // noe vi kan gjette oss til.
+      throw new TripletexError(
+        `Tripletex avviste refresh tokenet (HTTP ${res.status}). ${explain(text)}`.trim(),
+        res.status,
+        text
+      );
     }
-    let parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      throw new TripletexError("Uventet svar ved innlogging mot Tripletex.", res.status, text);
-    }
-    const token = parsed?.value?.token ?? parsed?.token;
-    if (!token) throw new TripletexError("Innloggingen ga ingen session token.", res.status, text);
-    return { token, expiresAtMs: Date.now() + SESSION_TTL_SECONDS * 1000 - RENEW_MARGIN_MS };
+    return {
+      token: readSessionToken(text, res.status),
+      expiresAtMs: Date.now() + SESSION_TTL_SECONDS * 1000 - RENEW_MARGIN_MS,
+    };
   }
 
-  // Consumer + employee token. Disse utløper ved midnatt CET på expirationDate.
+  // Employee token, eventuelt sammen med et consumer token. Session token fra
+  // denne veien utløper ved midnatt CET på expirationDate.
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const expirationDate = tomorrow.toISOString().slice(0, 10);
-  const url =
-    `${baseUrl()}/token/session/:create` +
-    `?consumerToken=${encodeURIComponent(consumerToken)}` +
-    `&employeeToken=${encodeURIComponent(employeeToken)}` +
-    `&expirationDate=${expirationDate}`;
-  const res = await fetch(url, { method: "PUT", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+  const res = await fetch(`${baseUrl()}/token/session/:create`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      employeeToken: cred.employeeToken,
+      consumerToken: cred.consumerToken || "",
+      expirationDate,
+    }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
   const text = await res.text();
   if (!res.ok) {
-    throw new TripletexError(
-      `Tripletex avviste tokenene (HTTP ${res.status}). ${explain(text)}`.trim(),
-      res.status,
-      text
-    );
+    const notes = [`Tripletex avviste nøkkelen (HTTP ${res.status})`, explain(text)];
+    if (!cred.consumerToken) {
+      notes.push(
+        "Verdien ble tolket som et employee token, og da kreves som regel også et consumer token. " +
+          "Enklere vei: lag et refresh token under Selskap → API-tokens i Tripletex (starter med «tlxr_») " +
+          "og bruk det som TRIPLETEX_JWT – da trengs ingen consumer token"
+      );
+    }
+    throw new TripletexError(notes.filter(Boolean).join(". "), res.status, text);
   }
-  const token = JSON.parse(text)?.value?.token;
-  if (!token) throw new TripletexError("Innloggingen ga ingen session token.", res.status, text);
-  return { token, expiresAtMs: new Date(`${expirationDate}T00:00:00`).getTime() };
+  return {
+    token: readSessionToken(text, res.status),
+    expiresAtMs: new Date(`${expirationDate}T00:00:00`).getTime(),
+  };
 }
 
 // Gyldig session token. Samtidige kall deler på samme innlogging.
