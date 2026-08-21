@@ -481,11 +481,16 @@ function renderHero(d) {
     { label: "Forfalt", value: nok(k.overdueTotal), cls: k.overdueTotal > 0 ? "bad" : "" },
     { label: "Aktive prosjekter", value: k.activeProjects },
     { label: "Timer denne mnd.", value: num(k.hoursThisMonth) },
-    { label: "Snitt faktureringsgrad", value: pct(k.avgBillingRate) },
+    {
+      label: "Faktureringsgrad (4 uker)",
+      value: pct(k.avgBillingRate),
+      // Grunnlaget synlig på hover, så tallet kan ettergås mot Tripletex.
+      hint: `${num(k.billableHours4w, 1)} fakturerbare av ${num(k.totalHours4w, 1)} førte timer siste 4 uker`,
+    },
     { label: "Ledig kapasitet", value: `${k.freeCapacityCount} ansatte` },
   ];
   document.getElementById("heroKpis").innerHTML = chips.map((c) =>
-    `<div class="hero-kpi"><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${c.value}</div></div>`
+    `<div class="hero-kpi"${c.hint ? ` title="${c.hint}"` : ""}><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${c.value}</div></div>`
   ).join("");
 
   // Adresse + vær

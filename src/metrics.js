@@ -115,7 +115,9 @@ export async function buildOverview() {
     byEmp.set(key, cur);
   }
   const billing = [...byEmp.values()]
-    .filter((e) => e.hours > 0)
+    // Timeføringer uten kjent ansatt hører ikke hjemme i en per-ansatt-liste, og
+    // ville dessuten telt med i snittet. Økonomi-fanen filtrerer dem alt bort.
+    .filter((e) => e.hours > 0 && e.name && e.name !== "Ukjent")
     .map((e) => {
       const billingRate = e.hours > 0 ? e.billable / e.hours : 0; // faktureringsgrad
       const utilization = capacity4w > 0 ? e.billable / capacity4w : 0; // mot kapasitet
@@ -133,8 +135,13 @@ export async function buildOverview() {
     })
     .sort((a, b) => a.billingRate - b.billingRate); // lavest faktureringsgrad (ledig) først
 
-  const avgBillingRate =
-    billing.length > 0 ? billing.reduce((s, e) => s + e.billingRate, 0) / billing.length : 0;
+  // Selskapets faktureringsgrad er summen av fakturerbare timer delt på summen av
+  // førte timer – ikke gjennomsnittet av de ansattes hver for seg. Med et snitt av
+  // prosenter teller én som har ført 3 timer like mye som én som har ført 150, og
+  // tallet blir misvisende lavt. Økonomi-fanen har alltid regnet det slik.
+  const billableHours4w = billing.reduce((s, e) => s + e.billable, 0);
+  const totalHours4w = billing.reduce((s, e) => s + e.hours, 0);
+  const avgBillingRate = totalHours4w > 0 ? billableHours4w / totalHours4w : 0;
   const freeCapacityCount = billing.filter((e) => e.billingRate < 0.6).length;
 
   // ---- Faktureringsgrad siste 7 dager, per ansatt (til kapasitet-stripa) ----
@@ -369,6 +376,9 @@ export async function buildOverview() {
       hoursThisMonth,
       chargeableHoursThisMonth: chargeableThisMonth,
       avgBillingRate,
+      // Grunnlaget bak snittet, så tallet kan ettergås mot Tripletex.
+      billableHours4w,
+      totalHours4w,
       freeCapacityCount,
     },
     monthlyRevenue,

@@ -178,5 +178,33 @@ export async function runConnectionTests() {
     }
   );
 
+  // Grunnlaget bak faktureringsgraden, så tallet kan holdes opp mot Tripletex
+  // sin egen timerapport for samme periode i stedet for å måtte tros på.
+  await step(
+    "Kryssjekk faktureringsgrad",
+    "Stemmer ikke timene med Tripletex, er det perioden eller hvem som telles med som avviker – ikke selve timeføringen.",
+    async () => {
+      const data = await apiGet("/timesheet/entry", {
+        dateFrom: ymdOffset(-28),
+        dateTo: ymdOffset(1),
+        from: 0,
+        count: 1000,
+        fields: "id,hours,chargeableHours,employee(id)",
+      });
+      const rows = data?.values || [];
+      const hours = rows.reduce((s, r) => s + (r.hours || 0), 0);
+      const billable = rows.reduce((s, r) => s + (r.chargeableHours || 0), 0);
+      const people = new Set(rows.map((r) => r.employee?.id).filter((x) => x != null)).size;
+      const rate = hours > 0 ? Math.round((billable / hours) * 100) : 0;
+      const truncated = (data?.fullResultSize ?? rows.length) > rows.length;
+      const nb = (n) => n.toLocaleString("nb-NO", { maximumFractionDigits: 1 });
+      return (
+        `Siste 4 uker: ${nb(billable)} fakturerbare av ${nb(hours)} førte timer = ${rate} %, ` +
+        `fordelt på ${people} ansatte.` +
+        (truncated ? " Merk: bare de første 1000 timeføringene er med i denne kontrollen." : "")
+      );
+    }
+  );
+
   return { ok: !failed, checkedAt: new Date().toISOString(), steps };
 }
