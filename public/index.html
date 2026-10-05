@@ -85,6 +85,7 @@
         <div class="nav-group-items">
           <button class="tab" data-tab="kiagenter">KI-agenter</button>
           <button class="tab" data-tab="kvalitet">Kvalitetssikring</button>
+          <button class="tab" data-tab="kssystem" id="tabKsSystem" hidden>KS-system</button>
           <button class="tab" data-tab="itsystem">IT-system</button>
           <button class="tab" data-tab="office365">Office 365</button>
           <button class="tab" data-tab="mcpkeys">MCP-nøkler 🔒</button>
@@ -1483,6 +1484,15 @@ cd ~/pitzDaily &amp;&amp; blockMesh &amp;&amp; simpleFoam &amp;&amp; paraFoam</p
     </main>
   </section>
 
+  <!-- ============ FANE: KS-SYSTEM ============ -->
+  <!-- KS kjører som egen app og speiles under /ks, slik at den deler opphav og
+       innlogging med dashbordet. Rammen lastes først når fanen åpnes. -->
+  <section class="tab-panel" id="panel-kssystem">
+    <div class="ks-ramme">
+      <iframe id="ksFrame" title="KS BYGG-KON" src="about:blank"></iframe>
+    </div>
+  </section>
+
   <!-- ============ FANE: RAPPORTER ============ -->
   <section class="tab-panel" id="panel-rapporter">
     <main class="container">
@@ -1850,6 +1860,7 @@ cd ~/pitzDaily &amp;&amp; blockMesh &amp;&amp; simpleFoam &amp;&amp; paraFoam</p
   <script src="/rib.js"></script>
   <script src="/ansatte-dashboard.js"></script>
   <script src="/logg.js"></script>
+  <script src="/kssystem.js"></script>
   <script type="module" src="/bim.js"></script>
 </body>
 </html>

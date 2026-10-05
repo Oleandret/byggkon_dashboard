@@ -10,37 +10,49 @@
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body class="login-body">
-  <div class="login-card">
-    <div class="login-logo">BYGG-KON</div>
-    <p class="login-sub">Internt driftsdashboard</p>
+  <aside class="login-merke">
+    <div class="login-ordmerke">BYGG-KON</div>
+    <p class="login-slagord">Alt om driften på ett sted.</p>
+    <ul class="login-punkter">
+      <li>Prosjekter, timer og økonomi i sanntid</li>
+      <li>Kvalitetssystem, avvik og sjekklister</li>
+      <li>Nova, Hilde og Loki</li>
+    </ul>
+    <p class="login-fot">Rådgivende ingeniører og arkitekter · Forus, Stavanger</p>
+  </aside>
 
-    <!-- Microsoft OAuth (vises kun når konfigurert) -->
-    <div id="msSignIn" hidden>
-      <a class="ms-signin" href="/auth/microsoft">
-        <svg viewBox="0 0 23 23" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <rect x="1" y="1" width="10" height="10" fill="#f25022"/>
-          <rect x="12" y="1" width="10" height="10" fill="#7fba00"/>
-          <rect x="1" y="12" width="10" height="10" fill="#00a4ef"/>
-          <rect x="12" y="12" width="10" height="10" fill="#ffb900"/>
-        </svg>
-        <span>Logg inn med Microsoft</span>
-      </a>
-      <p class="ms-hint">Kun ansatte med <b>@byggkon.no</b>-konto har tilgang.</p>
+  <main class="login-panel">
+    <div class="login-card">
+      <div class="login-logo">BYGG-KON</div>
+      <h1 class="login-tittel">Logg inn</h1>
+      <p class="login-sub">Internt driftsdashboard</p>
+
+      <p id="error" class="login-error" hidden></p>
+
+      <!-- Microsoft OAuth (vises kun når konfigurert) -->
+      <div id="msSignIn" hidden>
+        <a class="ms-signin" href="/auth/microsoft">
+          <svg viewBox="0 0 23 23" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <rect x="1" y="1" width="10" height="10" fill="#f25022"/>
+            <rect x="12" y="1" width="10" height="10" fill="#7fba00"/>
+            <rect x="1" y="12" width="10" height="10" fill="#00a4ef"/>
+            <rect x="12" y="12" width="10" height="10" fill="#ffb900"/>
+          </svg>
+          <span>Logg inn med Microsoft</span>
+        </a>
+        <p class="ms-hint">Kun ansatte med <b>@byggkon.no</b>-konto har tilgang.</p>
+      </div>
+
+      <!-- Felles passord (vises kun når OAuth IKKE er konfigurert) -->
+      <form id="pwForm" method="POST" action="/login" hidden>
+        <label for="password">Felles passord</label>
+        <input type="password" id="password" name="password" autofocus required
+               placeholder="Skriv inn felles passord" />
+        <button type="submit">Logg inn</button>
+        <p class="ms-hint">Microsoft-innlogging er ikke satt opp ennå. Be IT-ansvarlig konfigurere Entra-appen.</p>
+      </form>
     </div>
-
-    <!-- Felles passord (vises kun når OAuth IKKE er konfigurert) -->
-    <form id="pwForm" method="POST" action="/login" hidden>
-      <label for="password">Felles passord</label>
-      <input type="password" id="password" name="password" autofocus required
-             placeholder="Skriv inn felles passord" />
-      <button type="submit">Logg inn</button>
-      <p class="ms-hint" style="margin-top:10px;color:var(--muted)">
-        ⚠ Microsoft-innlogging er ikke konfigurert ennå. Be IT-ansvarlig sette opp Azure-appen.
-      </p>
-    </form>
-
-    <p id="error" class="login-error" hidden></p>
-  </div>
+  </main>
   <script>
     // Vis riktig innloggingsform basert på om OAuth er aktivert
     fetch("/api/auth/config").then((r) => r.json()).then((d) => {
@@ -70,7 +82,7 @@
         "state-mismatch": "Sesjon utløpt — prøv på nytt.",
         "token-exchange": "Klarte ikke å validere innloggingen.",
         "userinfo": "Klarte ikke å hente brukerinfo.",
-        "wrong-domain": got ? `❌ Kun @byggkon.no-kontoer kan logge inn. Du brukte @${got}.` : "Kun @byggkon.no-kontoer kan logge inn.",
+        "wrong-domain": got ? `Kun @byggkon.no-kontoer kan logge inn. Du brukte @${got}.` : "Kun @byggkon.no-kontoer kan logge inn.",
         "oauth-disabled": "Microsoft-innlogging er ikke konfigurert ennå.",
         "password-disabled": "Passord-innlogging er deaktivert. Bruk Microsoft-knappen ovenfor for å logge inn med din @byggkon.no-konto.",
         "server": "Serverfeil — prøv igjen.",

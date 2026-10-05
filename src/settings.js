@@ -43,6 +43,11 @@ function defaults() {
     // "test" kaller api-test.tripletex.tech i stedet for produksjon.
     tripletexEnv: process.env.TRIPLETEX_ENV || "",
     dashboardPassword: process.env.DASHBOARD_PASSWORD || "byggkon",
+    // KS-systemet vises som fane her, speilet under /ks. Hemmeligheten må være
+    // identisk med DASHBOARD_SSO_SECRET i KS — den er det som lar KS stole på
+    // at brukeren allerede er logget inn her.
+    ksUrl: process.env.KS_URL || "",
+    ksSsoSecret: process.env.KS_SSO_SECRET || "",
     weeklyCapacityHours: Number(process.env.WEEKLY_CAPACITY_HOURS || 37.5),
     cacheTtlMs: Number(process.env.CACHE_TTL_MS || 5 * 60 * 1000),
     refreshSeconds: Number(process.env.REFRESH_SECONDS || 60),
@@ -485,6 +490,8 @@ export function getConfigForAdmin() {
     hasTripletexTokenPair: Boolean(c.tripletexConsumerToken && c.tripletexEmployeeToken),
     tripletexEnv: c.tripletexEnv || "",
     hasDashboardPassword: Boolean(c.dashboardPassword),
+    ksUrl: c.ksUrl || "",
+    hasKsSsoSecret: Boolean(c.ksSsoSecret),
     weeklyCapacityHours: c.weeklyCapacityHours,
     cacheTtlMs: c.cacheTtlMs,
     refreshSeconds: c.refreshSeconds,

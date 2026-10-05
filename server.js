@@ -14,6 +14,7 @@ import { serveWithSnapshot, expireSnapshots, startBackgroundWarmer, getSnapshot,
 const snapTtl = () => getConfig().cacheTtlMs || 300000;
 import { getConfig, saveConfig, getConfigForAdmin, SETTINGS_PATH } from "./src/settings.js";
 import { runConnectionTests } from "./src/diagnostics.js";
+import { ksProxy, ksKlar, KS_PREFIX } from "./src/ksproxy.js";
 
 // Mappe for opplastede filer (ved siden av innstillingsfila – legg på Volume på Railway).
 const UPLOAD_DIR = path.join(path.dirname(SETTINGS_PATH), "uploads");
@@ -27,8 +28,6 @@ const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin-bytt-meg";
 const SESSION_SECRET = process.env.SESSION_SECRET || "bytt-meg-til-en-lang-tilfeldig-streng";
 
-app.use(express.urlencoded({ extended: false }));
-app.use(express.json({ limit: "15mb" })); // rom for opplastede bilder (base64)
 app.use(
   cookieSession({
     name: "bk_session",
@@ -38,6 +37,14 @@ app.use(
     sameSite: "lax",
   })
 );
+
+// KS-fanen speiles her. Den står før body-parserne med vilje: proxyen sender
+// forespørselen videre slik den kom inn, også filopplastinger, og da må
+// strømmen være urørt.
+app.use(KS_PREFIX, (req, res, next) => requireAuth(req, res, next), ksProxy);
+
+app.use(express.urlencoded({ extended: false }));
+app.use(express.json({ limit: "15mb" })); // rom for opplastede bilder (base64)
 
 // Opplastede filer (krever innlogging – samme cookie som dashbordet)
 app.use("/uploads", (req, res, next) => requireAuth(req, res, next), express.static(UPLOAD_DIR));
@@ -54,6 +61,10 @@ function requireAdmin(req, res, next) {
 }
 
 // ---- Ansatt-innlogging ----
+// Stilarket serveres før innloggingsvakta. Den gated static-mounten nederst
+// dekker hele public/, så /styles.css svarte 302 til /login og begge
+// innloggingssidene ble tegnet helt ustilt. Filen inneholder bare stil.
+app.get("/styles.css", (req, res) => res.sendFile(path.join(__dirname, "public", "styles.css")));
 app.get("/login", (req, res) => res.sendFile(path.join(__dirname, "public", "login.html")));
 app.post("/login", (req, res) => {
   // Når Microsoft OAuth er konfigurert er passord-pålogging deaktivert —
@@ -465,6 +476,10 @@ app.get("/api/me", requireAuth, (req, res) => {
     isAdmin: !!req.session?.isAdmin,
   });
 });
+
+// KS-fanen skjules helt når speilingen ikke er satt opp, slik at ingen klikker
+// seg inn i en tom ramme.
+app.get("/api/ks/status", requireAuth, (req, res) => res.json({ klar: ksKlar() }));
 
 // ---- Admin-innlogging ----
 app.get("/admin/login", (req, res) => res.sendFile(path.join(__dirname, "views", "admin-login.html")));
